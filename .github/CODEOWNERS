@@ -1,0 +1,88 @@
+# CODEOWNERS file for Cairo
+# 
+# This file defines who is responsible for reviewing changes to different parts of the codebase.
+# When a pull request is opened, GitHub will automatically request reviews from the specified owners.
+#
+# Learn more: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global ownership - @anianroid owns everything by default
+* @anianroid
+
+# Documentation - Critical for open source project
+*.md @anianroid
+docs/ @anianroid
+.github/ @anianroid
+
+# Core application files
+package.json @anianroid
+package-lock.json @anianroid
+server.js @anianroid
+src/app.js @anianroid
+
+# Configuration and deployment
+.env.example @anianroid
+railway.json @anianroid
+Dockerfile @anianroid
+nodemon.json @anianroid
+
+# Database and migrations - Critical for data integrity
+src/migrations/ @anianroid
+src/utils/db.js @anianroid
+
+# Core services - Business logic
+src/services/ @anianroid
+
+# API routes - External interface
+src/routes/ @anianroid
+
+# Lead scoring system - Core feature
+src/services/leadScoringService.js @anianroid
+src/routes/scoringRoutes.js @anianroid
+
+# Data synchronization - Core feature  
+src/services/lemlistService.js @anianroid
+src/services/smartleadService.js @anianroid
+src/services/attioService.js @anianroid
+src/routes/syncRoutes.js @anianroid
+src/routes/newSyncRoutes.js @anianroid
+
+# Enrichment services - Important for data quality
+src/services/apolloService.js @anianroid
+src/services/hunterService.js @anianroid
+src/services/aiEnrichmentService.js @anianroid
+src/services/enrichmentService.js @anianroid
+
+# Event tracking and analytics
+src/services/mixpanelService.js @anianroid
+src/routes/productEventRoutes.js @anianroid
+
+# Background jobs and automation
+src/routes/backgroundJobRoutes.js @anianroid
+src/routes/periodicSyncRoutes.js @anianroid
+src/config/cron.js @anianroid
+
+# Security and monitoring
+src/utils/sentry.js @anianroid
+src/utils/monitoring.js @anianroid
+src/utils/logger.js @anianroid
+
+# Testing and quality assurance
+src/routes/testRoutes.js @anianroid
+
+# API documentation
+cairo-api-collection.json @anianroid
+
+# Frontend/Dashboard
+src/views/ @anianroid
+src/routes/dashboardRoutes.js @anianroid
+
+# Utilities and helpers
+src/utils/ @anianroid
+
+# Data stores and state management
+src/stores/ @anianroid
+
+# Specific critical files that always need review
+CONTRIBUTING.md @anianroid
+LICENSE @anianroid
+CODE_OF_CONDUCT.md @anianroid
