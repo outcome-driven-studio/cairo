@@ -1,0 +1,1067 @@
+{
+  "info": {
+    "name": "Cairo API Collection",
+    "description": "Complete API collection for Cairo - Open Source Customer Data Platform. This collection includes all endpoints for data synchronization, lead scoring, event tracking, and system monitoring.",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "🏥 Health & System",
+      "description": "System health checks and monitoring endpoints",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "General health check endpoint that returns database status and system health. Used by load balancers and monitoring systems."
+          },
+          "response": []
+        },
+        {
+          "name": "Detailed Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health/detailed",
+              "host": ["{{base_url}}"],
+              "path": ["health", "detailed"]
+            },
+            "description": "Comprehensive health check with detailed system information including database connections, service status, and performance metrics."
+          },
+          "response": []
+        },
+        {
+          "name": "Simple Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health/simple",
+              "host": ["{{base_url}}"],
+              "path": ["health", "simple"]
+            },
+            "description": "Lightweight health check for Railway deployment that doesn't require database connection. Returns basic service status."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Unique Recipients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/recipients",
+              "host": ["{{base_url}}"],
+              "path": ["recipients"]
+            },
+            "description": "Retrieves all unique email recipients from both Lemlist and Smartlead campaigns. Useful for audience analysis and data verification."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📊 Dashboard",
+      "description": "Dashboard UI and stats endpoints",
+      "item": [
+        {
+          "name": "Dashboard UI",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "Serves the main dashboard HTML interface for monitoring and controlling Cairo operations."
+          },
+          "response": []
+        },
+        {
+          "name": "Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "stats"]
+            },
+            "description": "Returns comprehensive dashboard statistics including user counts, event metrics, scoring statistics, and system performance data."
+          },
+          "response": []
+        },
+        {
+          "name": "Run Sync from Dashboard",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"force\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/sync/:type",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sync", ":type"],
+              "variable": [
+                {
+                  "key": "type",
+                  "value": "lemlist",
+                  "description": "Type of sync: 'lemlist', 'smartlead', or 'full'"
+                }
+              ]
+            },
+            "description": "Triggers a synchronization operation from the dashboard. Supports different sync types: lemlist, smartlead, or full sync."
+          },
+          "response": []
+        },
+        {
+          "name": "Check Sync Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/check/:type",
+              "host": ["{{base_url}}"],
+              "path": ["api", "check", ":type"],
+              "variable": [
+                {
+                  "key": "type",
+                  "value": "lemlist",
+                  "description": "Type to check: 'lemlist', 'smartlead', 'apollo', 'hunter', or 'database'"
+                }
+              ]
+            },
+            "description": "Checks the status and configuration of various services. Returns connection status, API key validity, and service health."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔄 Legacy Sync",
+      "description": "Original sync endpoints (legacy)",
+      "item": [
+        {
+          "name": "Initial Sync",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"force\": false,\n  \"dryRun\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/sync/initial-sync",
+              "host": ["{{base_url}}"],
+              "path": ["sync", "initial-sync"]
+            },
+            "description": "Performs initial synchronization of all data from Lemlist and Smartlead. This is typically run once to import historical data."
+          },
+          "response": []
+        },
+        {
+          "name": "Lemlist Delta Sync",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"since\": \"2024-01-01T00:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/sync/lemlist-delta",
+              "host": ["{{base_url}}"],
+              "path": ["sync", "lemlist-delta"]
+            },
+            "description": "Synchronizes only new Lemlist data since the last sync. More efficient for regular updates."
+          },
+          "response": []
+        },
+        {
+          "name": "Smartlead Delta Sync",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"since\": \"2024-01-01T00:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/sync/smartlead-delta",
+              "host": ["{{base_url}}"],
+              "path": ["sync", "smartlead-delta"]
+            },
+            "description": "Synchronizes only new Smartlead data since the last sync. More efficient for regular updates."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🆕 New Sync API (v1)",
+      "description": "Improved sync endpoints with better performance and features",
+      "item": [
+        {
+          "name": "New Initial Sync",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"force\": false,\n  \"includeArchived\": false,\n  \"batchSize\": 100\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/sync/initial-sync",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "sync", "initial-sync"]
+            },
+            "description": "Enhanced initial sync with improved error handling, batching, and progress tracking. Includes better deduplication and data validation."
+          },
+          "response": []
+        },
+        {
+          "name": "Batch Smartlead Sync",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaignIds\": [\"12345\", \"67890\"],\n  \"batchSize\": 50,\n  \"includeEvents\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/sync/batch-smartlead-sync",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "sync", "batch-smartlead-sync"]
+            },
+            "description": "Optimized batch synchronization for Smartlead campaigns with configurable batch sizes and selective campaign syncing."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "⚙️ Background Jobs",
+      "description": "Asynchronous background processing endpoints",
+      "item": [
+        {
+          "name": "Sync Users (Background)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"all\",\n  \"enrichment\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/sync/users-background",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sync", "users-background"]
+            },
+            "description": "Starts background synchronization of user data with optional enrichment. Returns immediately with job ID for tracking."
+          },
+          "response": []
+        },
+        {
+          "name": "Sync Events (Background)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"all\",\n  \"daysBack\": 30\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/sync/events-background",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sync", "events-background"]
+            },
+            "description": "Starts background synchronization of event data. Useful for large datasets that require async processing."
+          },
+          "response": []
+        },
+        {
+          "name": "Full Background Sync",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"includeEnrichment\": true,\n  \"forceRefresh\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/sync/full-background",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sync", "full-background"]
+            },
+            "description": "Comprehensive background sync including users, events, and enrichment. Best for major data refreshes."
+          },
+          "response": []
+        },
+        {
+          "name": "Calculate Scores (Background)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scoreType\": \"both\",\n  \"forceRecalculate\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/scoring/calculate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "scoring", "calculate"]
+            },
+            "description": "Calculates lead scores in background. scoreType can be 'behavior', 'icp', or 'both'."
+          },
+          "response": []
+        },
+        {
+          "name": "Sync Scores to Attio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"minBehaviorScore\": 1,\n  \"onlyNewScores\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/scoring/sync-to-attio",
+              "host": ["{{base_url}}"],
+              "path": ["api", "scoring", "sync-to-attio"]
+            },
+            "description": "Syncs calculated scores to Attio CRM. Only syncs engaged leads (behavior score > minBehaviorScore)."
+          },
+          "response": []
+        },
+        {
+          "name": "Score and Sync",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scoreType\": \"both\",\n  \"syncToAttio\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/scoring/score-and-sync",
+              "host": ["{{base_url}}"],
+              "path": ["api", "scoring", "score-and-sync"]
+            },
+            "description": "Combined operation: calculates scores and immediately syncs to Attio. Efficient for complete score updates."
+          },
+          "response": []
+        },
+        {
+          "name": "Master Score All",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"includeEnrichment\": true,\n  \"syncToAttio\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/scoring/master-score-all",
+              "host": ["{{base_url}}"],
+              "path": ["api", "scoring", "master-score-all"]
+            },
+            "description": "Complete scoring pipeline: enrichment → ICP scoring → behavior scoring → Attio sync. The most comprehensive operation."
+          },
+          "response": []
+        },
+        {
+          "name": "List Background Jobs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/jobs",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jobs"]
+            },
+            "description": "Lists all currently running and recently completed background jobs with their status and progress."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Job Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/jobs/status/:jobName",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jobs", "status", ":jobName"],
+              "variable": [
+                {
+                  "key": "jobName",
+                  "value": "sync-users-background",
+                  "description": "Name of the job to check"
+                }
+              ]
+            },
+            "description": "Gets detailed status of a specific background job including progress, errors, and performance metrics."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Job Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/jobs/logs/:jobName",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jobs", "logs", ":jobName"],
+              "variable": [
+                {
+                  "key": "jobName",
+                  "value": "sync-users-background",
+                  "description": "Name of the job to get logs for"
+                }
+              ]
+            },
+            "description": "Retrieves execution logs for a specific background job. Useful for debugging and monitoring."
+          },
+          "response": []
+        },
+        {
+          "name": "Stop Background Job",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/jobs/stop/:jobName",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jobs", "stop", ":jobName"],
+              "variable": [
+                {
+                  "key": "jobName",
+                  "value": "sync-users-background",
+                  "description": "Name of the job to stop"
+                }
+              ]
+            },
+            "description": "Gracefully stops a running background job. The job will complete its current operation before stopping."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "👥 External Profiles",
+      "description": "LinkedIn profile processing and enrichment",
+      "item": [
+        {
+          "name": "Process LinkedIn Profiles",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"profiles\": [\n    {\n      \"linkedinUrl\": \"https://linkedin.com/in/john-doe\",\n      \"email\": \"john.doe@example.com\",\n      \"name\": \"John Doe\"\n    }\n  ],\n  \"enrichmentOptions\": {\n    \"useAI\": true,\n    \"fallbackToHunter\": true\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/process-linkedin-profiles",
+              "host": ["{{base_url}}"],
+              "path": ["api", "process-linkedin-profiles"]
+            },
+            "description": "Processes LinkedIn profiles for enrichment and scoring. Supports AI-first enrichment with fallback to traditional APIs."
+          },
+          "response": []
+        },
+        {
+          "name": "Get External Profile Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/external-profiles/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "external-profiles", "status"]
+            },
+            "description": "Returns status of external profile processing including queue size, processing rates, and error counts."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📱 Product Events",
+      "description": "Event tracking and analytics endpoints",
+      "item": [
+        {
+          "name": "Track Single Event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user123\",\n  \"event\": \"page_view\",\n  \"properties\": {\n    \"page\": \"/dashboard\",\n    \"source\": \"direct\",\n    \"timestamp\": \"2024-01-15T10:30:00Z\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/events/track",
+              "host": ["{{base_url}}"],
+              "path": ["api", "events", "track"]
+            },
+            "description": "Tracks a single user event. Events are sent to Mixpanel and stored in the database for behavior scoring."
+          },
+          "response": []
+        },
+        {
+          "name": "Track Batch Events",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"events\": [\n    {\n      \"userId\": \"user123\",\n      \"event\": \"page_view\",\n      \"properties\": {\n        \"page\": \"/dashboard\"\n      }\n    },\n    {\n      \"userId\": \"user123\",\n      \"event\": \"button_click\",\n      \"properties\": {\n        \"button\": \"signup\"\n      }\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/events/batch",
+              "host": ["{{base_url}}"],
+              "path": ["api", "events", "batch"]
+            },
+            "description": "Efficiently tracks multiple events in a single request. Useful for bulk imports or real-time applications."
+          },
+          "response": []
+        },
+        {
+          "name": "Identify User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user123\",\n  \"traits\": {\n    \"email\": \"user@example.com\",\n    \"name\": \"John Doe\",\n    \"company\": \"Acme Corp\",\n    \"plan\": \"premium\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/events/identify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "events", "identify"]
+            },
+            "description": "Associates user traits with a user ID. Creates or updates user profiles in Mixpanel and the database."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Event Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/events/stats?days=30",
+              "host": ["{{base_url}}"],
+              "path": ["api", "events", "stats"],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "30",
+                  "description": "Number of days to include in stats"
+                }
+              ]
+            },
+            "description": "Returns event statistics including event counts, unique users, and trending events for the specified time period."
+          },
+          "response": []
+        },
+        {
+          "name": "Events Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/events/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "events", "health"]
+            },
+            "description": "Checks health of event tracking services including Mixpanel, Attio, and database connections."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "⏰ Periodic Sync",
+      "description": "Automated sync scheduling and management",
+      "item": [
+        {
+          "name": "Start Periodic Sync",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"behaviorInterval\": 4,\n  \"icpInterval\": 168,\n  \"enabled\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/periodic-sync/start",
+              "host": ["{{base_url}}"],
+              "path": ["api", "periodic-sync", "start"]
+            },
+            "description": "Starts the periodic sync scheduler. behaviorInterval in hours (default 4), icpInterval in hours (default 168 = weekly)."
+          },
+          "response": []
+        },
+        {
+          "name": "Stop Periodic Sync",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/periodic-sync/stop",
+              "host": ["{{base_url}}"],
+              "path": ["api", "periodic-sync", "stop"]
+            },
+            "description": "Stops the periodic sync scheduler. Currently running jobs will complete before stopping."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Periodic Sync Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/periodic-sync/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "periodic-sync", "status"]
+            },
+            "description": "Returns current status of periodic sync including next scheduled runs, active jobs, and configuration."
+          },
+          "response": []
+        },
+        {
+          "name": "Force Sync Now",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"full\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/periodic-sync/sync-now",
+              "host": ["{{base_url}}"],
+              "path": ["api", "periodic-sync", "sync-now"]
+            },
+            "description": "Manually triggers a sync operation. Type can be 'full', 'behavior', or 'icp'. Runs immediately regardless of schedule."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Sync History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/periodic-sync/history?limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "periodic-sync", "history"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Number of history records to return"
+                }
+              ]
+            },
+            "description": "Returns history of sync operations including execution times, success rates, and error details."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Last Sync Times",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/periodic-sync/last-sync-times",
+              "host": ["{{base_url}}"],
+              "path": ["api", "periodic-sync", "last-sync-times"]
+            },
+            "description": "Returns timestamps of the last successful sync operations for each sync type."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Sync Schedules",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/periodic-sync/schedules",
+              "host": ["{{base_url}}"],
+              "path": ["api", "periodic-sync", "schedules"]
+            },
+            "description": "Returns current sync schedules and next execution times for behavior and ICP scoring."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Sync Config",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"behaviorInterval\": 6,\n  \"icpInterval\": 168,\n  \"minBehaviorScore\": 1,\n  \"enabled\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/periodic-sync/config",
+              "host": ["{{base_url}}"],
+              "path": ["api", "periodic-sync", "config"]
+            },
+            "description": "Updates periodic sync configuration including intervals and scoring thresholds."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🧪 Testing",
+      "description": "API testing and integration validation",
+      "item": [
+        {
+          "name": "Test Apollo Enrichment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"tim@apollo.io\",\n  \"name\": \"Tim Zheng\",\n  \"companyDomain\": \"apollo.io\",\n  \"testCompany\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/test/apollo",
+              "host": ["{{base_url}}"],
+              "path": ["api", "test", "apollo"]
+            },
+            "description": "Tests Apollo API integration with person and company enrichment. Returns enrichment results and API usage statistics."
+          },
+          "response": []
+        },
+        {
+          "name": "Test Apollo Usage",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/test/apollo/usage",
+              "host": ["{{base_url}}"],
+              "path": ["api", "test", "apollo", "usage"]
+            },
+            "description": "Returns Apollo API usage statistics including credits used, remaining credits, and rate limit status."
+          },
+          "response": []
+        },
+        {
+          "name": "Test Hunter Enrichment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@hunter.io\",\n  \"company\": \"Hunter\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/test/hunter",
+              "host": ["{{base_url}}"],
+              "path": ["api", "test", "hunter"]
+            },
+            "description": "Tests Hunter API integration for email verification and company enrichment."
+          },
+          "response": []
+        },
+        {
+          "name": "Test Enrichment with Fallback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"company\": \"Example Corp\",\n  \"testAI\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/test/enrichment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "test", "enrichment"]
+            },
+            "description": "Tests the complete enrichment pipeline with AI-first approach and fallback to Hunter/Apollo. Shows cost-optimization strategy."
+          },
+          "response": []
+        },
+        {
+          "name": "Test Database Connection",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/test/database",
+              "host": ["{{base_url}}"],
+              "path": ["api", "test", "database"]
+            },
+            "description": "Tests database connectivity and performs basic operations to ensure proper database configuration."
+          },
+          "response": []
+        },
+        {
+          "name": "Test Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/test/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "test", "health"]
+            },
+            "description": "Comprehensive health check of all services including APIs, database, and external integrations."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📊 Scoring",
+      "description": "Lead scoring and calculation endpoints",
+      "item": [
+        {
+          "name": "Scoring Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/scoring/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "scoring", "health"]
+            },
+            "description": "Checks health of scoring system including enrichment services and scoring configuration."
+          },
+          "response": []
+        },
+        {
+          "name": "Fix Zero Scores",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scoreType\": \"icp\",\n  \"limit\": 100\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/scoring/fix-zero-scores",
+              "host": ["{{base_url}}"],
+              "path": ["api", "scoring", "fix-zero-scores"]
+            },
+            "description": "Identifies and recalculates users with zero scores. Useful for fixing incomplete scoring operations."
+          },
+          "response": []
+        },
+        {
+          "name": "Recalculate All Scores",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scoreType\": \"both\",\n  \"forceRecalculate\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/scoring/recalculate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "scoring", "recalculate"]
+            },
+            "description": "Recalculates scores for all users. scoreType can be 'behavior', 'icp', or 'both'. Use forceRecalculate to override existing scores."
+          },
+          "response": []
+        },
+        {
+          "name": "Recalculate User Score",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scoreType\": \"both\",\n  \"enrichIfNeeded\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/scoring/recalculate/:email",
+              "host": ["{{base_url}}"],
+              "path": ["api", "scoring", "recalculate", ":email"],
+              "variable": [
+                {
+                  "key": "email",
+                  "value": "user@example.com",
+                  "description": "Email address of the user to recalculate"
+                }
+              ]
+            },
+            "description": "Recalculates scores for a specific user. Optionally enriches user data if needed for ICP scoring."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Scoring Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/scoring/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "scoring", "stats"]
+            },
+            "description": "Returns comprehensive scoring statistics including score distributions, enrichment rates, and system performance."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3001",
+      "description": "Base URL for the Cairo API. Change to your deployment URL."
+    }
+  ]
+}

@@ -328,14 +328,29 @@ curl -X POST http://localhost:3001/api/process-linkedin-profiles \
 
 ### Postman Collection
 
-Import the complete API collection for easy testing:
+Import the complete API collection for easy testing and development:
 
-📥 **[Download Postman Collection](./cairo-complete-postman-collection.json)**
+📥 **[Download Postman Collection](./cairo-api-collection.json)**
 
-After importing:
+**What's Included:**
 
-1. Update the `base_url` variable to your deployment URL
-2. Set any required API keys in the environment variables
+- 🏥 **Health & System** - Health checks and monitoring
+- 📊 **Dashboard** - Dashboard UI and stats endpoints
+- 🔄 **Legacy Sync** - Original sync endpoints
+- 🆕 **New Sync API (v1)** - Enhanced sync with better performance
+- ⚙️ **Background Jobs** - Asynchronous processing endpoints
+- 👥 **External Profiles** - LinkedIn profile processing
+- 📱 **Product Events** - Event tracking and analytics
+- ⏰ **Periodic Sync** - Automated sync scheduling
+- 🧪 **Testing** - API testing and integration validation
+- 📊 **Scoring** - Lead scoring and calculation endpoints
+
+**Setup Instructions:**
+
+1. Import the collection file into Postman
+2. Update the `base_url` variable to your deployment URL (default: `http://localhost:3001`)
+3. Configure environment variables for API keys if testing external integrations
+4. Each endpoint includes detailed descriptions and example request bodies
 
 ## 📊 Lead Scoring
 
