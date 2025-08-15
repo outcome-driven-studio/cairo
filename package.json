@@ -1,0 +1,29 @@
+{
+  "name": "cairo",
+  "version": "1.0.0",
+  "dependencies": {
+    "@sentry/node": "^7.120.4",
+    "@sentry/profiling-node": "^7.120.3",
+    "axios": "^1.9.0",
+    "axios-rate-limit": "^1.4.0",
+    "csv-parse": "^5.6.0",
+    "csv-parser": "^3.2.0",
+    "dotenv": "^16.5.0",
+    "express": "^4.18.2",
+    "node-cron": "^3.0.3",
+    "pg": "^8.16.0",
+    "uuid": "^9.0.1",
+    "winston": "^3.17.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "start:dev": "nodemon server.js",
+    "dev": "LOG_LEVEL=debug nodemon server.js",
+    "test": "echo \"No tests specified\" && exit 0",
+    "setup": "node src/migrations/run_migrations.js"
+  },
+  "devDependencies": {
+    "@railway/cli": "^4.6.1",
+    "nodemon": "^3.1.10"
+  }
+}

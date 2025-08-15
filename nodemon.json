@@ -1,0 +1,16 @@
+{
+  "watch": ["src/", "*.js"],
+  "ext": "js,json",
+  "ignore": [
+    "node_modules/",
+    "*.log",
+    "*.csv",
+    "*.md",
+    "test-*.js",
+    "debug-*.js"
+  ],
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": "1000"
+}
