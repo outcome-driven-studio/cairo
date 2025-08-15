@@ -1,6 +1,6 @@
-# Cairo - Open Source Customer Data Platform
-
 <div align="center">
+  <img src="./logo.svg" alt="Cairo" width="200" height="auto">
+  <br/><br/>
   <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-green.svg" alt="Node">
   <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
