@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const fs = require('fs');
 const path = require('path');
 const { query } = require('../utils/db');
@@ -5,6 +7,8 @@ const logger = require('../utils/logger');
 
 async function runMigrations() {
   try {
+    logger.info('🔧 Starting database migrations...');
+
     await query(`
       CREATE TABLE IF NOT EXISTS migrations (
         id SERIAL PRIMARY KEY,
@@ -19,7 +23,12 @@ async function runMigrations() {
     const migrationsDir = __dirname;
     const files = fs.readdirSync(migrationsDir)
       .filter(f => (f.endsWith('.sql') || f.endsWith('.js')) && f !== 'run_migrations.js')
-      .sort();
+      .sort((a, b) => {
+        // Ensure core tables migration runs first
+        if (a.includes('000_create_core_tables')) return -1;
+        if (b.includes('000_create_core_tables')) return 1;
+        return a.localeCompare(b);
+      });
 
     for (const file of files) {
       const migrationName = path.basename(file);
@@ -55,11 +64,25 @@ async function runMigrations() {
       }
     }
 
-    logger.info('All migrations checked and up-to-date.');
+    logger.info('✅ All migrations completed successfully!');
   } catch (error) {
     logger.error('Error running migrations:', error);
     throw error;
   }
 }
 
-module.exports = { runMigrations }; 
+// Export for programmatic use
+module.exports = { runMigrations };
+
+// Run migrations if this file is executed directly
+if (require.main === module) {
+  runMigrations()
+    .then(() => {
+      logger.info('🎉 Database setup completed successfully!');
+      process.exit(0);
+    })
+    .catch((error) => {
+      logger.error('❌ Database setup failed:', error);
+      process.exit(1);
+    });
+} 

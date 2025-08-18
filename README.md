@@ -57,7 +57,18 @@ npm install
 
 ### 2. Set Up Environment Variables
 
-Copy the environment template and configure it:
+You can set up your environment variables in two ways:
+
+**Option A: Interactive Setup (Recommended)**
+
+```bash
+# Run the interactive setup script
+npm run setup-env
+# OR
+./setup-env.sh
+```
+
+**Option B: Manual Setup**
 
 ```bash
 cp .env.example .env
@@ -107,6 +118,13 @@ For a complete list of all environment variables, see [.env.example](.env.exampl
 # Run migrations (creates all required tables)
 npm run setup
 ```
+
+This command will:
+
+- ✅ Create all core database tables (`playmaker_user_source`, `event_source`, `campaigns`, etc.)
+- ✅ Set up proper indexes for performance
+- ✅ Insert default lead scoring configurations
+- ✅ Handle existing tables gracefully (no data loss)
 
 Alternatively, you can run migrations directly:
 

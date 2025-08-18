@@ -9,12 +9,12 @@ if (!connectionString) {
   );
 }
 
-// Optimized configuration for Neon serverless PostgreSQL
-const pool = new Pool({
+// Smart SSL configuration - only use SSL for cloud databases
+const isLocalDatabase = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
+const isCloudDatabase = connectionString.includes('.neon.tech') || connectionString.includes('.railway.app') || connectionString.includes('.supabase.co');
+
+const poolConfig = {
   connectionString: connectionString,
-  ssl: {
-    rejectUnauthorized: false,
-  },
 
   // Connection Pool Settings
   max: 8, // Increased for concurrent sync operations
@@ -31,7 +31,27 @@ const pool = new Pool({
 
   // Application name for debugging
   application_name: "cairo-app",
-});
+};
+
+// Add SSL configuration conditionally
+if (isCloudDatabase) {
+  poolConfig.ssl = {
+    rejectUnauthorized: false,
+  };
+  logger.info('[Database] Using SSL for cloud database');
+} else if (isLocalDatabase) {
+  // Local databases typically don't use SSL
+  poolConfig.ssl = false;
+  logger.info('[Database] SSL disabled for local database');
+} else {
+  // Default to SSL for unknown hosts
+  poolConfig.ssl = {
+    rejectUnauthorized: false,
+  };
+  logger.info('[Database] Using SSL for unknown database host');
+}
+
+const pool = new Pool(poolConfig);
 
 // Global error handling for the pool
 pool.on("error", (err, client) => {
