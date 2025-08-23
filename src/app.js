@@ -16,7 +16,6 @@ const ProductEventRoutes = require("./routes/productEventRoutes");
 const PeriodicSyncRoutes = require("./routes/periodicSyncRoutes");
 const TestRoutes = require("./routes/testRoutes");
 const ScoringRoutes = require("./routes/scoringRoutes");
-const NamespaceRoutes = require("./routes/namespaceRoutes");
 
 // Create Express app
 const app = express();
@@ -87,16 +86,6 @@ app.use("/api/test", testRoutes.setupRoutes());
 // Scoring routes
 const scoringRoutes = new ScoringRoutes();
 app.use("/api/scoring", scoringRoutes.setupRoutes());
-
-// Namespace routes
-try {
-  const namespaceRoutes = new NamespaceRoutes();
-  app.use("/api", namespaceRoutes.setupRoutes());
-  logger.info("✅ Namespace routes successfully registered");
-} catch (error) {
-  logger.error("❌ Failed to register namespace routes:", error);
-  logger.error("Stack trace:", error.stack);
-}
 
 // Initialize cron jobs
 const PORT = process.env.PORT || 8080;
