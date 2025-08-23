@@ -69,6 +69,100 @@
       ]
     },
     {
+      "name": "🏢 Namespace Management",
+      "description": "Multi-tenant namespace management for data segregation",
+      "item": [
+        {
+          "name": "List All Namespaces",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/namespaces",
+              "host": ["{{base_url}}"],
+              "path": ["api", "namespaces"]
+            },
+            "description": "Retrieve all active namespaces with their configurations, keywords, and metadata. Used for namespace management and overview."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Namespace by Name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/namespaces/acme-corp",
+              "host": ["{{base_url}}"],
+              "path": ["api", "namespaces", "acme-corp"]
+            },
+            "description": "Get detailed information about a specific namespace including its keywords, table name, and Attio configuration."
+          },
+          "response": []
+        },
+        {
+          "name": "Create New Namespace",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"tech-startup\",\n  \"keywords\": [\"TechStartup\", \"Tech Startup Inc\", \"TSI\"],\n  \"attio_config\": {\n    \"workspace\": \"tech-startup-workspace\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/namespaces",
+              "host": ["{{base_url}}"],
+              "path": ["api", "namespaces"]
+            },
+            "description": "Create a new namespace for data segregation. Automatically creates the corresponding database table and configures keyword matching for campaign routing."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Namespace",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"keywords\": [\"ACME\", \"ACME Corp\", \"acme-corp\", \"Acme Corporation\"],\n  \"attio_config\": {\n    \"workspace\": \"acme-updated-workspace\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/namespaces/acme-corp",
+              "host": ["{{base_url}}"],
+              "path": ["api", "namespaces", "acme-corp"]
+            },
+            "description": "Update namespace configuration including keywords for campaign matching and Attio CRM settings."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Namespace Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/namespaces/acme-corp/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "namespaces", "acme-corp", "stats"]
+            },
+            "description": "Get usage statistics for a namespace including user counts, table information, and data metrics. Essential for monitoring namespace health and usage."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "📊 Dashboard",
       "description": "Dashboard UI and stats endpoints",
       "item": [

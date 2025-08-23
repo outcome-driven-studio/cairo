@@ -14,6 +14,7 @@ Cairo is an open-source Customer Data Platform (CDP) that unifies lead data from
 ### Key Features
 
 - 📊 **Multi-Source Data Integration** - Pull data from Lemlist, Smartlead, and your product
+- 🏢 **Multi-Tenant Namespaces** - Separate data by customer/client automatically via campaign keywords
 - 🤖 **AI-First Enrichment** - Cost-effective lead enrichment with AI ($0.005/lead) + fallbacks
 - 📈 **Intelligent Lead Scoring** - Combine ICP (Ideal Customer Profile) and behavioral scores
 - 🔄 **Smart CRM Sync** - Only sync engaged leads (behavior > 0) to Attio CRM
@@ -27,6 +28,7 @@ Cairo is an open-source Customer Data Platform (CDP) that unifies lead data from
 ## 📋 Table of Contents
 
 - [Quick Start](#-quick-start)
+- [Multi-Tenant Namespaces](#-multi-tenant-namespaces)
 - [API Documentation](#-api-documentation)
 - [Lead Scoring](#-lead-scoring)
 - [Periodic Sync & Automation](#-periodic-sync--automation)
@@ -100,8 +102,8 @@ MIXPANEL_PROJECT_TOKEN=your_mixpanel_token
 LEMLIST_API_KEY=your_lemlist_api_key
 SMARTLEAD_API_KEY=your_smartlead_api_key
 
-# Server Configuration
-PORT=3001
+# Server Configuration  
+PORT=8080
 NODE_ENV=development
 
 # Periodic Sync (Optional - auto-sync every 4 hours)
@@ -122,6 +124,7 @@ npm run setup
 This command will:
 
 - ✅ Create all core database tables (`playmaker_user_source`, `event_source`, `campaigns`, etc.)
+- ✅ Initialize namespace system (`namespaces` table with default namespace)
 - ✅ Set up proper indexes for performance
 - ✅ Insert default lead scoring configurations
 - ✅ Handle existing tables gracefully (no data loss)
@@ -142,21 +145,91 @@ npm run dev
 npm start
 ```
 
-The API will be available at `http://localhost:3001`
+The API will be available at `http://localhost:8080`
 
 ### 5. Test the Setup
 
 ```bash
 # Check health
-curl http://localhost:3001/health
+curl http://localhost:8080/health
 
 # Test integrations via API
-curl -X POST http://localhost:3001/api/test/apollo \
+curl -X POST http://localhost:8080/api/test/apollo \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "company": "Test Company"}'
 
 # Check all service integrations
-curl http://localhost:3001/api/test/health
+curl http://localhost:8080/api/test/health
+
+# Test namespace system
+curl http://localhost:8080/api/namespaces
+```
+
+## 🏢 Multi-Tenant Namespaces
+
+Cairo supports **multi-tenant data segregation** through namespaces, allowing agencies and service providers to separate data for different customers/clients automatically based on campaign keywords.
+
+### How It Works
+
+1. **Campaign Detection**: Cairo analyzes campaign names from Lemlist and Smartlead
+2. **Keyword Matching**: Matches campaigns against configured keywords per namespace  
+3. **Automatic Routing**: Routes data to separate `{namespace}_user_source` tables
+4. **Isolated CRM Sync**: Each namespace can have its own Attio configuration
+
+### Example Use Cases
+
+- **Marketing Agency**: Separate data for "ACME Corp", "TechStart", "Startup Co" clients
+- **SaaS Company**: Segment data by product lines or customer tiers  
+- **Consulting Firm**: Isolate client data for compliance and reporting
+
+### Quick Example
+
+```bash
+# Create a new namespace for ACME Corp
+curl -X POST http://localhost:8080/api/namespaces \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "acme-corp",
+    "keywords": ["ACME", "ACME Corp", "acme-corp"]
+  }'
+
+# Now any Lemlist/Smartlead campaigns with "ACME Corp Q1 Campaign" 
+# will automatically route to the acme_corp_user_source table
+```
+
+### Namespace Management
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/namespaces` | GET | List all namespaces |
+| `/api/namespaces` | POST | Create new namespace |
+| `/api/namespaces/{name}` | GET | Get specific namespace |
+| `/api/namespaces/{name}` | PUT | Update namespace |
+| `/api/namespaces/{name}/stats` | GET | Get namespace statistics |
+
+### Key Benefits
+
+✅ **Zero Configuration**: Works immediately with existing sync processes  
+✅ **Automatic Detection**: Smart keyword matching for campaign routing  
+✅ **Complete Isolation**: Each customer gets their own database table  
+✅ **Scalable**: Add unlimited customer namespaces via API  
+✅ **Backward Compatible**: No changes to existing functionality  
+
+### Examples
+
+```bash
+# List all namespaces
+curl http://localhost:8080/api/namespaces
+
+# Get namespace statistics
+curl http://localhost:8080/api/namespaces/acme-corp/stats
+
+# Update namespace keywords
+curl -X PUT http://localhost:8080/api/namespaces/acme-corp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "keywords": ["ACME", "ACME Corp", "acme-corp", "Acme Corporation"]
+  }'
 ```
 
 ## 📖 API Documentation
@@ -170,6 +243,16 @@ curl http://localhost:3001/api/test/health
 | `/health`          | GET    | Basic health check                 |
 | `/health/detailed` | GET    | Detailed health with dependencies  |
 | `/health/simple`   | GET    | Simple health check for containers |
+
+#### Namespace Management
+
+| Endpoint                      | Method | Description                     |
+| ----------------------------- | ------ | ------------------------------- |
+| `/api/namespaces`             | GET    | List all active namespaces      |
+| `/api/namespaces`             | POST   | Create new namespace            |
+| `/api/namespaces/{name}`      | GET    | Get specific namespace details  |
+| `/api/namespaces/{name}`      | PUT    | Update namespace configuration  |
+| `/api/namespaces/{name}/stats`| GET    | Get namespace usage statistics  |
 
 #### Lead Scoring
 
@@ -262,10 +345,41 @@ curl http://localhost:3001/api/test/health
 
 ### Example Requests
 
+#### Create and Manage Namespaces
+
+```bash
+# Create a new namespace for a client
+curl -X POST http://localhost:8080/api/namespaces \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "tech-startup",
+    "keywords": ["TechStartup", "Tech Startup Inc", "TSI"],
+    "attio_config": {
+      "workspace": "tech-startup-workspace"
+    }
+  }'
+
+# List all namespaces
+curl http://localhost:8080/api/namespaces
+
+# Get specific namespace details
+curl http://localhost:8080/api/namespaces/tech-startup
+
+# Update namespace keywords
+curl -X PUT http://localhost:8080/api/namespaces/tech-startup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "keywords": ["TechStartup", "Tech Startup Inc", "TSI", "TechStart"]
+  }'
+
+# Get namespace usage statistics
+curl http://localhost:8080/api/namespaces/tech-startup/stats
+```
+
 #### Calculate Lead Scores with Enrichment
 
 ```bash
-curl -X POST http://localhost:3001/api/scoring/calculate \
+curl -X POST http://localhost:8080/api/scoring/calculate \
   -H "Content-Type: application/json" \
   -d '{
     "forceReenrich": true,
@@ -277,7 +391,7 @@ curl -X POST http://localhost:3001/api/scoring/calculate \
 #### Track Product Event
 
 ```bash
-curl -X POST http://localhost:3001/api/events/track \
+curl -X POST http://localhost:8080/api/events/track \
   -H "Content-Type: application/json" \
   -d '{
     "user_email": "user@company.com",
@@ -293,17 +407,17 @@ curl -X POST http://localhost:3001/api/events/track \
 
 ```bash
 # Full sync (behavior + ICP + sync to Attio)
-curl -X POST http://localhost:3001/api/periodic-sync/sync-now \
+curl -X POST http://localhost:8080/api/periodic-sync/sync-now \
   -H "Content-Type: application/json" \
   -d '{"type": "full"}'
 
 # Behavior scoring only (no API calls)
-curl -X POST http://localhost:3001/api/periodic-sync/sync-now \
+curl -X POST http://localhost:8080/api/periodic-sync/sync-now \
   -H "Content-Type: application/json" \
   -d '{"type": "behavior"}'
 
 # ICP scoring only (uses AI-first enrichment)
-curl -X POST http://localhost:3001/api/periodic-sync/sync-now \
+curl -X POST http://localhost:8080/api/periodic-sync/sync-now \
   -H "Content-Type: application/json" \
   -d '{"type": "icp"}'
 ```
@@ -311,26 +425,26 @@ curl -X POST http://localhost:3001/api/periodic-sync/sync-now \
 #### Check Periodic Sync Status
 
 ```bash
-curl http://localhost:3001/api/periodic-sync/status
+curl http://localhost:8080/api/periodic-sync/status
 ```
 
 #### Background Job Management
 
 ```bash
 # List all running jobs
-curl http://localhost:3001/api/jobs
+curl http://localhost:8080/api/jobs
 
 # Check specific job status
-curl http://localhost:3001/api/jobs/status/calculate-lead-scores
+curl http://localhost:8080/api/jobs/status/calculate-lead-scores
 
 # Stop a running job
-curl -X POST http://localhost:3001/api/jobs/stop/calculate-lead-scores
+curl -X POST http://localhost:8080/api/jobs/stop/calculate-lead-scores
 ```
 
 #### Process External LinkedIn Profiles
 
 ```bash
-curl -X POST http://localhost:3001/api/process-linkedin-profiles \
+curl -X POST http://localhost:8080/api/process-linkedin-profiles \
   -H "Content-Type: application/json" \
   -d '{
     "profiles": [
@@ -353,6 +467,7 @@ Import the complete API collection for easy testing and development:
 **What's Included:**
 
 - 🏥 **Health & System** - Health checks and monitoring
+- 🏢 **Namespace Management** - Multi-tenant data segregation
 - 📊 **Dashboard** - Dashboard UI and stats endpoints
 - 🔄 **Legacy Sync** - Original sync endpoints
 - 🆕 **New Sync API (v1)** - Enhanced sync with better performance
@@ -366,7 +481,7 @@ Import the complete API collection for easy testing and development:
 **Setup Instructions:**
 
 1. Import the collection file into Postman
-2. Update the `base_url` variable to your deployment URL (default: `http://localhost:3001`)
+2. Update the `base_url` variable to your deployment URL (default: `http://localhost:8080`)
 3. Configure environment variables for API keys if testing external integrations
 4. Each endpoint includes detailed descriptions and example request bodies
 
@@ -457,10 +572,10 @@ MIN_BEHAVIOR_SCORE_FOR_ATTIO=1
 
 ```bash
 # Check periodic sync status
-curl http://localhost:3001/api/periodic-sync/status
+curl http://localhost:8080/api/periodic-sync/status
 
 # Force different sync types
-curl -X POST http://localhost:3001/api/periodic-sync/sync-now \
+curl -X POST http://localhost:8080/api/periodic-sync/sync-now \
   -H "Content-Type: application/json" \
   -d '{"type": "behavior"}'  # or "icp" or "full"
 ```
@@ -557,7 +672,7 @@ Imports campaign data and tracks engagement:
 docker build -t cairo .
 
 # Run container
-docker run -p 3001:3001 --env-file .env cairo
+docker run -p 8080:8080 --env-file .env cairo
 ```
 
 ### Manual Deployment
@@ -580,7 +695,9 @@ pm2 startup
 
 The system uses these main tables:
 
-- `playmaker_user_source` - User profiles with scores
+- `playmaker_user_source` - Default user profiles with scores
+- `{namespace}_user_source` - Namespace-specific user tables (auto-created)
+- `namespaces` - Namespace configurations and keywords
 - `event_source` - All tracked events
 - `campaigns` - Campaign data
 - `sent_events` - Deduplication tracking
@@ -607,20 +724,20 @@ npm test
 
 ```bash
 # Test Apollo enrichment
-curl -X POST http://localhost:3001/api/test/apollo \
+curl -X POST http://localhost:8080/api/test/apollo \
   -H "Content-Type: application/json" \
   -d '{"email": "test@company.com", "company": "Test Company"}'
 
 # Test Hunter enrichment
-curl -X POST http://localhost:3001/api/test/hunter \
+curl -X POST http://localhost:8080/api/test/hunter \
   -H "Content-Type: application/json" \
   -d '{"email": "test@company.com", "company": "Test Company"}'
 
 # Test database connection
-curl http://localhost:3001/api/test/database
+curl http://localhost:8080/api/test/database
 
 # Test all service integrations
-curl http://localhost:3001/api/test/health
+curl http://localhost:8080/api/test/health
 ```
 
 ### Development Mode
@@ -648,17 +765,17 @@ Migrations are automatically run when the server starts, but you can run them ma
 ### Health Check
 
 ```bash
-curl http://localhost:3001/health
+curl http://localhost:8080/health
 ```
 
 ### Job Status
 
 ```bash
 # Check scoring job status
-curl http://localhost:3001/api/jobs/status/calculate-lead-scores
+curl http://localhost:8080/api/jobs/status/calculate-lead-scores
 
 # View job logs
-curl http://localhost:3001/api/jobs/logs/calculate-lead-scores
+curl http://localhost:8080/api/jobs/logs/calculate-lead-scores
 ```
 
 ### Error Tracking
@@ -710,9 +827,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Machine learning for score optimization
 - [ ] Custom scoring rules UI
 - [ ] Data warehouse export (Snowflake, BigQuery)
-- [ ] Multi-tenant support
+- [x] **Multi-tenant support** - Complete namespace-based data segregation
 - [ ] GraphQL API
 - [ ] Real-time WebSocket updates
+- [ ] Namespace-specific dashboard views
 
 ---
 
