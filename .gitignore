@@ -113,6 +113,7 @@ test-output/
 test-results/
 *.test-report.json
 projectplan.md
+MIXPANEL_INTEGRATION_PLAN.md
 
 # Keep important files
 !README.md
