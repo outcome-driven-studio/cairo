@@ -90,11 +90,25 @@ const envConfig = {
             category: 'Analytics & Marketing'
         }
     ],
+    namespaces: [
+        {
+            key: 'ENABLE_NAMESPACE_SYSTEM',
+            description: 'Enable multi-tenant namespace system (true/false)',
+            default: 'true',
+            category: 'Multi-Tenant Namespaces'
+        },
+        {
+            key: 'DEFAULT_NAMESPACE',
+            description: 'Default namespace for uncategorized campaigns',
+            default: 'playmaker',
+            category: 'Multi-Tenant Namespaces'
+        }
+    ],
     server: [
         {
             key: 'PORT',
             description: 'Server port',
-            default: '3001',
+            default: '8080',
             category: 'Server Configuration'
         },
         {
@@ -237,6 +251,7 @@ class EnvSetup {
             { name: 'AI Enrichment', items: envConfig.ai },
             { name: 'CRM Integration', items: envConfig.crm },
             { name: 'Analytics & Marketing', items: envConfig.analytics },
+            { name: 'Multi-Tenant Namespaces', items: envConfig.namespaces },
             { name: 'Server Configuration', items: envConfig.server },
             { name: 'Periodic Sync', items: envConfig.sync },
             { name: 'Optional Services', items: envConfig.optional }

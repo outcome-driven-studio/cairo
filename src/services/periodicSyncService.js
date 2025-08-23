@@ -287,7 +287,7 @@ class PeriodicSyncService {
       for (const campaign of campaigns) {
         try {
           // Get activities since last sync
-          const activities = await this.lemlistService.getActivities(
+          const activities = await this.lemlistService.getCampaignActivities(
             campaign.id,
             100,
             0,
@@ -314,7 +314,7 @@ class PeriodicSyncService {
           }
 
           // Also sync campaign leads (users)
-          const leads = await this.lemlistService.getCampaignLeads(campaign.id);
+          const leads = await this.lemlistService.getLeads(campaign.id);
           for (const lead of leads) {
             if (!lead.email) continue;
 
@@ -381,9 +381,7 @@ class PeriodicSyncService {
       for (const campaign of campaigns) {
         try {
           // Get leads
-          const leads = await this.smartleadService.getLeadsByCampaign(
-            campaign.id
-          );
+          const leads = await this.smartleadService.getLeads(campaign.id);
 
           for (const lead of leads) {
             if (!lead.email) continue;

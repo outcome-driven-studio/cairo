@@ -19,6 +19,7 @@ const PeriodicSyncRoutes = require("./src/routes/periodicSyncRoutes");
 const NewSyncRoutes = require("./src/routes/newSyncRoutes");
 const ScoringRoutes = require("./src/routes/scoringRoutes");
 const ExternalProfileRoutes = require("./src/routes/externalProfileRoutes");
+const NamespaceRoutes = require("./src/routes/namespaceRoutes");
 
 // Create Express app
 const app = express();
@@ -111,6 +112,10 @@ app.use("/api/test", testRoutes.setupRoutes());
 // Scoring routes
 const scoringRoutes = new ScoringRoutes();
 app.use("/api/scoring", scoringRoutes.setupRoutes());
+
+// Namespace routes
+const namespaceRoutes = new NamespaceRoutes();
+app.use("/api", namespaceRoutes.setupRoutes());
 
 // Initialize cron jobs
 const PORT = process.env.PORT || 8080;
