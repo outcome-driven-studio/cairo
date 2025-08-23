@@ -16,6 +16,7 @@ const ProductEventRoutes = require("./routes/productEventRoutes");
 const PeriodicSyncRoutes = require("./routes/periodicSyncRoutes");
 const TestRoutes = require("./routes/testRoutes");
 const ScoringRoutes = require("./routes/scoringRoutes");
+const FullSyncRoutes = require("./routes/fullSyncRoutes");
 
 // Create Express app
 const app = express();
@@ -86,6 +87,10 @@ app.use("/api/test", testRoutes.setupRoutes());
 // Scoring routes
 const scoringRoutes = new ScoringRoutes();
 app.use("/api/scoring", scoringRoutes.setupRoutes());
+
+// Full sync routes
+const fullSyncRoutes = new FullSyncRoutes();
+app.use("/api/full-sync", fullSyncRoutes.setupRoutes());
 
 // Initialize cron jobs
 const PORT = process.env.PORT || 8080;

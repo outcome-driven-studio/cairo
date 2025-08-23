@@ -15,6 +15,7 @@ Cairo is an open-source Customer Data Platform (CDP) that unifies lead data from
 
 - 📊 **Multi-Source Data Integration** - Pull data from Lemlist, Smartlead, and your product
 - 🏢 **Multi-Tenant Namespaces** - Separate data by customer/client automatically via campaign keywords
+- 🚀 **Full Sync System** - Bulk sync hundreds of thousands of records with intelligent rate limiting
 - 🤖 **AI-First Enrichment** - Cost-effective lead enrichment with AI ($0.005/lead) + fallbacks
 - 📈 **Intelligent Lead Scoring** - Combine ICP (Ideal Customer Profile) and behavioral scores
 - 🔄 **Smart CRM Sync** - Only sync engaged leads (behavior > 0) to Attio CRM
@@ -30,6 +31,7 @@ Cairo is an open-source Customer Data Platform (CDP) that unifies lead data from
 - [Quick Start](#-quick-start)
 - [Multi-Tenant Namespaces](#-multi-tenant-namespaces)
 - [API Documentation](#-api-documentation)
+- [🔄 Full Sync System](#-full-sync-system)
 - [Lead Scoring](#-lead-scoring)
 - [Periodic Sync & Automation](#-periodic-sync--automation)
 - [AI-First Enrichment](#-ai-first-enrichment)
@@ -102,7 +104,7 @@ MIXPANEL_PROJECT_TOKEN=your_mixpanel_token
 LEMLIST_API_KEY=your_lemlist_api_key
 SMARTLEAD_API_KEY=your_smartlead_api_key
 
-# Server Configuration  
+# Server Configuration
 PORT=8080
 NODE_ENV=development
 
@@ -172,14 +174,14 @@ Cairo supports **multi-tenant data segregation** through namespaces, allowing ag
 ### How It Works
 
 1. **Campaign Detection**: Cairo analyzes campaign names from Lemlist and Smartlead
-2. **Keyword Matching**: Matches campaigns against configured keywords per namespace  
+2. **Keyword Matching**: Matches campaigns against configured keywords per namespace
 3. **Automatic Routing**: Routes data to separate `{namespace}_user_source` tables
 4. **Isolated CRM Sync**: Each namespace can have its own Attio configuration
 
 ### Example Use Cases
 
 - **Marketing Agency**: Separate data for "ACME Corp", "TechStart", "Startup Co" clients
-- **SaaS Company**: Segment data by product lines or customer tiers  
+- **SaaS Company**: Segment data by product lines or customer tiers
 - **Consulting Firm**: Isolate client data for compliance and reporting
 
 ### Quick Example
@@ -193,19 +195,19 @@ curl -X POST http://localhost:8080/api/namespaces \
     "keywords": ["ACME", "ACME Corp", "acme-corp"]
   }'
 
-# Now any Lemlist/Smartlead campaigns with "ACME Corp Q1 Campaign" 
+# Now any Lemlist/Smartlead campaigns with "ACME Corp Q1 Campaign"
 # will automatically route to the acme_corp_user_source table
 ```
 
 ### Namespace Management
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/namespaces` | GET | List all namespaces |
-| `/api/namespaces` | POST | Create new namespace |
-| `/api/namespaces/{name}` | GET | Get specific namespace |
-| `/api/namespaces/{name}` | PUT | Update namespace |
-| `/api/namespaces/{name}/stats` | GET | Get namespace statistics |
+| Endpoint                       | Method | Description              |
+| ------------------------------ | ------ | ------------------------ |
+| `/api/namespaces`              | GET    | List all namespaces      |
+| `/api/namespaces`              | POST   | Create new namespace     |
+| `/api/namespaces/{name}`       | GET    | Get specific namespace   |
+| `/api/namespaces/{name}`       | PUT    | Update namespace         |
+| `/api/namespaces/{name}/stats` | GET    | Get namespace statistics |
 
 ### Key Benefits
 
@@ -213,7 +215,7 @@ curl -X POST http://localhost:8080/api/namespaces \
 ✅ **Automatic Detection**: Smart keyword matching for campaign routing  
 ✅ **Complete Isolation**: Each customer gets their own database table  
 ✅ **Scalable**: Add unlimited customer namespaces via API  
-✅ **Backward Compatible**: No changes to existing functionality  
+✅ **Backward Compatible**: No changes to existing functionality
 
 ### Examples
 
@@ -246,13 +248,13 @@ curl -X PUT http://localhost:8080/api/namespaces/acme-corp \
 
 #### Namespace Management
 
-| Endpoint                      | Method | Description                     |
-| ----------------------------- | ------ | ------------------------------- |
-| `/api/namespaces`             | GET    | List all active namespaces      |
-| `/api/namespaces`             | POST   | Create new namespace            |
-| `/api/namespaces/{name}`      | GET    | Get specific namespace details  |
-| `/api/namespaces/{name}`      | PUT    | Update namespace configuration  |
-| `/api/namespaces/{name}/stats`| GET    | Get namespace usage statistics  |
+| Endpoint                       | Method | Description                    |
+| ------------------------------ | ------ | ------------------------------ |
+| `/api/namespaces`              | GET    | List all active namespaces     |
+| `/api/namespaces`              | POST   | Create new namespace           |
+| `/api/namespaces/{name}`       | GET    | Get specific namespace details |
+| `/api/namespaces/{name}`       | PUT    | Update namespace configuration |
+| `/api/namespaces/{name}/stats` | GET    | Get namespace usage statistics |
 
 #### Lead Scoring
 
@@ -471,6 +473,7 @@ Import the complete API collection for easy testing and development:
 - 📊 **Dashboard** - Dashboard UI and stats endpoints
 - 🔄 **Legacy Sync** - Original sync endpoints
 - 🆕 **New Sync API (v1)** - Enhanced sync with better performance
+- 🚀 **Full Sync System** - Bulk sync with intelligent rate limiting
 - ⚙️ **Background Jobs** - Asynchronous processing endpoints
 - 👥 **External Profiles** - LinkedIn profile processing
 - 📱 **Product Events** - Event tracking and analytics
@@ -484,6 +487,242 @@ Import the complete API collection for easy testing and development:
 2. Update the `base_url` variable to your deployment URL (default: `http://localhost:8080`)
 3. Configure environment variables for API keys if testing external integrations
 4. Each endpoint includes detailed descriptions and example request bodies
+
+## 🔄 Full Sync System
+
+Cairo includes a powerful **full synchronization system** designed to handle massive data imports and historical syncs from Smartlead and Lemlist while preventing duplicates and maintaining data integrity.
+
+### 🎯 Key Capabilities
+
+- ✅ **Massive Scale** - Sync hundreds of thousands of records efficiently
+- ✅ **3 Sync Modes** - Full historical, date range, and reset from date
+- ✅ **Smart Rate Limiting** - API-specific limits prevent quota exhaustion
+- ✅ **Deduplication Built-In** - Events by key, users by email
+- ✅ **Namespace Control** - Sync all or specific client partitions
+- ✅ **Progress Tracking** - Real-time updates with ETA calculations
+- ✅ **Background Processing** - Async jobs with webhook callbacks
+- ✅ **Mixpanel Integration** - Automatic analytics tracking
+
+### 📋 API Endpoints
+
+| Endpoint                         | Method | Description                       |
+| -------------------------------- | ------ | --------------------------------- |
+| `/api/full-sync/execute`         | POST   | Execute synchronous full sync     |
+| `/api/full-sync/execute-async`   | POST   | Execute asynchronous full sync    |
+| `/api/full-sync/status/:jobId`   | GET    | Get job status and progress       |
+| `/api/full-sync/health`          | GET    | Check full sync system health     |
+| `/api/full-sync/config/validate` | POST   | Validate sync configuration       |
+| `/api/full-sync/namespaces`      | GET    | Get available namespaces for sync |
+| `/api/full-sync/jobs`            | GET    | List job history and management   |
+
+### 🎮 Sync Modes
+
+#### 1. Full Historical Sync
+
+Syncs all historical data, ignoring `last_sync_time` timestamps.
+
+```bash
+curl -X POST http://localhost:8080/api/full-sync/execute-async \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "FULL_HISTORICAL",
+    "platforms": ["smartlead", "lemlist"],
+    "namespaces": "all",
+    "batchSize": 100,
+    "enableMixpanelTracking": true
+  }'
+```
+
+#### 2. Date Range Sync
+
+Syncs data from a specific time period with precise control.
+
+```bash
+curl -X POST http://localhost:8080/api/full-sync/execute-async \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "DATE_RANGE",
+    "platforms": ["smartlead"],
+    "namespaces": ["playmaker"],
+    "dateRange": {
+      "start": "2024-01-01T00:00:00.000Z",
+      "end": "2024-01-31T23:59:59.999Z"
+    },
+    "batchSize": 50
+  }'
+```
+
+#### 3. Reset From Date
+
+Resets sync timestamps and syncs from a specific date forward.
+
+```bash
+curl -X POST http://localhost:8080/api/full-sync/execute-async \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "RESET_FROM_DATE",
+    "platforms": ["lemlist"],
+    "namespaces": ["client1", "client2"],
+    "resetDate": "2024-02-01T00:00:00.000Z",
+    "batchSize": 75,
+    "rateLimitDelay": 1000
+  }'
+```
+
+### 📊 Configuration Options
+
+| Parameter                | Type         | Description                                             |
+| ------------------------ | ------------ | ------------------------------------------------------- |
+| `mode`                   | String       | `FULL_HISTORICAL`, `DATE_RANGE`, or `RESET_FROM_DATE`   |
+| `platforms`              | Array        | `["smartlead"]`, `["lemlist"]`, or both                 |
+| `namespaces`             | String/Array | `"all"` or specific namespaces `["client1", "client2"]` |
+| `dateRange`              | Object       | Required for DATE_RANGE mode: `{start, end}`            |
+| `resetDate`              | String       | Required for RESET_FROM_DATE mode                       |
+| `batchSize`              | Number       | Records per batch (1-1000, default: 100)                |
+| `rateLimitDelay`         | Number       | Milliseconds between requests (default: 500)            |
+| `enableMixpanelTracking` | Boolean      | Track sync events in Mixpanel                           |
+| `callbackUrl`            | String       | Webhook URL for job completion notifications            |
+
+### 🚨 Rate Limits & Performance
+
+The system includes intelligent rate limiting based on API documentation:
+
+| Platform      | Requests/Sec | Max Batch Size | Notes                 |
+| ------------- | ------------ | -------------- | --------------------- |
+| **Smartlead** | 10           | 100            | Conservative limits   |
+| **Lemlist**   | 10           | 50             | Respects 20/2sec rule |
+| **Attio**     | 5            | 25             | CRM-specific limits   |
+| **Mixpanel**  | 50           | 200            | Analytics-optimized   |
+| **Database**  | 100          | 500            | High-performance      |
+
+### 📈 Progress Monitoring
+
+#### Check Job Status
+
+```bash
+curl -X GET http://localhost:8080/api/full-sync/status/full-sync-1234567890
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "full-sync-1234567890",
+    "status": "running",
+    "progress": {
+      "processed": 2500,
+      "total": 10000,
+      "percentage": 25,
+      "eta": "15 minutes"
+    },
+    "result": {
+      "platforms": {
+        "smartlead": { "users": 1200, "events": 8500 },
+        "lemlist": { "users": 800, "events": 4200 }
+      }
+    }
+  }
+}
+```
+
+#### System Health Check
+
+```bash
+curl -X GET http://localhost:8080/api/full-sync/health
+```
+
+#### Job History
+
+```bash
+curl -X GET "http://localhost:8080/api/full-sync/jobs?limit=20&status=completed"
+```
+
+### ⚙️ Configuration Validation
+
+Validate your sync configuration before executing:
+
+```bash
+curl -X POST http://localhost:8080/api/full-sync/config/validate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "DATE_RANGE",
+    "platforms": ["smartlead"],
+    "namespaces": ["playmaker"],
+    "dateRange": {
+      "start": "2024-01-01T00:00:00.000Z",
+      "end": "2024-01-31T23:59:59.999Z"
+    }
+  }'
+```
+
+### 🔧 Production Best Practices
+
+1. **Start Small**: Begin with `batchSize: 25-50` for testing
+2. **Monitor Health**: Use `/api/full-sync/health` for system monitoring
+3. **Use Date Range**: For regular syncs, avoid `FULL_HISTORICAL`
+4. **Namespace Filtering**: Sync specific clients instead of "all" when possible
+5. **Async Jobs**: Use `/execute-async` for large datasets
+6. **Rate Limiting**: Adjust `rateLimitDelay` based on API responses
+
+### 🚨 Error Handling & Recovery
+
+The system includes comprehensive error handling:
+
+- **Automatic Retry**: Failed batches are retried with exponential backoff
+- **Partial Success**: Completed portions are preserved if sync fails
+- **Rate Limit Recovery**: Automatic delay adjustments when limits are hit
+- **Progress Preservation**: Jobs can be resumed from the last successful batch
+
+### 💡 Use Cases
+
+#### Marketing Agency Full Client Onboarding
+
+```bash
+# Sync all historical data for a new client
+curl -X POST http://localhost:8080/api/full-sync/execute-async \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "FULL_HISTORICAL",
+    "platforms": ["smartlead", "lemlist"],
+    "namespaces": ["new-client"],
+    "batchSize": 100,
+    "callbackUrl": "https://mycrm.com/webhooks/sync-complete"
+  }'
+```
+
+#### Data Recovery After Sync Issues
+
+```bash
+# Reset sync timestamps and re-sync from specific date
+curl -X POST http://localhost:8080/api/full-sync/execute-async \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "RESET_FROM_DATE",
+    "platforms": ["smartlead", "lemlist"],
+    "namespaces": "all",
+    "resetDate": "2024-01-01T00:00:00.000Z"
+  }'
+```
+
+#### Monthly Reporting Data Sync
+
+```bash
+# Sync specific month for reporting
+curl -X POST http://localhost:8080/api/full-sync/execute-async \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "DATE_RANGE",
+    "platforms": ["smartlead", "lemlist"],
+    "namespaces": "all",
+    "dateRange": {
+      "start": "2024-01-01T00:00:00.000Z",
+      "end": "2024-01-31T23:59:59.999Z"
+    },
+    "enableMixpanelTracking": true
+  }'
+```
 
 ## 📊 Lead Scoring
 
@@ -828,6 +1067,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Custom scoring rules UI
 - [ ] Data warehouse export (Snowflake, BigQuery)
 - [x] **Multi-tenant support** - Complete namespace-based data segregation
+- [x] **Full Sync System** - Bulk sync with intelligent rate limiting for hundreds of thousands of records
 - [ ] GraphQL API
 - [ ] Real-time WebSocket updates
 - [ ] Namespace-specific dashboard views

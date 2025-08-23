@@ -1149,6 +1149,225 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "🚀 Full Sync System",
+      "description": "Bulk synchronization system for handling hundreds of thousands of records from Smartlead and Lemlist with intelligent rate limiting and progress tracking",
+      "item": [
+        {
+          "name": "Execute Full Sync (Synchronous)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"DATE_RANGE\",\n  \"platforms\": [\"smartlead\"],\n  \"namespaces\": [\"playmaker\"],\n  \"dateRange\": {\n    \"start\": \"2024-01-01T00:00:00.000Z\",\n    \"end\": \"2024-01-31T23:59:59.999Z\"\n  },\n  \"batchSize\": 50,\n  \"enableMixpanelTracking\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/full-sync/execute",
+              "host": ["{{base_url}}"],
+              "path": ["api", "full-sync", "execute"]
+            },
+            "description": "Execute a full sync synchronously (blocks until complete). Best for smaller datasets or when you need immediate results. Supports all sync modes: FULL_HISTORICAL, DATE_RANGE, RESET_FROM_DATE."
+          },
+          "response": []
+        },
+        {
+          "name": "Execute Full Sync (Asynchronous)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"FULL_HISTORICAL\",\n  \"platforms\": [\"smartlead\", \"lemlist\"],\n  \"namespaces\": \"all\",\n  \"batchSize\": 100,\n  \"enableMixpanelTracking\": true,\n  \"callbackUrl\": \"https://your-app.com/webhooks/sync-complete\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/full-sync/execute-async",
+              "host": ["{{base_url}}"],
+              "path": ["api", "full-sync", "execute-async"]
+            },
+            "description": "Execute a full sync asynchronously as a background job. Returns a job ID for tracking progress. Recommended for large datasets. Supports webhook callbacks when job completes."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Job Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/full-sync/status/:jobId",
+              "host": ["{{base_url}}"],
+              "path": ["api", "full-sync", "status", ":jobId"],
+              "variable": [
+                {
+                  "key": "jobId",
+                  "value": "full-sync-1234567890",
+                  "description": "The job ID returned from execute-async"
+                }
+              ]
+            },
+            "description": "Check the status and progress of an asynchronous full sync job. Returns detailed progress information including processed records, ETA, and results."
+          },
+          "response": []
+        },
+        {
+          "name": "System Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/full-sync/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "full-sync", "health"]
+            },
+            "description": "Check the health of the full sync system including rate limiter status, database connectivity, and recent activity. Use for monitoring and alerting."
+          },
+          "response": []
+        },
+        {
+          "name": "Validate Sync Configuration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"DATE_RANGE\",\n  \"platforms\": [\"smartlead\"],\n  \"namespaces\": [\"playmaker\"],\n  \"dateRange\": {\n    \"start\": \"2024-01-01T00:00:00.000Z\",\n    \"end\": \"2024-01-31T23:59:59.999Z\"\n  },\n  \"batchSize\": 50\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/full-sync/config/validate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "full-sync", "config", "validate"]
+            },
+            "description": "Validate a sync configuration without executing it. Returns validation results, target namespaces, estimated duration, and warnings. Use before executing large syncs."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Available Namespaces",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/full-sync/namespaces",
+              "host": ["{{base_url}}"],
+              "path": ["api", "full-sync", "namespaces"]
+            },
+            "description": "Get list of all available namespaces for sync operations. Shows namespace names, active status, and last sync times for each platform."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Job History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/full-sync/jobs?limit=20&status=completed",
+              "host": ["{{base_url}}"],
+              "path": ["api", "full-sync", "jobs"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Maximum number of jobs to return (1-100)"
+                },
+                {
+                  "key": "status",
+                  "value": "completed",
+                  "description": "Filter by status: active, completed, failed, cancelled, all"
+                }
+              ]
+            },
+            "description": "Get history of full sync jobs with filtering and pagination. Shows job status, duration, results, and statistics. Use for monitoring and troubleshooting."
+          },
+          "response": []
+        },
+        {
+          "name": "Full Historical Sync Example",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"FULL_HISTORICAL\",\n  \"platforms\": [\"smartlead\", \"lemlist\"],\n  \"namespaces\": \"all\",\n  \"batchSize\": 100,\n  \"rateLimitDelay\": 500,\n  \"enableMixpanelTracking\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/full-sync/execute-async",
+              "host": ["{{base_url}}"],
+              "path": ["api", "full-sync", "execute-async"]
+            },
+            "description": "Example: Full historical sync for all platforms and namespaces. Ignores last_sync_time and syncs all historical data. Use carefully as this can consume significant API quota."
+          },
+          "response": []
+        },
+        {
+          "name": "Date Range Sync Example",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"DATE_RANGE\",\n  \"platforms\": [\"smartlead\"],\n  \"namespaces\": [\"playmaker\", \"client1\"],\n  \"dateRange\": {\n    \"start\": \"2024-01-01T00:00:00.000Z\",\n    \"end\": \"2024-01-31T23:59:59.999Z\"\n  },\n  \"batchSize\": 50,\n  \"enableMixpanelTracking\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/full-sync/execute-async",
+              "host": ["{{base_url}}"],
+              "path": ["api", "full-sync", "execute-async"]
+            },
+            "description": "Example: Sync data from a specific date range. Recommended for regular syncs and reporting. More predictable resource usage than full historical sync."
+          },
+          "response": []
+        },
+        {
+          "name": "Reset From Date Sync Example",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"RESET_FROM_DATE\",\n  \"platforms\": [\"lemlist\"],\n  \"namespaces\": [\"client1\"],\n  \"resetDate\": \"2024-01-01T00:00:00.000Z\",\n  \"batchSize\": 75,\n  \"rateLimitDelay\": 1000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/full-sync/execute-async",
+              "host": ["{{base_url}}"],
+              "path": ["api", "full-sync", "execute-async"]
+            },
+            "description": "Example: Reset sync timestamps and sync from a specific date forward. Useful for fixing sync issues or changing sync strategy. Resets last_sync_time in the database."
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "variable": [

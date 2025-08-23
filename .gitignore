@@ -114,6 +114,7 @@ test-results/
 *.test-report.json
 projectplan.md
 MIXPANEL_INTEGRATION_PLAN.md
+FULL_SYNC_SYSTEM_SUMMARY.md
 
 # Keep important files
 !README.md
