@@ -121,7 +121,6 @@ class SmartleadSync {
 
         // Track event in Mixpanel (non-blocking)
         await this.trackEventInMixpanel(eventData, namespace);
-
         return result.rows[0];
       }
       return null;
