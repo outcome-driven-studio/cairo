@@ -4,6 +4,7 @@ const logger = require("../utils/logger");
 const monitoring = require("../utils/monitoring");
 const { query } = require("../utils/db");
 const syncState = require("../utils/syncState");
+const { eventKeyGenerator } = require("../utils/eventKeyGenerator");
 
 class SyncRoutes {
   constructor(lemlistService, smartleadService) {
@@ -129,10 +130,25 @@ class SyncRoutes {
           name: activity.campaignName || "Unknown Campaign",
         });
 
+        // Generate improved event key using the unified generator
+        const improvedEventKey = eventKeyGenerator.generateLemlistKey(
+          {
+            id: activity._id || activity.id,
+            type: activity.type,
+            campaignId: activity.campaignId,
+            createdAt: activity.createdAt,
+            leadId: activity.leadId,
+            campaignName: activity.campaignName,
+            lead: { email: lead.email },
+          },
+          activity.campaignId,
+          "playmaker"
+        );
+
         const eventData = {
           user_id: lead.email,
           email: lead.email,
-          event_key: `lemlist_${activity._id || activity.id}`,
+          event_key: improvedEventKey,
           event_type: this.getEventTypeName("lemlist", activity.type),
           event_timestamp: new Date(activity.createdAt),
           platform: "lemlist",
@@ -208,10 +224,24 @@ class SyncRoutes {
         for (const eventType of eventTypes) {
           const eventKey = `${eventType}_count`;
           if (lead[eventKey] && lead[eventKey] > 0) {
+            // Generate improved event key using the unified generator
+            const improvedEventKey = eventKeyGenerator.generateSmartleadKey(
+              {
+                id: lead.lead.id,
+                email_campaign_seq_id: campaignId,
+                lead_id: lead.lead.id,
+                sent_time: lead.sent_at || campaign.created_at,
+              },
+              eventType,
+              campaignId,
+              lead.lead.email,
+              "playmaker"
+            );
+
             const eventData = {
               user_id: lead.lead.email,
               email: lead.lead.email,
-              event_key: `smartlead_${eventType}_${campaignId}_${lead.lead.id}`,
+              event_key: improvedEventKey,
               event_type: this.getEventTypeName("smartlead", eventType),
               event_timestamp: new Date(lead.sent_at || campaign.created_at),
               platform: "smartlead",

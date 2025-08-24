@@ -23,6 +23,7 @@ const NamespaceService = require("./namespaceService");
 
 // Import database utilities
 const { query } = require("../utils/db");
+const { eventKeyGenerator } = require("../utils/eventKeyGenerator");
 
 /**
  * Full Sync Service - Main orchestration class
@@ -626,25 +627,104 @@ class FullSyncService {
 
     // Store in database
     const dbResult = await dbRateLimiter.makeRateLimitedCall(async () => {
-      // Implementation would go here - storing events with event_key deduplication
-      // For now, return success result
-      return { processed: events.length, errors: [] };
+      const processed = [];
+      const errors = [];
+
+      for (const event of events) {
+        try {
+          // Generate improved event key using the unified generator
+          const eventKey =
+            platform === "lemlist"
+              ? eventKeyGenerator.generateLemlistKey(
+                  {
+                    id: event.id,
+                    type: event.type || "activity",
+                    campaignId: campaignId,
+                    date: event.created_at || event.timestamp,
+                    leadId: event.lead_id,
+                    lead: { email: event.email || event.contact_email },
+                  },
+                  campaignId,
+                  namespace
+                )
+              : eventKeyGenerator.generateSmartleadKey(
+                  event,
+                  event.type || "activity",
+                  campaignId,
+                  event.email || event.contact_email,
+                  namespace
+                );
+
+          const result = await query(
+            `INSERT INTO event_source (
+               event_key, user_id, event_type, platform, metadata, created_at
+             )
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (event_key) DO NOTHING
+             RETURNING *`,
+            [
+              eventKey,
+              event.email || event.contact_email,
+              event.type || "activity",
+              platform,
+              JSON.stringify({
+                ...event,
+                namespace: namespace,
+                campaign_id: campaignId,
+                full_sync: true,
+              }),
+              new Date(event.created_at || event.timestamp || Date.now()),
+            ]
+          );
+
+          if (result.rows.length > 0) {
+            processed.push(result.rows[0]);
+          }
+        } catch (error) {
+          errors.push({ event: event, error: error.message });
+        }
+      }
+
+      return { processed: processed.length, errors };
     });
 
     // Track in Mixpanel if enabled
-    if (syncConfig.enableMixpanelTracking) {
+    if (syncConfig.enableMixpanelTracking && this.mixpanelService.enabled) {
       try {
         await mixpanelRateLimiter.makeRateLimitedCall(async () => {
-          // Convert events to Mixpanel format and batch send
-          const mixpanelEvents = events.map((event) =>
-            this.convertToMixpanelEvent(event, platform, namespace, campaignId)
-          );
+          // Track events individually (don't fail batch if some fail)
+          const trackingPromises = events.map(async (event) => {
+            try {
+              const mixpanelEvent = this.convertToMixpanelEvent(
+                event,
+                platform,
+                namespace,
+                campaignId
+              );
+              if (mixpanelEvent.event && mixpanelEvent.properties.distinct_id) {
+                await this.mixpanelService.track(
+                  mixpanelEvent.properties.distinct_id,
+                  mixpanelEvent.event,
+                  mixpanelEvent.properties
+                );
+              }
+            } catch (error) {
+              logger.debug(
+                `Failed to track single event in Mixpanel:`,
+                error.message
+              );
+            }
+          });
 
-          // Implementation would use mixpanelService.trackBatch(mixpanelEvents)
-          return { tracked: mixpanelEvents.length };
+          // Don't await all - just fire and forget for performance
+          Promise.allSettled(trackingPromises).catch(() => {
+            // Ignore batch tracking errors
+          });
+
+          return { tracked: events.length };
         });
       } catch (error) {
-        logger.warn(`Failed to track events in Mixpanel`, {
+        logger.warn(`Failed to batch track events in Mixpanel`, {
           error: error.message,
         });
         // Don't fail the whole batch for Mixpanel errors
@@ -659,20 +739,102 @@ class FullSyncService {
    * @private
    */
   convertToMixpanelEvent(event, platform, namespace, campaignId) {
-    return {
-      event: `${platform}_${event.type || "activity"}`,
-      properties: {
-        distinct_id: event.email || event.contact_email,
-        time: new Date(event.created_at || event.timestamp),
-        campaign_id: campaignId,
-        campaign_platform: platform,
-        user_namespace: namespace,
-        event_source: "full_sync",
-        sync_mode: "bulk",
-        // Add more platform-specific properties as needed
-        ...event.properties,
+    // Map platform-specific event types to Mixpanel events
+    const eventTypeMap = {
+      smartlead: {
+        email_sent: "smartlead_email_sent",
+        email_opened: "smartlead_email_opened",
+        email_clicked: "smartlead_email_clicked",
+        email_replied: "smartlead_email_replied",
+        lead_created: "smartlead_lead_created",
+        campaign_started: "smartlead_campaign_started",
+      },
+      lemlist: {
+        emailsent: "lemlist_email_sent",
+        emailopened: "lemlist_email_opened",
+        emailclicked: "lemlist_email_clicked",
+        emailreplied: "lemlist_email_replied",
+        linkedinmessage: "lemlist_linkedin_message",
+        linkedinvisit: "lemlist_linkedin_visit",
+        campaignstarted: "lemlist_campaign_started",
       },
     };
+
+    const eventType = event.type || "activity";
+    const mixpanelEvent =
+      eventTypeMap[platform]?.[eventType] || `${platform}_${eventType}`;
+
+    // Extract email from different possible fields
+    const userEmail =
+      event.email || event.contact_email || event.lead_email || event.leadEmail;
+
+    if (!userEmail) {
+      logger.debug(`No email found for event: ${JSON.stringify(event)}`);
+      return null;
+    }
+
+    return {
+      event: mixpanelEvent,
+      properties: {
+        distinct_id: userEmail.toLowerCase(),
+        time: Math.floor(
+          new Date(
+            event.created_at || event.timestamp || Date.now()
+          ).getTime() / 1000
+        ),
+
+        // Campaign context
+        campaign_id: campaignId,
+        campaign_name: event.campaign_name || event.campaignName,
+        campaign_platform: platform,
+
+        // User context
+        user_namespace: namespace,
+        user_source: "sync",
+
+        // Event context
+        event_source: "full_sync_pipeline",
+        sync_mode: "bulk",
+        event_key: `${platform}-${campaignId}-${
+          event.id || event.type
+        }-${userEmail}`,
+
+        // Technical metadata
+        platform: platform,
+        original_timestamp: event.created_at || event.timestamp,
+
+        // Additional event properties
+        ...(event.properties || {}),
+
+        // Platform-specific metadata
+        ...this.extractPlatformMetadata(event, platform),
+      },
+    };
+  }
+
+  /**
+   * Extract platform-specific metadata for Mixpanel
+   * @private
+   */
+  extractPlatformMetadata(event, platform) {
+    const metadata = {};
+
+    if (platform === "smartlead") {
+      if (event.first_name) metadata.lead_first_name = event.first_name;
+      if (event.last_name) metadata.lead_last_name = event.last_name;
+      if (event.company) metadata.lead_company = event.company;
+      if (event.linkedin_url) metadata.has_linkedin = true;
+    } else if (platform === "lemlist") {
+      if (event.lead?.firstName)
+        metadata.lead_first_name = event.lead.firstName;
+      if (event.lead?.lastName) metadata.lead_last_name = event.lead.lastName;
+      if (event.lead?.company) metadata.lead_company = event.lead.company;
+      if (event.lead?.linkedinUrl) metadata.has_linkedin = true;
+      if (event.stepIndex) metadata.sequence_step = event.stepIndex;
+      if (event.subject) metadata.email_subject = event.subject;
+    }
+
+    return metadata;
   }
 
   /**

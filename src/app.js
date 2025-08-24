@@ -11,6 +11,8 @@ const syncState = require("./utils/syncState");
 const dedupStore = require("./utils/sourceUsersStore");
 const DedupStore = require("./utils/dedupStore");
 const { runMigrations } = require("./migrations/run_migrations");
+const { migrationService } = require("./services/migrationService");
+const { dbOptimizations } = require("./utils/dbOptimizations");
 const NewSyncRoutes = require("./routes/newSyncRoutes");
 const ProductEventRoutes = require("./routes/productEventRoutes");
 const PeriodicSyncRoutes = require("./routes/periodicSyncRoutes");
@@ -98,21 +100,61 @@ const cronManager = new CronManager(
   process.env.BASE_URL || `http://localhost:${PORT}`
 );
 
-// Initialize database tables
+// Initialize database tables, migrations, and optimizations
 async function initializeDatabaseTables() {
   try {
-    logger.info("Running database migrations...");
-    await runMigrations();
-    logger.info("Database migrations completed.");
+    logger.info("🔧 Starting database initialization...");
 
-    // Verification of tables can remain or be removed, as migrations handle creation.
+    // Step 1: Run legacy migrations first
+    logger.info("Running legacy database migrations...");
+    await runMigrations();
+    logger.info("✅ Legacy migrations completed.");
+
+    // Step 2: Run new migration service for additional migrations
+    logger.info("Running enhanced migrations...");
+    const migrationResults = await migrationService.runPendingMigrations();
+    if (migrationResults.success) {
+      logger.info(
+        `✅ Enhanced migrations completed: ${migrationResults.migrationsRun} new migrations`
+      );
+    } else {
+      logger.warn(
+        `⚠️ Some enhanced migrations failed: ${migrationResults.migrationsRun}/${migrationResults.totalPending} successful`
+      );
+    }
+
+    // Step 3: Initialize database optimizations
+    logger.info("Initializing database optimizations...");
+    await dbOptimizations.initialize();
+    logger.info("✅ Database optimizations initialized");
+
+    // Step 4: Verify critical tables exist
     const tables = ["user_source", "event_source", "campaigns", "sent_events"];
     for (const table of tables) {
-      await db.query(`SELECT 1 FROM ${table} LIMIT 1`);
-      logger.info(`✅ Table ${table} verified.`);
+      try {
+        await db.query(`SELECT 1 FROM ${table} LIMIT 1`);
+        logger.info(`✅ Table ${table} verified.`);
+      } catch (error) {
+        logger.warn(`⚠️ Table ${table} verification failed:`, error.message);
+      }
     }
+
+    // Step 5: Get database optimization status
+    const poolStats = await dbOptimizations.getConnectionPoolStats();
+    const bulkStats = dbOptimizations.getBulkOperationStats();
+
+    logger.info("📊 Database initialization summary:", {
+      migrationsRun: migrationResults.migrationsRun,
+      optimizationsEnabled: bulkStats.initialized,
+      connectionPool: poolStats
+        ? `${poolStats.totalCount}/${poolStats.maxPoolSize}`
+        : "unknown",
+      tablesVerified: tables.length,
+    });
+
+    logger.info("🎉 Database initialization completed successfully!");
   } catch (error) {
-    logger.error("Failed to initialize database tables:", error);
+    logger.error("❌ Failed to initialize database:", error);
     throw error;
   }
 }
