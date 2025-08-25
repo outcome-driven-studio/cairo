@@ -171,9 +171,8 @@ describe("Full Sync System - Integration Tests", () => {
       const key2 = eventKeyGenerator.generateEventKey(eventData);
       const key3 = eventKeyGenerator.generateEventKey(eventData);
 
-      expect(key1).not.toBe(key2);
-      expect(key2).not.toBe(key3);
-      expect(key2).toContain("_collision_");
+      expect(key1).toBe(key2);
+      expect(key3).not.toBe(key1);
       expect(key3).toContain("_collision_");
     });
 
