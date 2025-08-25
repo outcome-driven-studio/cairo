@@ -3,12 +3,30 @@ const logger = require("../../utils/logger");
 const SmartleadService = require("../smartleadService");
 const NamespaceService = require("../namespaceService");
 const TableManagerService = require("../tableManagerService");
+const MixpanelService = require("../mixpanelService");
+const { eventKeyGenerator } = require("../../utils/eventKeyGenerator");
 
 class SmartleadSync {
-  constructor() {
+  constructor(options = {}) {
     this.smartleadService = new SmartleadService(process.env.SMARTLEAD_API_KEY);
     this.namespaceService = new NamespaceService();
     this.tableManager = new TableManagerService();
+    this.mixpanelService = new MixpanelService(
+      process.env.MIXPANEL_PROJECT_TOKEN
+    );
+
+    // Mixpanel tracking configuration
+    this.trackingConfig = {
+      enableMixpanelTracking: options.enableMixpanelTracking !== false, // Default true
+      trackCampaignEvents: options.trackCampaignEvents !== false, // Default true
+      trackUserEvents: options.trackUserEvents !== false, // Default true
+      ...options.trackingConfig,
+    };
+
+    logger.info("SmartleadSync initialized with Mixpanel tracking", {
+      mixpanelEnabled: this.mixpanelService.enabled,
+      trackingConfig: this.trackingConfig,
+    });
   }
 
   async upsertUserSource(userData, campaignName = null) {
@@ -100,6 +118,9 @@ class SmartleadSync {
         logger.info(
           `✅ [${namespace}] Created new event: ${eventData.event_key}`
         );
+
+        // Track event in Mixpanel (non-blocking)
+        await this.trackEventInMixpanel(eventData, namespace);
         return result.rows[0];
       }
       return null;
@@ -107,6 +128,117 @@ class SmartleadSync {
       logger.error(`❌ Failed to create event for: ${eventData.email}`, error);
       return null;
     }
+  }
+
+  /**
+   * Track event in Mixpanel with campaign context
+   * @param {Object} eventData - Event data from database
+   * @param {string} namespace - Namespace for the event
+   * @private
+   */
+  async trackEventInMixpanel(eventData, namespace) {
+    if (
+      !this.trackingConfig.enableMixpanelTracking ||
+      !this.mixpanelService.enabled
+    ) {
+      return;
+    }
+
+    try {
+      // Map database event types to Mixpanel events
+      const mixpanelEvent = this.mapToMixpanelEvent(eventData.event_type);
+      if (!mixpanelEvent) return;
+
+      // Prepare Mixpanel properties
+      const mixpanelProperties = {
+        // Campaign context
+        campaign_id: eventData.metadata?.campaign_id,
+        campaign_name: eventData.metadata?.campaign_name,
+        campaign_platform: "smartlead",
+
+        // User context
+        user_namespace: namespace,
+        user_source: "sync",
+
+        // Event context
+        event_source: "sync_pipeline",
+        event_key: eventData.event_key,
+        sync_mode: "periodic",
+
+        // Technical metadata
+        platform: eventData.platform,
+        original_timestamp: eventData.timestamp || new Date(),
+
+        // Additional metadata from event
+        ...this.extractMixpanelMetadata(eventData.metadata),
+      };
+
+      // Track asynchronously (don't await to avoid slowing down sync)
+      this.mixpanelService
+        .track(eventData.email.toLowerCase(), mixpanelEvent, mixpanelProperties)
+        .catch((error) => {
+          logger.warn(
+            `[SmartleadSync] Mixpanel tracking failed for ${eventData.event_key}:`,
+            error.message
+          );
+        });
+
+      logger.debug(
+        `[SmartleadSync] Queued Mixpanel event: ${mixpanelEvent} for ${eventData.email}`
+      );
+    } catch (error) {
+      logger.warn(
+        `[SmartleadSync] Error preparing Mixpanel event:`,
+        error.message
+      );
+    }
+  }
+
+  /**
+   * Map database event types to Mixpanel event names
+   * @param {string} eventType - Database event type
+   * @returns {string|null} Mixpanel event name
+   * @private
+   */
+  mapToMixpanelEvent(eventType) {
+    const eventMap = {
+      lead_created: "smartlead_lead_created",
+      email_sent: "smartlead_email_sent",
+      email_opened: "smartlead_email_opened",
+      email_clicked: "smartlead_email_clicked",
+      email_replied: "smartlead_email_replied",
+      campaign_started: "smartlead_campaign_started",
+      campaign_paused: "smartlead_campaign_paused",
+      lead_bounced: "smartlead_email_bounced",
+      lead_unsubscribed: "smartlead_lead_unsubscribed",
+    };
+
+    return eventMap[eventType] || null;
+  }
+
+  /**
+   * Extract relevant metadata for Mixpanel properties
+   * @param {Object} metadata - Event metadata
+   * @returns {Object} Cleaned metadata for Mixpanel
+   * @private
+   */
+  extractMixpanelMetadata(metadata = {}) {
+    const cleanMetadata = {};
+
+    // Extract useful fields for analytics
+    if (metadata.lead?.company)
+      cleanMetadata.lead_company = metadata.lead.company;
+    if (metadata.lead?.first_name)
+      cleanMetadata.lead_first_name = metadata.lead.first_name;
+    if (metadata.lead?.last_name)
+      cleanMetadata.lead_last_name = metadata.lead.last_name;
+    if (metadata.lead?.linkedin_url) cleanMetadata.has_linkedin = true;
+    if (metadata.sequence_step)
+      cleanMetadata.sequence_step = metadata.sequence_step;
+    if (metadata.email_subject)
+      cleanMetadata.email_subject = metadata.email_subject;
+
+    return cleanMetadata;
   }
 
   /**

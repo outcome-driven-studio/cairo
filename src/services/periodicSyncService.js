@@ -6,16 +6,28 @@ const AttioService = require("./attioService");
 const LemlistService = require("./lemlistService");
 const SmartleadService = require("./smartleadService");
 const LeadScoringService = require("./leadScoringService");
+const LemlistSync = require("./sync/lemlistSync");
+const SmartleadSync = require("./sync/smartleadSync");
 const monitoring = require("../utils/monitoring");
 
 class PeriodicSyncService {
-  constructor() {
+  constructor(options = {}) {
     this.isRunning = false;
     this.syncInterval = process.env.SYNC_INTERVAL_HOURS || 4; // Default 4 hours
     this.cronJobs = [];
     this.lastSyncTimes = {};
 
-    // Initialize services
+    // Mixpanel tracking configuration
+    const mixpanelTrackingEnabled =
+      process.env.PERIODIC_SYNC_MIXPANEL_ENABLED !== "false"; // Default true
+    const trackingOptions = {
+      enableMixpanelTracking: mixpanelTrackingEnabled,
+      trackCampaignEvents: options.trackCampaignEvents !== false,
+      trackUserEvents: options.trackUserEvents !== false,
+      ...options.trackingConfig,
+    };
+
+    // Initialize services (keeping old services for backward compatibility)
     this.attioService = new AttioService(process.env.ATTIO_API_KEY);
     this.lemlistService = process.env.LEMLIST_API_KEY
       ? new LemlistService(process.env.LEMLIST_API_KEY)
@@ -25,6 +37,14 @@ class PeriodicSyncService {
       : null;
     this.leadScoringService = new LeadScoringService();
 
+    // Initialize new sync services with Mixpanel tracking
+    this.lemlistSyncService = process.env.LEMLIST_API_KEY
+      ? new LemlistSync(trackingOptions)
+      : null;
+    this.smartleadSyncService = process.env.SMARTLEAD_API_KEY
+      ? new SmartleadSync(trackingOptions)
+      : null;
+
     // Track statistics
     this.stats = {
       totalSyncs: 0,
@@ -32,6 +52,11 @@ class PeriodicSyncService {
       errors: [],
       syncHistory: [],
     };
+
+    logger.info("PeriodicSyncService initialized with Mixpanel tracking", {
+      mixpanelEnabled: mixpanelTrackingEnabled,
+      trackingOptions: trackingOptions,
+    });
   }
 
   /**
@@ -104,13 +129,16 @@ class PeriodicSyncService {
       }
 
       // Step 2: Sync Lemlist data (delta sync based on last sync time)
-      if (this.lemlistService && process.env.SYNC_FROM_LEMLIST !== "false") {
+      if (
+        this.lemlistSyncService &&
+        process.env.SYNC_FROM_LEMLIST !== "false"
+      ) {
         results.lemlist = await this.syncFromLemlist();
       }
 
       // Step 3: Sync Smartlead data (delta sync based on last sync time)
       if (
-        this.smartleadService &&
+        this.smartleadSyncService &&
         process.env.SYNC_FROM_SMARTLEAD !== "false"
       ) {
         results.smartlead = await this.syncFromSmartlead();
@@ -263,93 +291,22 @@ class PeriodicSyncService {
   }
 
   /**
-   * Sync data from Lemlist (delta sync)
+   * Sync data from Lemlist (delta sync) with Mixpanel tracking
    */
   async syncFromLemlist() {
-    logger.info("[PeriodicSync] Starting Lemlist delta sync...");
+    logger.info(
+      "[PeriodicSync] Starting Lemlist delta sync with Mixpanel tracking..."
+    );
 
     try {
-      // Get last sync time
-      const lastSync = await syncState.getLastChecked("lemlist");
-      const lastSyncTime =
-        lastSync || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // Default 7 days
-
-      logger.info(
-        `[PeriodicSync] Last Lemlist sync: ${lastSyncTime.toISOString()}`
-      );
-
-      let totalEvents = 0;
-      let totalUsers = 0;
-
-      // Get all campaigns
-      const campaigns = await this.lemlistService.getCampaigns();
-
-      for (const campaign of campaigns) {
-        try {
-          // Get activities since last sync
-          const activities = await this.lemlistService.getCampaignActivities(
-            campaign.id,
-            100,
-            0,
-            { startDate: lastSyncTime.toISOString() }
-          );
-
-          for (const activity of activities) {
-            // Insert event
-            await query(
-              `INSERT INTO event_source 
-               (event_key, event_type, platform, user_id, metadata, created_at)
-               VALUES ($1, $2, $3, $4, $5, $6)
-               ON CONFLICT (event_key) DO NOTHING`,
-              [
-                `lemlist-${activity.type}-${activity.id}`,
-                activity.type,
-                "lemlist",
-                activity.leadEmail || activity.leadId,
-                JSON.stringify(activity),
-                activity.createdAt || new Date(),
-              ]
-            );
-            totalEvents++;
-          }
-
-          // Also sync campaign leads (users)
-          const leads = await this.lemlistService.getLeads(campaign.id);
-          for (const lead of leads) {
-            if (!lead.email) continue;
-
-            await query(
-              `INSERT INTO playmaker_user_source 
-               (email, name, created_at, updated_at, original_user_id, platform)
-               VALUES ($1, $2, $3, $4, $5, $6)
-               ON CONFLICT (email) DO UPDATE SET
-                 name = COALESCE(EXCLUDED.name, playmaker_user_source.name),
-                 updated_at = NOW()`,
-              [
-                lead.email,
-                lead.firstName && lead.lastName
-                  ? `${lead.firstName} ${lead.lastName}`
-                  : lead.email.split("@")[0],
-                lead.createdAt || new Date(),
-                new Date(),
-                lead.id,
-                "lemlist",
-              ]
-            );
-            totalUsers++;
-          }
-        } catch (error) {
-          logger.error(
-            `[PeriodicSync] Failed to sync Lemlist campaign ${campaign.id}:`,
-            error
-          );
-        }
-      }
+      // Use the new LemlistSync service that includes Mixpanel tracking
+      await this.lemlistSyncService.run();
 
       // Update last sync time
       await syncState.setLastChecked("lemlist");
 
-      return { success: true, events: totalEvents, users: totalUsers };
+      // Get basic stats for return (the LemlistSync service logs detailed info)
+      return { success: true, events: "tracked", users: "tracked" };
     } catch (error) {
       logger.error("[PeriodicSync] Lemlist sync failed:", error);
       return { success: false, events: 0, users: 0, error: error.message };
@@ -357,98 +314,22 @@ class PeriodicSyncService {
   }
 
   /**
-   * Sync data from Smartlead (delta sync)
+   * Sync data from Smartlead (delta sync) with Mixpanel tracking
    */
   async syncFromSmartlead() {
-    logger.info("[PeriodicSync] Starting Smartlead delta sync...");
+    logger.info(
+      "[PeriodicSync] Starting Smartlead delta sync with Mixpanel tracking..."
+    );
 
     try {
-      // Get last sync time
-      const lastSync = await syncState.getLastChecked("smartlead");
-      const lastSyncTime =
-        lastSync || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // Default 7 days
-
-      logger.info(
-        `[PeriodicSync] Last Smartlead sync: ${lastSyncTime.toISOString()}`
-      );
-
-      let totalEvents = 0;
-      let totalUsers = 0;
-
-      // Get all campaigns
-      const campaigns = await this.smartleadService.getCampaigns();
-
-      for (const campaign of campaigns) {
-        try {
-          // Get leads
-          const leads = await this.smartleadService.getLeads(campaign.id);
-
-          for (const lead of leads) {
-            if (!lead.email) continue;
-
-            // Insert/update user
-            await query(
-              `INSERT INTO playmaker_user_source 
-               (email, name, created_at, updated_at, original_user_id, platform)
-               VALUES ($1, $2, $3, $4, $5, $6)
-               ON CONFLICT (email) DO UPDATE SET
-                 name = COALESCE(EXCLUDED.name, playmaker_user_source.name),
-                 updated_at = NOW()`,
-              [
-                lead.email,
-                lead.first_name && lead.last_name
-                  ? `${lead.first_name} ${lead.last_name}`
-                  : lead.email.split("@")[0],
-                lead.created_at || new Date(),
-                new Date(),
-                lead.id,
-                "smartlead",
-              ]
-            );
-            totalUsers++;
-
-            // Get email stats for events
-            const stats = await this.smartleadService.getEmailStats(
-              campaign.id,
-              lead.email
-            );
-
-            // Process each event type
-            const eventTypes = ["sent", "opened", "clicked", "replied"];
-            for (const eventType of eventTypes) {
-              if (stats[eventType] && stats[eventType] > 0) {
-                const eventKey = `smartlead-${eventType}-${campaign.id}-${lead.email}`;
-
-                await query(
-                  `INSERT INTO event_source 
-                   (event_key, event_type, platform, user_id, metadata, created_at)
-                   VALUES ($1, $2, $3, $4, $5, $6)
-                   ON CONFLICT (event_key) DO NOTHING`,
-                  [
-                    eventKey,
-                    `email_${eventType}`,
-                    "smartlead",
-                    lead.email,
-                    JSON.stringify({ campaign_id: campaign.id, ...stats }),
-                    new Date(),
-                  ]
-                );
-                totalEvents++;
-              }
-            }
-          }
-        } catch (error) {
-          logger.error(
-            `[PeriodicSync] Failed to sync Smartlead campaign ${campaign.id}:`,
-            error
-          );
-        }
-      }
+      // Use the new SmartleadSync service that includes Mixpanel tracking
+      await this.smartleadSyncService.run();
 
       // Update last sync time
       await syncState.setLastChecked("smartlead");
 
-      return { success: true, events: totalEvents, users: totalUsers };
+      // Get basic stats for return (the SmartleadSync service logs detailed info)
+      return { success: true, events: "tracked", users: "tracked" };
     } catch (error) {
       logger.error("[PeriodicSync] Smartlead sync failed:", error);
       return { success: false, events: 0, users: 0, error: error.message };

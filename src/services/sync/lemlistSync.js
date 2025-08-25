@@ -3,12 +3,30 @@ const logger = require("../../utils/logger");
 const LemlistService = require("../lemlistService");
 const NamespaceService = require("../namespaceService");
 const TableManagerService = require("../tableManagerService");
+const MixpanelService = require("../mixpanelService");
+const { eventKeyGenerator } = require("../../utils/eventKeyGenerator");
 
 class LemlistSync {
-  constructor() {
+  constructor(options = {}) {
     this.lemlistService = new LemlistService(process.env.LEMLIST_API_KEY);
     this.namespaceService = new NamespaceService();
     this.tableManager = new TableManagerService();
+    this.mixpanelService = new MixpanelService(
+      process.env.MIXPANEL_PROJECT_TOKEN
+    );
+
+    // Mixpanel tracking configuration
+    this.trackingConfig = {
+      enableMixpanelTracking: options.enableMixpanelTracking !== false, // Default true
+      trackCampaignEvents: options.trackCampaignEvents !== false, // Default true
+      trackUserEvents: options.trackUserEvents !== false, // Default true
+      ...options.trackingConfig,
+    };
+
+    logger.info("LemlistSync initialized with Mixpanel tracking", {
+      mixpanelEnabled: this.mixpanelService.enabled,
+      trackingConfig: this.trackingConfig,
+    });
   }
 
   async upsertUserSource(userData, campaignName = null) {
@@ -100,6 +118,9 @@ class LemlistSync {
         logger.info(
           `✅ [${namespace}] Created new event: ${eventData.event_key}`
         );
+
+        // Track event in Mixpanel (non-blocking)
+        await this.trackEventInMixpanel(eventData, namespace);
         return result.rows[0];
       }
       return null;
@@ -107,6 +128,121 @@ class LemlistSync {
       logger.error(`❌ Failed to create event for: ${eventData.email}`, error);
       return null;
     }
+  }
+
+  /**
+   * Track event in Mixpanel with campaign context
+   * @param {Object} eventData - Event data from database
+   * @param {string} namespace - Namespace for the event
+   * @private
+   */
+  async trackEventInMixpanel(eventData, namespace) {
+    if (
+      !this.trackingConfig.enableMixpanelTracking ||
+      !this.mixpanelService.enabled
+    ) {
+      return;
+    }
+
+    try {
+      // Map database event types to Mixpanel events
+      const mixpanelEvent = this.mapToMixpanelEvent(eventData.event_type);
+      if (!mixpanelEvent) return;
+
+      // Prepare Mixpanel properties
+      const mixpanelProperties = {
+        // Campaign context
+        campaign_id: eventData.metadata?.campaign_id,
+        campaign_name: eventData.metadata?.campaign_name,
+        campaign_platform: "lemlist",
+
+        // User context
+        user_namespace: namespace,
+        user_source: "sync",
+
+        // Event context
+        event_source: "sync_pipeline",
+        event_key: eventData.event_key,
+        sync_mode: "periodic",
+
+        // Technical metadata
+        platform: eventData.platform,
+        original_timestamp: eventData.timestamp || new Date(),
+
+        // Additional metadata from event
+        ...this.extractMixpanelMetadata(eventData.metadata),
+      };
+
+      // Track asynchronously (don't await to avoid slowing down sync)
+      this.mixpanelService
+        .track(eventData.email.toLowerCase(), mixpanelEvent, mixpanelProperties)
+        .catch((error) => {
+          logger.warn(
+            `[LemlistSync] Mixpanel tracking failed for ${eventData.event_key}:`,
+            error.message
+          );
+        });
+
+      logger.debug(
+        `[LemlistSync] Queued Mixpanel event: ${mixpanelEvent} for ${eventData.email}`
+      );
+    } catch (error) {
+      logger.warn(
+        `[LemlistSync] Error preparing Mixpanel event:`,
+        error.message
+      );
+    }
+  }
+
+  /**
+   * Map database event types to Mixpanel event names
+   * @param {string} eventType - Database event type
+   * @returns {string|null} Mixpanel event name
+   * @private
+   */
+  mapToMixpanelEvent(eventType) {
+    const eventMap = {
+      emailsent: "lemlist_email_sent",
+      emailopened: "lemlist_email_opened",
+      emailclicked: "lemlist_email_clicked",
+      emailreplied: "lemlist_email_replied",
+      linkedinvisit: "lemlist_linkedin_visit",
+      linkedinmessage: "lemlist_linkedin_message",
+      linkedinconnect: "lemlist_linkedin_connect",
+      emailbounced: "lemlist_email_bounced",
+      emailunsubscribed: "lemlist_email_unsubscribed",
+      campaignstarted: "lemlist_campaign_started",
+      lead_created: "lemlist_lead_created",
+    };
+
+    return eventMap[eventType] || null;
+  }
+
+  /**
+   * Extract relevant metadata for Mixpanel properties
+   * @param {Object} metadata - Event metadata
+   * @returns {Object} Cleaned metadata for Mixpanel
+   * @private
+   */
+  extractMixpanelMetadata(metadata = {}) {
+    const cleanMetadata = {};
+
+    // Extract useful fields for analytics
+    if (metadata.activity?.lead?.company)
+      cleanMetadata.lead_company = metadata.activity.lead.company;
+    if (metadata.activity?.lead?.firstName)
+      cleanMetadata.lead_first_name = metadata.activity.lead.firstName;
+    if (metadata.activity?.lead?.lastName)
+      cleanMetadata.lead_last_name = metadata.activity.lead.lastName;
+    if (metadata.activity?.lead?.linkedinUrl) cleanMetadata.has_linkedin = true;
+    if (metadata.activity?.stepIndex)
+      cleanMetadata.sequence_step = metadata.activity.stepIndex;
+    if (metadata.activity?.subject)
+      cleanMetadata.email_subject = metadata.activity.subject;
+    if (metadata.activity?.type)
+      cleanMetadata.activity_type = metadata.activity.type;
+
+    return cleanMetadata;
   }
 
   /**
@@ -190,13 +326,17 @@ class LemlistSync {
           );
 
           if (userResult) {
-            // Insert event with namespace context
+            // Insert event with namespace context using improved event key generation
+            const eventKey = eventKeyGenerator.generateLemlistKey(
+              activity,
+              activity.campaignId,
+              namespace
+            );
+
             await this.insertEventSource(
               {
                 email: activity.lead.email,
-                event_key: `lemlist_${activity.campaignId}_${
-                  activity.id || Date.now()
-                }`,
+                event_key: eventKey,
                 event_type: activity.type,
                 platform: "lemlist",
                 timestamp: activity.date,
