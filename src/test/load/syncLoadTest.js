@@ -225,9 +225,7 @@ class SyncLoadTester {
     for (let i = 0; i < configCount; i++) {
       try {
         const config = new FullSyncConfig({
-          platforms: [PLATFORMS.LEMLIST, PLATFORMS.SMARTLEAD][i % 2]
-            ? [PLATFORMS.LEMLIST]
-            : [PLATFORMS.SMARTLEAD],
+          platforms: i % 2 === 0 ? [PLATFORMS.LEMLIST] : [PLATFORMS.SMARTLEAD],
           namespaces: [`worker_${workerId}_ns_${i % 5}`],
           syncMode:
             Object.values(SYNC_MODES)[i % Object.values(SYNC_MODES).length],
