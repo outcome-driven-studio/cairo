@@ -363,6 +363,42 @@ class AttioService {
   }
 
   /**
+   * List people from Attio with pagination
+   * @param {Number} limit - Number of records to fetch (default 100)
+   * @param {Number} offset - Number of records to skip (default 0)
+   * @returns {Object} Response with data array and pagination info
+   */
+  async listPeople(limit = 100, offset = 0) {
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/objects/people/records/query`,
+        {
+          limit,
+          offset,
+          sorts: [
+            {
+              attribute: "created_at",
+              direction: "desc",
+            },
+          ],
+        },
+        { headers: this.headers }
+      );
+
+      return {
+        data: response.data.data || [],
+        total: response.data.total || 0,
+        has_more: response.data.has_more || false,
+      };
+    } catch (error) {
+      logger.error(`Failed to list people from Attio`, {
+        error: error.response?.data || error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Find a person by email
    * @param {String} email - Email address to search
    * @returns {Object|null} Person record or null if not found

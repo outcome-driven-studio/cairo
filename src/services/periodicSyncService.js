@@ -76,14 +76,51 @@ class PeriodicSyncService {
     await syncState.init();
 
     // Schedule cron job (every N hours)
-    const cronExpression = `0 */${this.syncInterval} * * *`;
+    // For testing: if SYNC_TEST_MODE=true, run every 2 minutes instead
+    const isTestMode = process.env.SYNC_TEST_MODE === "true";
+    const cronExpression = isTestMode
+      ? `*/2 * * * *` // Every 2 minutes for testing
+      : `0 */${this.syncInterval} * * *`; // Every N hours for production
 
-    const job = cron.schedule(cronExpression, async () => {
-      await this.runFullSync();
-    });
+    if (isTestMode) {
+      logger.warn(
+        "[PeriodicSync] TEST MODE ENABLED - Syncing every 2 minutes!"
+      );
+    }
+
+    logger.info(
+      `[PeriodicSync] Creating cron job with expression: ${cronExpression}`
+    );
+
+    const job = cron.schedule(
+      cronExpression,
+      async () => {
+        logger.info(
+          `[PeriodicSync] Cron job triggered at ${new Date().toISOString()}`
+        );
+        try {
+          await this.runFullSync();
+        } catch (error) {
+          logger.error("[PeriodicSync] Cron job execution failed:", error);
+        }
+      },
+      {
+        scheduled: true, // Ensure the job is scheduled
+        timezone: "UTC", // Use UTC timezone for consistency
+      }
+    );
+
+    // Explicitly start the job
+    job.start();
 
     this.cronJobs.push(job);
     this.isRunning = true;
+
+    logger.info(
+      `[PeriodicSync] Cron job scheduled successfully. Job active: ${
+        job !== null
+      }, Running: ${this.isRunning}`
+    );
 
     // Run initial sync if configured
     if (process.env.RUN_SYNC_ON_START === "true") {
@@ -92,6 +129,21 @@ class PeriodicSyncService {
     }
 
     logger.info(`[PeriodicSync] Scheduled sync job: ${cronExpression}`);
+
+    // Log next sync time for debugging
+    const nextSyncTime = this.getNextSyncTime();
+    logger.info(
+      `[PeriodicSync] Next sync scheduled for: ${nextSyncTime.toISOString()}`
+    );
+
+    // Add heartbeat logging every minute to ensure service is running
+    if (process.env.PERIODIC_SYNC_HEARTBEAT === "true") {
+      setInterval(() => {
+        logger.info(
+          `[PeriodicSync] Heartbeat - Service is running. Next sync: ${this.getNextSyncTime().toISOString()}`
+        );
+      }, 60000); // Every minute
+    }
   }
 
   /**
@@ -235,7 +287,10 @@ class PeriodicSyncService {
 
       // Filter for new people (created after last sync)
       const newPeople = allPeople.filter((person) => {
-        const createdAt = new Date(person.created_at);
+        // Attio returns timestamps in values.created_at.value
+        const createdAt = new Date(
+          person.values?.created_at?.value || person.created_at
+        );
         return createdAt > lastSyncTime;
       });
 
@@ -247,7 +302,11 @@ class PeriodicSyncService {
       let imported = 0;
       for (const person of newPeople) {
         try {
-          const email = person.values.email?.[0]?.email_address;
+          // Extract email from Attio structure
+          const email =
+            person.values?.email_addresses?.[0]?.value ||
+            person.values?.email_addresses?.[0]?.email_address ||
+            person.values?.email_addresses?.[0];
           if (!email) continue;
 
           // Check if user already exists
@@ -257,17 +316,32 @@ class PeriodicSyncService {
           );
 
           if (existing.rows.length === 0) {
-            // Insert new user
+            // Extract name from Attio structure
+            const nameValue = person.values?.name?.[0];
+            const fullName =
+              nameValue?.full_name ||
+              nameValue?.value ||
+              `${nameValue?.first_name || ""} ${
+                nameValue?.last_name || ""
+              }`.trim() ||
+              email.split("@")[0];
+
+            // Insert new user (store name in enrichment_profile)
+            const enrichmentProfile = {
+              name: fullName,
+              source: "attio_import",
+              imported_at: new Date().toISOString(),
+            };
+
             await query(
               `INSERT INTO playmaker_user_source 
-               (email, name, created_at, updated_at, original_user_id, platform)
-               VALUES ($1, $2, NOW(), NOW(), $3, $4)
+               (email, enrichment_profile, created_at, updated_at, original_user_id)
+               VALUES ($1, $2, NOW(), NOW(), $3)
                ON CONFLICT (email) DO NOTHING`,
               [
                 email,
-                person.values.name || email.split("@")[0],
-                person.id.record_id,
-                "attio",
+                JSON.stringify(enrichmentProfile),
+                person.id?.record_id || person.id,
               ]
             );
             imported++;
@@ -282,6 +356,10 @@ class PeriodicSyncService {
 
       // Update last sync time
       await syncState.setLastChecked("attio_import");
+
+      logger.info(
+        `[PeriodicSync] Attio import completed: ${imported} imported out of ${newPeople.length} new people (${allPeople.length} total in Attio)`
+      );
 
       return { success: true, imported, total: allPeople.length };
     } catch (error) {
@@ -559,14 +637,7 @@ class PeriodicSyncService {
             continue;
           }
 
-          await this.attioService.upsertPersonWithScores(
-            user.email,
-            user.name,
-            user.icp_score,
-            user.behaviour_score,
-            user.lead_score,
-            user.lead_grade
-          );
+          await this.attioService.upsertPersonWithScores(user);
           synced++;
         } catch (error) {
           logger.error(
