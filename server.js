@@ -306,12 +306,26 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     // Sync configuration
     // Option 1: Use new periodic sync (recommended - every 4 hours)
     if (process.env.USE_PERIODIC_SYNC === "true") {
-      const { getInstance } = require("./src/services/periodicSyncService");
-      const periodicSync = getInstance();
-      await periodicSync.start();
-      logger.info(
-        `Periodic sync started (every ${periodicSync.syncInterval} hours)`
-      );
+      logger.info("[Server] Initializing PeriodicSyncService...");
+      try {
+        const { getInstance } = require("./src/services/periodicSyncService");
+        const periodicSync = getInstance();
+        await periodicSync.start();
+        logger.info(
+          `[Server] Periodic sync started successfully (every ${periodicSync.syncInterval} hours)`
+        );
+
+        // Log initial status
+        const stats = periodicSync.getStats();
+        logger.info("[Server] Periodic sync initial status:", {
+          isRunning: stats.isRunning,
+          syncInterval: stats.syncInterval,
+          nextSyncTime: stats.nextSyncTime,
+        });
+      } catch (error) {
+        logger.error("[Server] Failed to start periodic sync:", error);
+        throw error; // Re-throw to prevent server from starting with broken sync
+      }
     }
     // Option 2: Use legacy cron jobs (every 10-15 minutes)
     else if (process.env.ENABLE_CRON_JOBS === "true") {
