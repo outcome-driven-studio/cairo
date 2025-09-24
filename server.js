@@ -16,6 +16,7 @@ const dedupStore = require("./src/utils/sourceUsersStore");
 const TestRoutes = require("./src/routes/testRoutes");
 const ProductEventRoutes = require("./src/routes/productEventRoutes");
 const PeriodicSyncRoutes = require("./src/routes/periodicSyncRoutes");
+const WebSocketService = require("./src/services/websocketService");
 const NewSyncRoutes = require("./src/routes/newSyncRoutes");
 const ScoringRoutes = require("./src/routes/scoringRoutes");
 const ExternalProfileRoutes = require("./src/routes/externalProfileRoutes");
@@ -98,6 +99,7 @@ const dashboardRoutes = new DashboardRoutes();
 app.use("/", dashboardRoutes.setupRoutes());
 
 // Product event tracking routes
+let webSocketService = null;  // Will be initialized after server starts
 const productEventRoutes = new ProductEventRoutes();
 app.use("/api/events", productEventRoutes.setupRoutes());
 
@@ -303,6 +305,13 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     // Start monitoring health checks
     monitoring.startHealthChecks();
 
+    // Initialize WebSocket service
+    webSocketService = new WebSocketService(server);
+
+    // Pass WebSocket service to product event routes for real-time event streaming
+    productEventRoutes.webSocketService = webSocketService;
+    logger.info("✅ WebSocket service initialized for real-time event streaming");
+
     // Sync configuration
     // Option 1: Use new periodic sync (recommended - every 4 hours)
     if (process.env.USE_PERIODIC_SYNC === "true") {
@@ -413,6 +422,12 @@ process.on("SIGTERM", async () => {
 
 async function gracefulShutdown() {
   try {
+    // Shutdown WebSocket service first
+    if (webSocketService) {
+      webSocketService.shutdown();
+      logger.info("WebSocket service shut down");
+    }
+
     // Stop accepting new connections
     server.close(() => {
       logger.info("HTTP server closed");

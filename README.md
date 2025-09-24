@@ -9,25 +9,68 @@
 
 ## 🚀 Overview
 
-Cairo is an open-source Customer Data Platform (CDP) that unifies lead data from multiple sources, enriches it with company information, calculates lead scores, and syncs everything to your CRM and analytics tools.
+Cairo CDP is an open-source Customer Data Platform that collects, processes, and routes customer data from any source to any destination. Transform your applications into a comprehensive data ecosystem with real-time event tracking, intelligent routing, and powerful analytics.
 
-### Key Features
+## 📖 Documentation
 
-- 📊 **Multi-Source Data Integration** - Pull data from Lemlist, Smartlead, and your product
-- 🏢 **Multi-Tenant Namespaces** - Separate data by customer/client automatically via campaign keywords
-- 🚀 **Full Sync System** - Bulk sync hundreds of thousands of records with intelligent rate limiting
-- 🤖 **AI-First Enrichment** - Cost-effective lead enrichment with AI ($0.005/lead) + fallbacks
-- 📈 **Intelligent Lead Scoring** - Combine ICP (Ideal Customer Profile) and behavioral scores
-- 🔄 **Smart CRM Sync** - Only sync engaged leads (behavior > 0) to Attio CRM
-- 📱 **Event Tracking** - Send events to Mixpanel and your database
-- 🎯 **Webhook Support** - Real-time data ingestion via webhooks
-- ⏰ **Periodic Auto-Sync** - Intelligent 4-hour behavior + weekly ICP scoring
-- 📦 **REST API** - Complete API for all operations
-- 🔧 **Background Jobs** - Async processing with status monitoring
-- 🎛️ **Dashboard UI** - Built-in dashboard for monitoring and control
+- **👤 [User Guide](./USER_GUIDE.md)** - Complete guide for non-technical users
+- **⚡ [Quick Start](./SDK_QUICK_START.md)** - Get started with SDKs in 5 minutes
+- **🛣️ [Roadmap](./CAIRO_CDP_ROADMAP.md)** - Platform evolution and features
+- **📚 [Technical Docs](./docs/README.md)** - API references and advanced guides
+
+### 🌟 Key Features
+
+**🔌 Universal SDK Support**
+- Node.js, React/Next.js, and Browser JavaScript SDKs
+- Segment-compatible API for easy migration
+- TypeScript support with full type definitions
+- Event batching, retries, and queue management
+
+**🎯 Intelligent Routing**
+- Plugin-based destination architecture
+- Pre-built integrations: Slack, Mixpanel, Webhooks
+- Custom transformation rules
+- Real-time and batch processing
+
+**📊 Real-Time Analytics**
+- Live event debugging with WebSocket streaming
+- Modern React dashboard with dark/light themes
+- Advanced filtering and search capabilities
+- Export functionality for analysis
+
+**🏢 Enterprise Ready**
+- Multi-tenant data segregation via namespaces
+- GDPR/CCPA compliant with consent management
+- Auto-scaling with intelligent rate limiting
+- Comprehensive monitoring and health checks
+
+**🤖 AI-Powered Enrichment**
+- Cost-effective lead enrichment ($0.005/lead)
+- Intelligent lead scoring (ICP + behavioral)
+- Smart CRM sync for engaged leads only
+- Background job processing with status monitoring
+
+## 🎯 How to Use Cairo CDP
+
+### For Non-Technical Users
+1. **Access the Dashboard** - Open Cairo CDP in your browser
+2. **Monitor Live Events** - See customer actions in real-time
+3. **Configure Destinations** - Set up Slack notifications and analytics
+4. **Review Analytics** - Use charts and reports to understand customer behavior
+
+👉 **[Complete User Guide](./USER_GUIDE.md)** - Step-by-step instructions
+
+### For Developers
+1. **Install SDK** - Choose Node.js, React, or Browser SDK
+2. **Track Events** - Add customer action tracking to your app
+3. **Configure Routing** - Set up data destinations
+4. **Monitor & Debug** - Use real-time debugging tools
+
+👉 **[SDK Quick Start](./SDK_QUICK_START.md)** - Get coding in 5 minutes
 
 ## 📋 Table of Contents
 
+- [How to Use](#-how-to-use-cairo-cdp)
 - [Quick Start](#-quick-start)
 - [Multi-Tenant Namespaces](#-multi-tenant-namespaces)
 - [API Documentation](#-api-documentation)
@@ -105,7 +148,7 @@ LEMLIST_API_KEY=your_lemlist_api_key
 SMARTLEAD_API_KEY=your_smartlead_api_key
 
 
-# Server Configuration  
+# Server Configuration
 PORT=8080
 NODE_ENV=development
 
@@ -175,14 +218,14 @@ Cairo supports **multi-tenant data segregation** through namespaces, allowing ag
 ### How It Works
 
 1. **Campaign Detection**: Cairo analyzes campaign names from Lemlist and Smartlead
-2. **Keyword Matching**: Matches campaigns against configured keywords per namespace  
+2. **Keyword Matching**: Matches campaigns against configured keywords per namespace
 3. **Automatic Routing**: Routes data to separate `{namespace}_user_source` tables
 4. **Isolated CRM Sync**: Each namespace can have its own Attio configuration
 
 ### Example Use Cases
 
 - **Marketing Agency**: Separate data for "ACME Corp", "TechStart", "Startup Co" clients
-- **SaaS Company**: Segment data by product lines or customer tiers  
+- **SaaS Company**: Segment data by product lines or customer tiers
 - **Consulting Firm**: Isolate client data for compliance and reporting
 
 ### Quick Example
@@ -196,19 +239,19 @@ curl -X POST http://localhost:8080/api/namespaces \
     "keywords": ["ACME", "ACME Corp", "acme-corp"]
   }'
 
-# Now any Lemlist/Smartlead campaigns with "ACME Corp Q1 Campaign" 
+# Now any Lemlist/Smartlead campaigns with "ACME Corp Q1 Campaign"
 # will automatically route to the acme_corp_user_source table
 ```
 
 ### Namespace Management
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/namespaces` | GET | List all namespaces |
-| `/api/namespaces` | POST | Create new namespace |
-| `/api/namespaces/{name}` | GET | Get specific namespace |
-| `/api/namespaces/{name}` | PUT | Update namespace |
-| `/api/namespaces/{name}/stats` | GET | Get namespace statistics |
+| Endpoint                       | Method | Description              |
+| ------------------------------ | ------ | ------------------------ |
+| `/api/namespaces`              | GET    | List all namespaces      |
+| `/api/namespaces`              | POST   | Create new namespace     |
+| `/api/namespaces/{name}`       | GET    | Get specific namespace   |
+| `/api/namespaces/{name}`       | PUT    | Update namespace         |
+| `/api/namespaces/{name}/stats` | GET    | Get namespace statistics |
 
 ### Key Benefits
 
@@ -249,14 +292,13 @@ curl -X PUT http://localhost:8080/api/namespaces/acme-corp \
 
 #### Namespace Management
 
-
-| Endpoint                      | Method | Description                     |
-| ----------------------------- | ------ | ------------------------------- |
-| `/api/namespaces`             | GET    | List all active namespaces      |
-| `/api/namespaces`             | POST   | Create new namespace            |
-| `/api/namespaces/{name}`      | GET    | Get specific namespace details  |
-| `/api/namespaces/{name}`      | PUT    | Update namespace configuration  |
-| `/api/namespaces/{name}/stats`| GET    | Get namespace usage statistics  |
+| Endpoint                       | Method | Description                    |
+| ------------------------------ | ------ | ------------------------------ |
+| `/api/namespaces`              | GET    | List all active namespaces     |
+| `/api/namespaces`              | POST   | Create new namespace           |
+| `/api/namespaces/{name}`       | GET    | Get specific namespace details |
+| `/api/namespaces/{name}`       | PUT    | Update namespace configuration |
+| `/api/namespaces/{name}/stats` | GET    | Get namespace usage statistics |
 
 #### Lead Scoring
 
@@ -276,6 +318,8 @@ curl -X PUT http://localhost:8080/api/namespaces/acme-corp \
 | `/api/events/identify` | POST   | Identify/update user properties     |
 | `/api/events/stats`    | GET    | Get event tracking statistics       |
 | `/api/events/health`   | GET    | Check event tracking service health |
+
+**New:** Event tracking now supports automatic Slack alerts for important events like signups, payments, and high-value actions. See [Event Tracking Guide](./docs/EVENT_TRACKING_GUIDE.md#slack-alerts) for configuration.
 
 #### Periodic Sync Management
 

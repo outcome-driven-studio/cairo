@@ -1,0 +1,62 @@
+{
+  "name": "@cairo/react",
+  "version": "1.0.0",
+  "description": "Cairo CDP React SDK for client-side event tracking",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src --ext .ts,.tsx",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "cairo",
+    "cdp",
+    "analytics",
+    "tracking",
+    "react",
+    "nextjs",
+    "hooks"
+  ],
+  "author": "Cairo Team",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "react-dom": ">=16.8.0"
+  },
+  "dependencies": {
+    "@cairo/node-sdk": "^1.0.0",
+    "axios": "^1.6.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "@types/uuid": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "eslint-plugin-react": "^7.33.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "jest": "^29.5.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "ts-jest": "^29.0.0",
+    "typescript": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/outcome-driven-studio/cairo.git"
+  },
+  "bugs": {
+    "url": "https://github.com/outcome-driven-studio/cairo/issues"
+  },
+  "homepage": "https://github.com/outcome-driven-studio/cairo#readme"
+}

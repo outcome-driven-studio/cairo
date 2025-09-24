@@ -1,0 +1,50 @@
+{
+  "name": "@cairo/browser",
+  "version": "1.0.0",
+  "description": "Cairo CDP Browser SDK for universal web tracking",
+  "main": "dist/cairo.min.js",
+  "module": "dist/cairo.esm.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "build:dev": "rollup -c --watch",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "cairo",
+    "cdp",
+    "analytics",
+    "tracking",
+    "browser",
+    "javascript"
+  ],
+  "author": "Cairo Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.0",
+    "@rollup/plugin-node-resolve": "^15.0.0",
+    "@rollup/plugin-typescript": "^11.0.0",
+    "@types/jest": "^29.5.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.5.0",
+    "rollup": "^4.0.0",
+    "rollup-plugin-terser": "^7.0.0",
+    "ts-jest": "^29.0.0",
+    "typescript": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/outcome-driven-studio/cairo.git"
+  },
+  "bugs": {
+    "url": "https://github.com/outcome-driven-studio/cairo/issues"
+  },
+  "homepage": "https://github.com/outcome-driven-studio/cairo#readme"
+}
