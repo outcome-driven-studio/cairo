@@ -31,6 +31,7 @@ const NamespaceRoutes = require("./src/routes/namespaceRoutes");
 
 // Create Express app
 const app = express();
+const path = require("path");
 
 // Initialize Sentry with Express app (must be before any middleware)
 sentry.initSentry(app);
@@ -53,6 +54,15 @@ app.get("/health/simple", (req, res) => {
     });
   }
 });
+
+// Serve static files from the UI build
+const publicPath = path.join(__dirname, "public");
+if (require("fs").existsSync(publicPath)) {
+  app.use(express.static(publicPath));
+  logger.info(`📁 Serving UI from ${publicPath}`);
+} else {
+  logger.warn("⚠️ No UI build found. Run 'node build-ui.js' to build the UI.");
+}
 
 // Add body parser middleware
 app.use(express.json());
@@ -271,6 +281,22 @@ app.get("/test-sentry", async (req, res) => {
   } catch (error) {
     // This error will be caught by Sentry error handler
     throw error;
+  }
+});
+
+// Catch-all route for client-side routing (must be after API routes)
+app.get("*", (req, res) => {
+  // Don't catch API routes
+  if (req.path.startsWith('/api') || req.path.startsWith('/sync') || req.path.startsWith('/ws')) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+
+  const indexPath = path.join(__dirname, "public", "index.html");
+  if (require("fs").existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).send("UI not built. Please run 'node build-ui.js' to build the UI.");
   }
 });
 
