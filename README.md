@@ -105,7 +105,7 @@ LEMLIST_API_KEY=your_lemlist_api_key
 SMARTLEAD_API_KEY=your_smartlead_api_key
 
 
-# Server Configuration  
+# Server Configuration
 PORT=8080
 NODE_ENV=development
 
@@ -175,14 +175,14 @@ Cairo supports **multi-tenant data segregation** through namespaces, allowing ag
 ### How It Works
 
 1. **Campaign Detection**: Cairo analyzes campaign names from Lemlist and Smartlead
-2. **Keyword Matching**: Matches campaigns against configured keywords per namespace  
+2. **Keyword Matching**: Matches campaigns against configured keywords per namespace
 3. **Automatic Routing**: Routes data to separate `{namespace}_user_source` tables
 4. **Isolated CRM Sync**: Each namespace can have its own Attio configuration
 
 ### Example Use Cases
 
 - **Marketing Agency**: Separate data for "ACME Corp", "TechStart", "Startup Co" clients
-- **SaaS Company**: Segment data by product lines or customer tiers  
+- **SaaS Company**: Segment data by product lines or customer tiers
 - **Consulting Firm**: Isolate client data for compliance and reporting
 
 ### Quick Example
@@ -196,19 +196,19 @@ curl -X POST http://localhost:8080/api/namespaces \
     "keywords": ["ACME", "ACME Corp", "acme-corp"]
   }'
 
-# Now any Lemlist/Smartlead campaigns with "ACME Corp Q1 Campaign" 
+# Now any Lemlist/Smartlead campaigns with "ACME Corp Q1 Campaign"
 # will automatically route to the acme_corp_user_source table
 ```
 
 ### Namespace Management
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/namespaces` | GET | List all namespaces |
-| `/api/namespaces` | POST | Create new namespace |
-| `/api/namespaces/{name}` | GET | Get specific namespace |
-| `/api/namespaces/{name}` | PUT | Update namespace |
-| `/api/namespaces/{name}/stats` | GET | Get namespace statistics |
+| Endpoint                       | Method | Description              |
+| ------------------------------ | ------ | ------------------------ |
+| `/api/namespaces`              | GET    | List all namespaces      |
+| `/api/namespaces`              | POST   | Create new namespace     |
+| `/api/namespaces/{name}`       | GET    | Get specific namespace   |
+| `/api/namespaces/{name}`       | PUT    | Update namespace         |
+| `/api/namespaces/{name}/stats` | GET    | Get namespace statistics |
 
 ### Key Benefits
 
@@ -249,14 +249,13 @@ curl -X PUT http://localhost:8080/api/namespaces/acme-corp \
 
 #### Namespace Management
 
-
-| Endpoint                      | Method | Description                     |
-| ----------------------------- | ------ | ------------------------------- |
-| `/api/namespaces`             | GET    | List all active namespaces      |
-| `/api/namespaces`             | POST   | Create new namespace            |
-| `/api/namespaces/{name}`      | GET    | Get specific namespace details  |
-| `/api/namespaces/{name}`      | PUT    | Update namespace configuration  |
-| `/api/namespaces/{name}/stats`| GET    | Get namespace usage statistics  |
+| Endpoint                       | Method | Description                    |
+| ------------------------------ | ------ | ------------------------------ |
+| `/api/namespaces`              | GET    | List all active namespaces     |
+| `/api/namespaces`              | POST   | Create new namespace           |
+| `/api/namespaces/{name}`       | GET    | Get specific namespace details |
+| `/api/namespaces/{name}`       | PUT    | Update namespace configuration |
+| `/api/namespaces/{name}/stats` | GET    | Get namespace usage statistics |
 
 #### Lead Scoring
 
@@ -276,6 +275,8 @@ curl -X PUT http://localhost:8080/api/namespaces/acme-corp \
 | `/api/events/identify` | POST   | Identify/update user properties     |
 | `/api/events/stats`    | GET    | Get event tracking statistics       |
 | `/api/events/health`   | GET    | Check event tracking service health |
+
+**New:** Event tracking now supports automatic Slack alerts for important events like signups, payments, and high-value actions. See [Event Tracking Guide](./docs/EVENT_TRACKING_GUIDE.md#slack-alerts) for configuration.
 
 #### Periodic Sync Management
 

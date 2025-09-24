@@ -19,6 +19,7 @@ const PeriodicSyncRoutes = require("./routes/periodicSyncRoutes");
 const TestRoutes = require("./routes/testRoutes");
 const ScoringRoutes = require("./routes/scoringRoutes");
 const FullSyncRoutes = require("./routes/fullSyncRoutes");
+const SDKRoutes = require("./routes/sdkRoutes");
 
 // Create Express app
 const app = express();
@@ -93,6 +94,10 @@ app.use("/api/scoring", scoringRoutes.setupRoutes());
 // Full sync routes
 const fullSyncRoutes = new FullSyncRoutes();
 app.use("/api/full-sync", fullSyncRoutes.setupRoutes());
+
+// SDK routes (v2 API for SDKs)
+const sdkRoutes = new SDKRoutes();
+app.use("/v2", sdkRoutes.setupRoutes());
 
 // Initialize cron jobs
 const PORT = process.env.PORT || 8080;

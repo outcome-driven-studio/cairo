@@ -3,24 +3,49 @@ const { query } = require("../utils/db");
 const logger = require("../utils/logger");
 const MixpanelService = require("../services/mixpanelService");
 const AttioService = require("../services/attioService");
+const SlackService = require("../services/slackService");
 const config = require("../config");
 
 /**
  * Product Event Routes
- * Receives events from your product and sends to DB, Mixpanel, and Attio
+ * Receives events from your product and sends to DB, Mixpanel, Attio, and Slack
  */
 class ProductEventRoutes {
-  constructor() {
+  constructor(webSocketService = null) {
+    this.webSocketService = webSocketService;
     // Initialize services
-    this.mixpanelService = new MixpanelService(process.env.MIXPANEL_PROJECT_TOKEN);
-    this.attioService = config.attioApiKey ? new AttioService(config.attioApiKey) : null;
-    
+    this.mixpanelService = new MixpanelService(
+      process.env.MIXPANEL_PROJECT_TOKEN
+    );
+    this.attioService = config.attioApiKey
+      ? new AttioService(config.attioApiKey)
+      : null;
+
+    // Initialize Slack service with configuration
+    const slackConfig = {
+      defaultChannel: process.env.SLACK_DEFAULT_CHANNEL,
+      alertEvents: process.env.SLACK_ALERT_EVENTS
+        ? process.env.SLACK_ALERT_EVENTS.split(",").map((e) => e.trim())
+        : undefined,
+      paymentThreshold: process.env.SLACK_PAYMENT_THRESHOLD
+        ? parseFloat(process.env.SLACK_PAYMENT_THRESHOLD)
+        : undefined,
+      maxAlertsPerMinute: process.env.SLACK_MAX_ALERTS_PER_MINUTE
+        ? parseInt(process.env.SLACK_MAX_ALERTS_PER_MINUTE)
+        : undefined,
+    };
+    this.slackService = new SlackService(
+      process.env.SLACK_WEBHOOK_URL,
+      slackConfig
+    );
+
     // Track statistics
     this.stats = {
       eventsReceived: 0,
       eventsStored: 0,
       mixpanelSent: 0,
       attioSent: 0,
+      slackAlertsSent: 0,
       errors: [],
     };
 
@@ -123,7 +148,21 @@ class ProductEventRoutes {
         if (eventResult.rows.length > 0) {
           results.db = true;
           this.stats.eventsStored++;
-          logger.debug(`[Product Event] Stored in DB: ${event} for ${user_email}`);
+          logger.debug(
+            `[Product Event] Stored in DB: ${event} for ${user_email}`
+          );
+
+          // Broadcast event to WebSocket clients
+          if (this.webSocketService) {
+            this.webSocketService.broadcastEvent({
+              event,
+              userId: user?.original_user_id || user_email,
+              properties,
+              platform: 'product',
+              timestamp,
+              messageId: eventKey
+            });
+          }
         }
       } catch (error) {
         logger.error(`[Product Event] Error storing in DB:`, error);
@@ -169,6 +208,31 @@ class ProductEventRoutes {
             logger.error(`[Product Event] Attio error:`, error);
           });
         results.attio = "queued";
+      }
+
+      // 5. Send Slack alert if configured (async, don't wait)
+      if (this.slackService.enabled) {
+        const slackEventData = {
+          user_email,
+          event,
+          properties,
+          timestamp,
+        };
+
+        this.slackService
+          .sendAlert(slackEventData)
+          .then((result) => {
+            if (result.success) {
+              this.stats.slackAlertsSent++;
+              logger.debug(`[Product Event] Slack alert sent: ${event}`);
+            } else if (result.reason === "filtered") {
+              logger.debug(`[Product Event] Slack alert filtered: ${event}`);
+            }
+          })
+          .catch((error) => {
+            logger.error(`[Product Event] Slack error:`, error);
+          });
+        results.slack = "queued";
       }
 
       // Return immediate response
@@ -223,7 +287,9 @@ class ProductEventRoutes {
           }
 
           // Store in DB
-          const eventKey = `product-${event.event}-${event.user_email}-${Date.now()}`;
+          const eventKey = `product-${event.event}-${
+            event.user_email
+          }-${Date.now()}`;
           await query(
             `INSERT INTO event_source (
               event_key, 
@@ -259,7 +325,9 @@ class ProductEventRoutes {
         this.mixpanelService
           .trackBatch(events)
           .then((result) => {
-            logger.info(`[Product Event] Mixpanel batch sent: ${result.count || 0} events`);
+            logger.info(
+              `[Product Event] Mixpanel batch sent: ${result.count || 0} events`
+            );
           })
           .catch((error) => {
             logger.error(`[Product Event] Mixpanel batch error:`, error);
@@ -302,13 +370,17 @@ class ProductEventRoutes {
       let paramIndex = 2;
 
       if (properties.name) {
-        updates.push(`enrichment_profile = jsonb_set(COALESCE(enrichment_profile, '{}'), '{name}', $${paramIndex}::jsonb)`);
+        updates.push(
+          `enrichment_profile = jsonb_set(COALESCE(enrichment_profile, '{}'), '{name}', $${paramIndex}::jsonb)`
+        );
         params.push(JSON.stringify(properties.name));
         paramIndex++;
       }
 
       if (properties.company) {
-        updates.push(`enrichment_profile = jsonb_set(COALESCE(enrichment_profile, '{}'), '{company}', $${paramIndex}::jsonb)`);
+        updates.push(
+          `enrichment_profile = jsonb_set(COALESCE(enrichment_profile, '{}'), '{company}', $${paramIndex}::jsonb)`
+        );
         params.push(JSON.stringify(properties.company));
         paramIndex++;
       }
@@ -316,7 +388,9 @@ class ProductEventRoutes {
       if (updates.length > 0) {
         updates.push(`updated_at = NOW()`);
         await query(
-          `UPDATE playmaker_user_source SET ${updates.join(", ")} WHERE email = $1`,
+          `UPDATE playmaker_user_source SET ${updates.join(
+            ", "
+          )} WHERE email = $1`,
           params
         );
       }
@@ -371,6 +445,7 @@ class ProductEventRoutes {
           ...this.stats,
           db: dbStats.rows[0],
           mixpanel: this.mixpanelService.getStats(),
+          slack: this.slackService.getStats(),
         },
       });
     } catch (error) {
@@ -407,6 +482,7 @@ class ProductEventRoutes {
         services: {
           mixpanel: this.mixpanelService?.enabled || false,
           attio: !!this.attioService,
+          slack: this.slackService?.enabled || false,
           database: true,
         },
       });
