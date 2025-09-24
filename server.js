@@ -16,7 +16,14 @@ const dedupStore = require("./src/utils/sourceUsersStore");
 const TestRoutes = require("./src/routes/testRoutes");
 const ProductEventRoutes = require("./src/routes/productEventRoutes");
 const PeriodicSyncRoutes = require("./src/routes/periodicSyncRoutes");
-const WebSocketService = require("./src/services/websocketService");
+
+// Try to load WebSocket service (graceful failure if ws module is missing)
+let WebSocketService = null;
+try {
+  WebSocketService = require("./src/services/websocketService");
+} catch (error) {
+  logger.warn("⚠️ WebSocket service not available (missing 'ws' dependency):", error.message);
+}
 const NewSyncRoutes = require("./src/routes/newSyncRoutes");
 const ScoringRoutes = require("./src/routes/scoringRoutes");
 const ExternalProfileRoutes = require("./src/routes/externalProfileRoutes");
@@ -27,6 +34,25 @@ const app = express();
 
 // Initialize Sentry with Express app (must be before any middleware)
 sentry.initSentry(app);
+
+// Simple health check endpoint (FIRST - no dependencies, always available)
+app.get("/health/simple", (req, res) => {
+  try {
+    res.status(200).json({
+      status: "healthy",
+      service: "cairo-cdp",
+      timestamp: new Date().toISOString(),
+      version: "1.0.0"
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: "unhealthy",
+      service: "cairo-cdp",
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
 
 // Add body parser middleware
 app.use(express.json());
@@ -164,15 +190,6 @@ async function initializeDatabaseTables() {
   }
 }
 
-// Simple health check endpoint (no database required - for Railway healthcheck)
-app.get("/health/simple", (req, res) => {
-  res.status(200).json({
-    status: "healthy",
-    service: "cairo",
-    timestamp: new Date().toISOString(),
-  });
-});
-
 // Enhanced health check endpoint with database monitoring
 app.get("/health", async (req, res) => {
   try {
@@ -282,35 +299,51 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   logger.info(`✅ Server listening on http://0.0.0.0:${PORT}`);
 
   try {
-    // Check database health before starting - REQUIRED!
-    const dbHealth = await db.healthCheck();
-    if (!dbHealth.healthy) {
-      throw new Error(`Database connection REQUIRED but failed: ${dbHealth.error}. 
-        Please ensure POSTGRES_URL environment variable is set correctly.
-        Expected format: postgresql://user:pass@host.neon.tech/db?sslmode=require`);
+    // Check if POSTGRES_URL is available
+    if (process.env.POSTGRES_URL) {
+      // Check database health before starting - REQUIRED if URL is provided!
+      const dbHealth = await db.healthCheck();
+      if (!dbHealth.healthy) {
+        throw new Error(`Database connection REQUIRED but failed: ${dbHealth.error}.
+          Please ensure POSTGRES_URL environment variable is set correctly.
+          Expected format: postgresql://user:pass@host.neon.tech/db?sslmode=require`);
+      }
+      logger.info("✅ Database connection healthy");
+
+      // Initialize database tables
+      await initializeDatabaseTables();
+      logger.info("✅ Database tables initialized");
+    } else {
+      logger.warn("⚠️ POSTGRES_URL not set - running without database features");
+      logger.warn("⚠️ Some features will be disabled (event storage, user tracking, etc.)");
     }
-    logger.info("✅ Database connection healthy");
 
-    // Initialize database tables
-    await initializeDatabaseTables();
-    logger.info("✅ Database tables initialized");
+    // Prepare Postgres sync_state table (only if database is available)
+    if (process.env.POSTGRES_URL) {
+      await syncState.init();
 
-    // Prepare Postgres sync_state table
-    await syncState.init();
-
-    // Prepare sent_events dedup table
-    global.dedupStore = dedupStore;
-    await dedupStore.init();
+      // Prepare sent_events dedup table
+      global.dedupStore = dedupStore;
+      await dedupStore.init();
+    }
 
     // Start monitoring health checks
     monitoring.startHealthChecks();
 
-    // Initialize WebSocket service
-    webSocketService = new WebSocketService(server);
-
-    // Pass WebSocket service to product event routes for real-time event streaming
-    productEventRoutes.webSocketService = webSocketService;
-    logger.info("✅ WebSocket service initialized for real-time event streaming");
+    // Initialize WebSocket service (non-blocking)
+    if (WebSocketService) {
+      try {
+        webSocketService = new WebSocketService(server);
+        // Pass WebSocket service to product event routes for real-time event streaming
+        productEventRoutes.webSocketService = webSocketService;
+        logger.info("✅ WebSocket service initialized for real-time event streaming");
+      } catch (error) {
+        logger.error("⚠️ Failed to initialize WebSocket service (continuing without real-time features):", error);
+        // Continue without WebSocket - this is not critical for basic functionality
+      }
+    } else {
+      logger.warn("⚠️ WebSocket service unavailable - install 'ws' package for real-time features");
+    }
 
     // Sync configuration
     // Option 1: Use new periodic sync (recommended - every 4 hours)
