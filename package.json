@@ -22,7 +22,10 @@
     "dev": "LOG_LEVEL=debug nodemon server.js",
     "test": "echo \"No tests specified\" && exit 0",
     "setup": "node src/migrations/run_migrations.js",
-    "setup-env": "node setup-env.js"
+    "setup-env": "node setup-env.js",
+    "build:ui": "node build-ui.js",
+    "build": "npm run build:ui",
+    "postinstall": "node build-ui.js || echo 'UI build failed, continuing...'"
   },
   "devDependencies": {
     "@railway/cli": "^4.6.1",
