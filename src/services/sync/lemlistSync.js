@@ -176,11 +176,37 @@ class LemlistSync {
       // Track asynchronously (don't await to avoid slowing down sync)
       this.mixpanelService
         .track(eventData.email.toLowerCase(), mixpanelEvent, mixpanelProperties)
+        .then((result) => {
+          if (result.success) {
+            logger.debug(`[LemlistSync] Mixpanel event tracked: ${mixpanelEvent}`);
+          } else {
+            logger.error(`[LemlistSync] Mixpanel tracking failed: ${result.error || result.reason}`);
+            // Send to Sentry
+            const Sentry = require('@sentry/node');
+            Sentry.captureMessage(
+              `Mixpanel tracking failed for Lemlist event`,
+              'error',
+              {
+                event: mixpanelEvent,
+                email: eventData.email,
+                error: result.error || result.reason
+              }
+            );
+          }
+        })
         .catch((error) => {
-          logger.warn(
-            `[LemlistSync] Mixpanel tracking failed for ${eventData.event_key}:`,
+          logger.error(
+            `[LemlistSync] Mixpanel tracking error for ${eventData.event_key}:`,
             error.message
           );
+          // Send to Sentry
+          const Sentry = require('@sentry/node');
+          Sentry.captureException(error, {
+            tags: {
+              service: 'lemlist_sync',
+              event: mixpanelEvent
+            }
+          });
         });
 
       logger.debug(
