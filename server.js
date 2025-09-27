@@ -308,11 +308,34 @@ app.get("/debug/routes", (req, res) => {
   });
 });
 
-// Serve static files from the UI build
+// Serve static files from the UI build with proper MIME types
 const publicPath = path.join(__dirname, "public");
 if (require("fs").existsSync(publicPath)) {
-  app.use(express.static(publicPath));
+  // Add logging for static file requests
+  app.use('/assets', (req, res, next) => {
+    logger.info(`[STATIC] Requesting asset: ${req.path}`);
+    next();
+  });
+
+  app.use(express.static(publicPath, {
+    setHeaders: (res, path, stat) => {
+      logger.info(`[STATIC] Serving file: ${path}`);
+      if (path.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css; charset=utf-8');
+      } else if (path.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      }
+    }
+  }));
   logger.info(`📁 Serving UI from ${publicPath}`);
+
+  // Log available static files
+  const fs = require("fs");
+  const assetsPath = path.join(publicPath, "assets");
+  if (fs.existsSync(assetsPath)) {
+    const files = fs.readdirSync(assetsPath);
+    logger.info(`📄 Available assets: ${files.join(', ')}`);
+  }
 } else {
   logger.warn("⚠️ No UI build found. Run 'node build-ui.js' to build the UI.");
 }
