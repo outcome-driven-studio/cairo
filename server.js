@@ -61,7 +61,10 @@ app.get("/debug/test-integrations", async (req, res) => {
     sentry: { configured: false, working: false },
     mixpanel: { configured: false, working: false },
     periodicSync: { configured: false, running: false },
-    database: { configured: false, working: false }
+    database: { configured: false, working: false },
+    lemlist: { configured: false, working: false },
+    smartlead: { configured: false, working: false },
+    attio: { configured: false, working: false }
   };
 
   // Test Sentry
@@ -87,11 +90,54 @@ app.get("/debug/test-integrations", async (req, res) => {
         { source: "debug_endpoint", timestamp: new Date().toISOString() }
       );
       results.mixpanel.working = trackResult.success;
+      results.mixpanel.stats = mixpanel.stats;
       if (!trackResult.success) {
         results.mixpanel.error = trackResult.error;
       }
     } catch (error) {
       results.mixpanel.error = error.message;
+    }
+  }
+
+  // Test Lemlist
+  if (process.env.LEMLIST_API_KEY) {
+    results.lemlist.configured = true;
+    try {
+      const LemlistService = require("./src/services/lemlistService");
+      const lemlist = new LemlistService(process.env.LEMLIST_API_KEY);
+      const campaigns = await lemlist.getCampaigns();
+      results.lemlist.working = true;
+      results.lemlist.campaignCount = campaigns.length;
+    } catch (error) {
+      results.lemlist.error = error.message;
+    }
+  }
+
+  // Test Smartlead
+  if (process.env.SMARTLEAD_API_KEY) {
+    results.smartlead.configured = true;
+    try {
+      const SmartleadService = require("./src/services/smartleadService");
+      const smartlead = new SmartleadService(process.env.SMARTLEAD_API_KEY);
+      const campaigns = await smartlead.getCampaigns();
+      results.smartlead.working = true;
+      results.smartlead.campaignCount = campaigns.length;
+    } catch (error) {
+      results.smartlead.error = error.message;
+    }
+  }
+
+  // Test Attio
+  if (process.env.ATTIO_API_KEY) {
+    results.attio.configured = true;
+    try {
+      const AttioService = require("./src/services/attioService");
+      const attio = new AttioService(process.env.ATTIO_API_KEY);
+      const people = await attio.listPeople(1, 0); // Just get 1 person to test
+      results.attio.working = true;
+      results.attio.totalPeople = people.count || 0;
+    } catch (error) {
+      results.attio.error = error.message;
     }
   }
 
@@ -117,6 +163,14 @@ app.get("/debug/test-integrations", async (req, res) => {
       const result = await query("SELECT NOW() as time");
       results.database.working = true;
       results.database.time = result.rows[0].time;
+
+      // Check if we have any events
+      const eventCount = await query("SELECT COUNT(*) as count FROM event_source");
+      results.database.eventCount = parseInt(eventCount.rows[0].count);
+
+      // Check if we have any users
+      const userCount = await query("SELECT COUNT(*) as count FROM playmaker_user_source");
+      results.database.userCount = parseInt(userCount.rows[0].count);
     } catch (error) {
       results.database.error = error.message;
     }
@@ -124,6 +178,102 @@ app.get("/debug/test-integrations", async (req, res) => {
 
   logger.info("[DEBUG] Integration test completed", results);
   res.json(results);
+});
+
+// Debug endpoint to check data flow and recent activity
+app.get("/debug/data-status", async (req, res) => {
+  const results = {
+    lastSyncData: {},
+    recentEvents: [],
+    recentUsers: [],
+    syncTimestamps: {},
+    errors: []
+  };
+
+  try {
+    const { query } = require("./src/utils/db");
+
+    // Get last sync timestamps for each platform
+    const platforms = ['lemlist', 'smartlead', 'attio'];
+    for (const platform of platforms) {
+      try {
+        const lastEvent = await query(
+          `SELECT created_at, event_type, platform
+           FROM event_source
+           WHERE platform = $1
+           ORDER BY created_at DESC
+           LIMIT 1`,
+          [platform]
+        );
+        results.syncTimestamps[platform] = lastEvent.rows[0] || null;
+      } catch (error) {
+        results.errors.push(`Error getting ${platform} timestamps: ${error.message}`);
+      }
+    }
+
+    // Get recent events (last 10)
+    try {
+      const recentEvents = await query(
+        `SELECT email, event_type, platform, created_at, event_key
+         FROM event_source
+         ORDER BY created_at DESC
+         LIMIT 10`
+      );
+      results.recentEvents = recentEvents.rows;
+    } catch (error) {
+      results.errors.push(`Error getting recent events: ${error.message}`);
+    }
+
+    // Get recent users (last 10)
+    try {
+      const recentUsers = await query(
+        `SELECT email, platform, created_at, updated_at, apollo_enriched_at, last_scored_at
+         FROM playmaker_user_source
+         ORDER BY created_at DESC
+         LIMIT 10`
+      );
+      results.recentUsers = recentUsers.rows;
+    } catch (error) {
+      results.errors.push(`Error getting recent users: ${error.message}`);
+    }
+
+    // Get sync state data
+    try {
+      const syncStates = await query(
+        `SELECT source_name, last_checked_at, created_at
+         FROM sync_state
+         ORDER BY last_checked_at DESC`
+      );
+      results.syncStates = syncStates.rows;
+    } catch (error) {
+      results.errors.push(`Error getting sync states: ${error.message}`);
+    }
+
+    // Get periodic sync stats if available
+    if (process.env.USE_PERIODIC_SYNC === "true") {
+      try {
+        const { getInstance } = require("./src/services/periodicSyncService");
+        const periodicSync = getInstance();
+        results.periodicSyncStats = periodicSync.getStats();
+      } catch (error) {
+        results.errors.push(`Error getting periodic sync stats: ${error.message}`);
+      }
+    }
+
+    logger.info("[DEBUG] Data status check completed", {
+      eventCount: results.recentEvents.length,
+      userCount: results.recentUsers.length,
+      errorCount: results.errors.length
+    });
+
+    res.json(results);
+  } catch (error) {
+    logger.error("[DEBUG] Data status check failed:", error);
+    res.status(500).json({
+      error: error.message,
+      results
+    });
+  }
 });
 
 // Debug endpoint to list all registered routes
