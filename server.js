@@ -307,6 +307,7 @@ app.get("/debug/routes", (req, res) => {
     routes: routes.sort((a, b) => a.path.localeCompare(b.path))
   });
 });
+
 // Serve static files from the UI build
 const publicPath = path.join(__dirname, "public");
 if (require("fs").existsSync(publicPath)) {
@@ -744,6 +745,9 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     console.log(`🎉 Server is ready! Available endpoints:`);
     console.log(`  - GET  /health - Health check`);
     console.log(`  - GET  /health/detailed - Detailed health check`);
+    console.log(`  - GET  /debug/test-integrations - Test all integrations`);
+    console.log(`  - GET  /debug/data-status - Check data flow and recent activity`);
+    console.log(`  - GET  /debug/routes - List all registered routes`);
 
     // Show periodic sync endpoints if enabled
     if (process.env.USE_PERIODIC_SYNC === "true") {
@@ -788,7 +792,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     console.error(`
 ❌ APPLICATION STARTUP FAILED!
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Database connection is REQUIRED. 
+Database connection is REQUIRED.
 Please check your environment variables:
 
 1. POSTGRES_URL must be set with your NeonDB connection string
