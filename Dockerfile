@@ -7,25 +7,26 @@ RUN apk add --no-cache wget socat
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files first for better layer caching
 COPY package*.json ./
-
-# Copy UI source for building
-COPY ui/ ./ui/
 
 # Install dependencies (including dev dependencies for UI build)
 RUN npm ci
 
+# Copy build script and UI source for building
+COPY build-ui.js ./
+COPY ui/ ./ui/
+
 # Build UI during Docker build
 RUN npm run build:ui
 
-# Remove dev dependencies to keep image small
-RUN npm ci --omit=dev
-
-# Copy application source code
+# Now copy the rest of the application source
 COPY *.js ./
 COPY src/ ./src/
 COPY start.sh ./
+
+# Remove dev dependencies after building to keep image small
+RUN npm ci --omit=dev
 
 # Make start script executable
 RUN chmod +x ./start.sh
