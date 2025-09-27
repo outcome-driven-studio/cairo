@@ -57,6 +57,7 @@ const pool = new Pool(poolConfig);
 pool.on("error", (err, client) => {
   logger.error("Unexpected database pool error:", {
     error: err.message,
+    code: err.code,
     stack: err.stack,
     client: client ? "connected" : "disconnected",
     poolStats: {
@@ -64,6 +65,23 @@ pool.on("error", (err, client) => {
       idle: pool.idleCount,
       waiting: pool.waitingCount,
     },
+  });
+
+  // Send to Sentry for monitoring
+  const Sentry = require('@sentry/node');
+  Sentry.captureException(err, {
+    tags: {
+      component: 'database_pool',
+      code: err.code || 'unknown'
+    },
+    extra: {
+      poolStats: {
+        total: pool.totalCount,
+        idle: pool.idleCount,
+        waiting: pool.waitingCount,
+      },
+      client: client ? "connected" : "disconnected"
+    }
   });
 
   // For connection-related errors, we don't need to do anything special
