@@ -20,41 +20,58 @@ class DashboardRoutes {
   // Get statistics
   async getStats(req, res) {
     try {
-      // Get user count
-      const userResult = await query(
-        "SELECT COUNT(*) FROM playmaker_user_source WHERE email IS NOT NULL"
-      );
-      const totalUsers = parseInt(userResult.rows[0].count);
+      // Use a single optimized query to get all basic stats
+      const basicStats = await query(`
+        SELECT
+          (SELECT COUNT(*) FROM playmaker_user_source WHERE email IS NOT NULL) as total_users,
+          (SELECT COUNT(*) FROM event_source) as total_events
+      `);
 
-      // Get event count
-      const eventResult = await query("SELECT COUNT(*) FROM event_source");
-      const totalEvents = parseInt(eventResult.rows[0].count);
+      const { total_users, total_events } = basicStats.rows[0];
+      const totalUsers = parseInt(total_users || 0);
+      const totalEvents = parseInt(total_events || 0);
 
-      // Get Attio sync stats
+      // Get Attio sync stats with timeout protection
       let attioSynced = 0;
       let pendingSync = 0;
 
       try {
-        const syncStats = await query(`
-          SELECT 
-            (SELECT COUNT(*) FROM attio_sync_tracking WHERE status = 'synced') as synced,
-            (SELECT COUNT(*) FROM event_source es 
-             JOIN playmaker_user_source us ON us.original_user_id::text = es.user_id 
-             WHERE us.email IS NOT NULL
-               AND NOT EXISTS (
-                 SELECT 1 FROM attio_sync_tracking ast 
-                 WHERE ast.event_key = es.event_key
-               )
-            ) as pending
+        // Check if attio_sync_tracking table exists first
+        const tableExists = await query(`
+          SELECT EXISTS (
+            SELECT FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_name = 'attio_sync_tracking'
+          );
         `);
 
-        if (syncStats.rows[0]) {
-          attioSynced = parseInt(syncStats.rows[0].synced || 0);
-          pendingSync = parseInt(syncStats.rows[0].pending || 0);
+        if (tableExists.rows[0].exists) {
+          const syncStats = await query(`
+            SELECT
+              (SELECT COUNT(*) FROM attio_sync_tracking WHERE status = 'synced') as synced,
+              (
+                SELECT COUNT(*)
+                FROM event_source es
+                WHERE EXISTS (
+                  SELECT 1 FROM playmaker_user_source us
+                  WHERE us.original_user_id::text = es.user_id
+                  AND us.email IS NOT NULL
+                )
+                AND NOT EXISTS (
+                  SELECT 1 FROM attio_sync_tracking ast
+                  WHERE ast.event_key = es.event_key
+                )
+              ) as pending
+          `);
+
+          if (syncStats.rows[0]) {
+            attioSynced = parseInt(syncStats.rows[0].synced || 0);
+            pendingSync = parseInt(syncStats.rows[0].pending || 0);
+          }
         }
       } catch (error) {
-        // Table might not exist yet
-        logger.debug("Attio tracking table not found");
+        logger.warn("Failed to get Attio sync stats (table may not exist):", error.message);
+        // Don't fail the entire request if Attio stats fail
       }
 
       res.json({
@@ -65,6 +82,20 @@ class DashboardRoutes {
       });
     } catch (error) {
       logger.error("Failed to get stats:", error);
+
+      // Send to Sentry with more context
+      const sentry = require("../utils/sentry");
+      sentry.captureException(error, {
+        tags: {
+          component: 'dashboard_stats',
+          endpoint: '/api/stats'
+        },
+        extra: {
+          query: req.query,
+          url: req.url
+        }
+      });
+
       res.status(500).json({ error: error.message });
     }
   }

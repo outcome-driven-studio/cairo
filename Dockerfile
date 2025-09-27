@@ -10,7 +10,16 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (production only)
+# Copy UI source for building
+COPY ui/ ./ui/
+
+# Install dependencies (including dev dependencies for UI build)
+RUN npm ci
+
+# Build UI during Docker build
+RUN npm run build:ui
+
+# Remove dev dependencies to keep image small
 RUN npm ci --omit=dev
 
 # Copy application source code

@@ -469,6 +469,11 @@ app.use("/api/scoring", scoringRoutes.setupRoutes());
 const namespaceRoutes = new NamespaceRoutes();
 app.use("/api", namespaceRoutes.setupRoutes());
 
+// Configuration management routes
+const EnvConfigRoutes = require("./src/routes/envConfigRoutes");
+const envConfigRoutes = new EnvConfigRoutes();
+app.use("/api/config", envConfigRoutes.setupRoutes());
+
 // Initialize cron jobs
 const PORT = process.env.PORT || 8080;
 const cronManager = new CronManager(

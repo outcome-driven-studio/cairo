@@ -10,10 +10,9 @@ import {
   Code,
   Menu,
   X,
-  Bell,
-  Search,
   Moon,
   Sun,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useTheme } from '@/hooks/useTheme';
@@ -40,14 +39,14 @@ export default function Layout() {
         "fixed inset-0 flex z-40 md:hidden",
         sidebarOpen ? "block" : "hidden"
       )}>
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
-        <div className="relative flex-1 flex flex-col max-w-xs w-full bg-card border-r">
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+        <div className="relative flex-1 flex flex-col max-w-xs w-full bg-background border-r border-border/50">
           <div className="absolute top-0 right-0 -mr-12 pt-2">
             <button
               className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
               onClick={() => setSidebarOpen(false)}
             >
-              <X className="h-6 w-6 text-white" />
+              <X className="h-5 w-5 text-white" />
             </button>
           </div>
           <SidebarContent />
@@ -56,8 +55,8 @@ export default function Layout() {
 
       {/* Desktop sidebar */}
       <div className="hidden md:flex md:flex-shrink-0">
-        <div className="flex flex-col w-64">
-          <div className="flex flex-col flex-grow bg-card border-r overflow-y-auto">
+        <div className="flex flex-col w-60">
+          <div className="flex flex-col flex-grow bg-background border-r border-border/50 overflow-y-auto">
             <SidebarContent />
           </div>
         </div>
@@ -65,57 +64,31 @@ export default function Layout() {
 
       {/* Main content */}
       <div className="flex flex-col w-0 flex-1 overflow-hidden">
-        {/* Top navigation */}
-        <div className="relative z-10 flex-shrink-0 flex h-16 bg-background border-b shadow-sm">
+        {/* Minimal top bar */}
+        <div className="relative z-10 flex-shrink-0 flex h-12 bg-background/95 backdrop-blur-sm border-b border-border/50">
           <button
-            className="px-4 border-r border-border text-foreground focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary md:hidden"
+            className="px-4 text-muted-foreground hover:text-foreground focus:outline-none md:hidden transition-colors"
             onClick={() => setSidebarOpen(true)}
           >
-            <Menu className="h-6 w-6" />
+            <Menu className="h-5 w-5" />
           </button>
 
-          <div className="flex-1 px-4 flex justify-between items-center">
-            <div className="flex-1 flex">
-              <div className="w-full flex md:ml-0">
-                <div className="relative w-full text-foreground focus-within:text-gray-600">
-                  <div className="absolute inset-y-0 left-0 flex items-center pointer-events-none">
-                    <Search className="h-5 w-5" />
-                  </div>
-                  <input
-                    className="block w-full h-full pl-8 pr-3 py-2 border-transparent text-foreground placeholder-muted-foreground focus:outline-none focus:placeholder-gray-400 focus:ring-0 focus:border-transparent bg-background"
-                    placeholder="Search events, sources, destinations..."
-                    type="search"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="ml-4 flex items-center md:ml-6 space-x-3">
-              <button className="p-1 rounded-full text-foreground hover:text-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
-                <Bell className="h-6 w-6" />
-              </button>
+          <div className="flex-1 px-6 flex justify-end items-center">
+            <div className="flex items-center space-x-1">
               <button
                 onClick={toggleTheme}
-                className="p-1 rounded-full text-foreground hover:text-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 focus:outline-none transition-all duration-200"
               >
-                {theme === 'dark' ? <Sun className="h-6 w-6" /> : <Moon className="h-6 w-6" />}
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
-              <div className="flex items-center space-x-3">
-                <div className="flex-shrink-0">
-                  <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center">
-                    <span className="text-primary-foreground text-sm font-medium">U</span>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
 
         {/* Main content area */}
-        <main className="flex-1 relative overflow-y-auto focus:outline-none">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-              <Outlet />
-            </div>
+        <main className="flex-1 relative overflow-y-auto focus:outline-none bg-background">
+          <div className="min-h-full">
+            <Outlet />
           </div>
         </main>
       </div>
@@ -127,17 +100,22 @@ function SidebarContent() {
   const location = useLocation();
 
   return (
-    <>
-      <div className="flex items-center flex-shrink-0 px-4 py-4">
-        <div className="flex items-center">
-          <div className="cairo-gradient h-8 w-8 rounded flex items-center justify-center">
-            <span className="text-white font-bold">C</span>
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center px-6 py-6">
+        <div className="flex items-center space-x-3">
+          <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+            <span className="text-white font-semibold text-sm">C</span>
           </div>
-          <span className="ml-2 text-xl font-bold cairo-gradient-text">Cairo CDP</span>
+          <div>
+            <h1 className="text-base font-semibold text-foreground">Cairo CDP</h1>
+          </div>
         </div>
       </div>
-      <div className="mt-5 flex-grow flex flex-col">
-        <nav className="flex-1 px-2 space-y-1">
+
+      {/* Navigation */}
+      <nav className="flex-1 px-3">
+        <div className="space-y-1">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href;
             return (
@@ -145,40 +123,37 @@ function SidebarContent() {
                 key={item.name}
                 to={item.href}
                 className={cn(
+                  'group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ease-in-out',
                   isActive
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-foreground hover:bg-muted hover:text-foreground',
-                  'group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors'
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 )}
               >
                 <item.icon
                   className={cn(
+                    'mr-3 flex-shrink-0 h-4 w-4 transition-colors',
                     isActive
-                      ? 'text-primary-foreground'
-                      : 'text-muted-foreground group-hover:text-foreground',
-                    'mr-3 flex-shrink-0 h-5 w-5'
+                      ? 'text-foreground'
+                      : 'text-muted-foreground group-hover:text-foreground'
                   )}
                 />
-                {item.name}
+                <span className="truncate">{item.name}</span>
+                {isActive && (
+                  <ChevronRight className="ml-auto h-3 w-3 text-muted-foreground" />
+                )}
               </Link>
             );
           })}
-        </nav>
-        <div className="flex-shrink-0 flex border-t border-border p-4">
-          <div className="flex-shrink-0 w-full group block">
-            <div className="flex items-center">
-              <div className="ml-3">
-                <p className="text-xs font-medium text-muted-foreground">
-                  Cairo CDP v1.0.0
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Open Source
-                </p>
-              </div>
-            </div>
-          </div>
+        </div>
+      </nav>
+
+      {/* Footer */}
+      <div className="px-6 py-4 border-t border-border/50">
+        <div className="text-xs text-muted-foreground">
+          <p className="font-medium">Cairo CDP</p>
+          <p className="mt-1">v1.0.0 • Open Source</p>
         </div>
       </div>
-    </>
+    </div>
   );
 }
