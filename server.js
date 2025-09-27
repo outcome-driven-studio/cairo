@@ -157,7 +157,6 @@ app.get("/debug/routes", (req, res) => {
     routes: routes.sort((a, b) => a.path.localeCompare(b.path))
   });
 });
-
 // Serve static files from the UI build
 const publicPath = path.join(__dirname, "public");
 if (require("fs").existsSync(publicPath)) {
