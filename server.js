@@ -55,6 +55,108 @@ app.get("/health/simple", (req, res) => {
   }
 });
 
+// Debug endpoint to test integrations
+app.get("/debug/test-integrations", async (req, res) => {
+  const results = {
+    sentry: { configured: false, working: false },
+    mixpanel: { configured: false, working: false },
+    periodicSync: { configured: false, running: false },
+    database: { configured: false, working: false }
+  };
+
+  // Test Sentry
+  if (process.env.SENTRY_DSN) {
+    results.sentry.configured = true;
+    try {
+      sentry.captureMessage("Test message from /debug/test-integrations", 'info');
+      results.sentry.working = true;
+    } catch (error) {
+      results.sentry.error = error.message;
+    }
+  }
+
+  // Test Mixpanel
+  if (process.env.MIXPANEL_PROJECT_TOKEN) {
+    results.mixpanel.configured = true;
+    try {
+      const MixpanelService = require("./src/services/mixpanelService");
+      const mixpanel = new MixpanelService(process.env.MIXPANEL_PROJECT_TOKEN);
+      const trackResult = await mixpanel.track(
+        "test@cairo.com",
+        "Integration Test",
+        { source: "debug_endpoint", timestamp: new Date().toISOString() }
+      );
+      results.mixpanel.working = trackResult.success;
+      if (!trackResult.success) {
+        results.mixpanel.error = trackResult.error;
+      }
+    } catch (error) {
+      results.mixpanel.error = error.message;
+    }
+  }
+
+  // Test Periodic Sync
+  if (process.env.USE_PERIODIC_SYNC === "true") {
+    results.periodicSync.configured = true;
+    try {
+      const { getInstance } = require("./src/services/periodicSyncService");
+      const periodicSync = getInstance();
+      const stats = periodicSync.getStats();
+      results.periodicSync.running = stats.isRunning;
+      results.periodicSync.stats = stats;
+    } catch (error) {
+      results.periodicSync.error = error.message;
+    }
+  }
+
+  // Test Database
+  if (process.env.POSTGRES_URL) {
+    results.database.configured = true;
+    try {
+      const { query } = require("./src/utils/db");
+      const result = await query("SELECT NOW() as time");
+      results.database.working = true;
+      results.database.time = result.rows[0].time;
+    } catch (error) {
+      results.database.error = error.message;
+    }
+  }
+
+  logger.info("[DEBUG] Integration test completed", results);
+  res.json(results);
+});
+
+// Debug endpoint to list all registered routes
+app.get("/debug/routes", (req, res) => {
+  const routes = [];
+  app._router.stack.forEach((middleware) => {
+    if (middleware.route) {
+      // Regular routes
+      routes.push({
+        path: middleware.route.path,
+        methods: Object.keys(middleware.route.methods)
+      });
+    } else if (middleware.name === 'router') {
+      // Router middleware
+      middleware.handle.stack.forEach((handler) => {
+        if (handler.route) {
+          routes.push({
+            path: handler.route.path,
+            methods: Object.keys(handler.route.methods),
+            router: true
+          });
+        }
+      });
+    }
+  });
+
+  logger.info(`[DEBUG] Routes endpoint accessed, found ${routes.length} routes`);
+  res.json({
+    totalRoutes: routes.length,
+    periodicSyncEnabled: process.env.USE_PERIODIC_SYNC === 'true',
+    routes: routes.sort((a, b) => a.path.localeCompare(b.path))
+  });
+});
 // Serve static files from the UI build
 const publicPath = path.join(__dirname, "public");
 if (require("fs").existsSync(publicPath)) {
@@ -88,6 +190,57 @@ process.on("unhandledRejection", async (reason, promise) => {
     promise: promise.toString(),
   });
   logger.error("Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+// Request logging middleware with Sentry breadcrumbs
+app.use((req, res, next) => {
+  const start = Date.now();
+
+  // Log the incoming request
+  logger.info(`[REQUEST] ${req.method} ${req.path}`, {
+    query: req.query,
+    body: req.body ? Object.keys(req.body) : undefined,
+    headers: {
+      'content-type': req.headers['content-type'],
+      'user-agent': req.headers['user-agent']
+    }
+  });
+
+  // Add Sentry breadcrumb for API calls
+  sentry.Sentry.addBreadcrumb({
+    category: 'http',
+    message: `${req.method} ${req.path}`,
+    level: 'info',
+    data: {
+      method: req.method,
+      url: req.url,
+      query: req.query
+    }
+  });
+
+  // Log response when finished
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const logLevel = res.statusCode >= 400 ? 'error' : 'info';
+    logger[logLevel](`[RESPONSE] ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`);
+
+    // Capture 4xx and 5xx errors to Sentry
+    if (res.statusCode >= 400) {
+      sentry.captureMessage(
+        `HTTP ${res.statusCode}: ${req.method} ${req.path}`,
+        res.statusCode >= 500 ? 'error' : 'warning',
+        {
+          statusCode: res.statusCode,
+          method: req.method,
+          path: req.path,
+          duration,
+          query: req.query
+        }
+      );
+    }
+  });
+
+  next();
 });
 
 // Enable CORS for test endpoints
@@ -140,8 +293,18 @@ const productEventRoutes = new ProductEventRoutes();
 app.use("/api/events", productEventRoutes.setupRoutes());
 
 // Periodic sync routes
-const periodicSyncRoutes = new PeriodicSyncRoutes();
-app.use("/api/periodic-sync", periodicSyncRoutes.setupRoutes());
+try {
+  const periodicSyncRoutes = new PeriodicSyncRoutes();
+  const routes = periodicSyncRoutes.setupRoutes();
+  app.use("/api/periodic-sync", routes);
+  logger.info("[Server] Periodic sync routes registered successfully at /api/periodic-sync");
+} catch (error) {
+  logger.error("[Server] Failed to register periodic sync routes:", error);
+  sentry.captureError(error, {
+    category: 'route_registration',
+    route: 'periodic-sync'
+  });
+}
 
 // Test routes (for debugging and testing)
 const testRoutes = new TestRoutes();
@@ -288,7 +451,28 @@ app.get("/test-sentry", async (req, res) => {
 app.get("*", (req, res) => {
   // Don't catch API routes
   if (req.path.startsWith('/api') || req.path.startsWith('/sync') || req.path.startsWith('/ws')) {
-    res.status(404).json({ error: 'Not found' });
+    logger.warn(`[404] API route not found: ${req.method} ${req.path}`);
+
+    // Send to Sentry for monitoring
+    sentry.captureMessage(
+      `API route not found: ${req.method} ${req.path}`,
+      'warning',
+      {
+        method: req.method,
+        path: req.path,
+        query: req.query,
+        headers: {
+          'user-agent': req.headers['user-agent'],
+          'referer': req.headers['referer']
+        }
+      }
+    );
+
+    res.status(404).json({
+      error: 'Not found',
+      path: req.path,
+      message: `The endpoint ${req.path} does not exist. Check /debug/routes for available endpoints.`
+    });
     return;
   }
 
