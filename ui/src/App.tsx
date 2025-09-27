@@ -5,6 +5,7 @@ import Overview from './pages/Overview';
 import Events from './pages/Events';
 import Sources from './pages/Sources';
 import Destinations from './pages/Destinations';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -16,7 +17,7 @@ function App() {
         <Route path="destinations" element={<Destinations />} />
         <Route path="transformations" element={<div className="p-4">Transformations page coming soon...</div>} />
         <Route path="users" element={<div className="p-4">Users page coming soon...</div>} />
-        <Route path="settings" element={<div className="p-4">Settings page coming soon...</div>} />
+        <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>
   );

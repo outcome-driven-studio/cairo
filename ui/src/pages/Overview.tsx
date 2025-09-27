@@ -50,11 +50,11 @@ const StatCard = ({ title, value, change, icon: Icon, trend = 'up' }: {
   icon: any;
   trend?: 'up' | 'down';
 }) => (
-  <div className="card p-6">
+  <div className="border border-border/50 rounded-lg p-6 hover:bg-muted/30 transition-colors">
     <div className="flex items-center justify-between">
       <div>
         <p className="text-sm font-medium text-muted-foreground">{title}</p>
-        <p className="text-3xl font-bold mt-2">{typeof value === 'number' ? value.toLocaleString() : value}</p>
+        <p className="text-2xl font-semibold mt-2 text-foreground">{typeof value === 'number' ? value.toLocaleString() : value}</p>
         {change && (
           <p className={`text-sm mt-2 flex items-center ${
             trend === 'up' ? 'text-green-600' : 'text-red-600'
@@ -64,8 +64,8 @@ const StatCard = ({ title, value, change, icon: Icon, trend = 'up' }: {
           </p>
         )}
       </div>
-      <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-        <Icon className="h-6 w-6 text-primary" />
+      <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center">
+        <Icon className="h-5 w-5 text-muted-foreground" />
       </div>
     </div>
   </div>
