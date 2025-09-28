@@ -2,6 +2,7 @@
 // This migration creates the namespaces table for multi-tenant data segregation
 
 const logger = require("../utils/logger");
+const namespaceGenerator = require("../utils/namespaceGenerator");
 
 async function up(query) {
   logger.info("Creating namespaces table for multi-tenant support...");
@@ -54,15 +55,21 @@ async function up(query) {
                 EXECUTE FUNCTION update_namespaces_updated_at();
         `);
 
-    // Insert default namespace that maps to existing playmaker_user_source table
+    // Generate a random default namespace
+    // Format: {greek_mythology}-{verb}-{adjective}-{space_object}
+    const defaultNamespace = namespaceGenerator.generate();
+    const defaultTableName = namespaceGenerator.toTableName(defaultNamespace);
+
+    logger.info(`Generated default namespace: ${defaultNamespace}`);
+
     await query(`
             INSERT INTO namespaces (name, keywords, table_name, is_active)
-            VALUES ('playmaker', '["default"]'::jsonb, 'playmaker_user_source', true)
+            VALUES ($1, '["default"]'::jsonb, $2, true)
             ON CONFLICT (name) DO NOTHING
-        `);
+        `, [defaultNamespace, defaultTableName]);
 
     logger.info("✅ namespaces table created successfully");
-    logger.info('✅ Default "playmaker" namespace created');
+    logger.info(`✅ Default "${defaultNamespace}" namespace created`);
   } catch (error) {
     logger.error("❌ Failed to create namespaces table:", error);
     throw error;

@@ -28,6 +28,8 @@ const NewSyncRoutes = require("./src/routes/newSyncRoutes");
 const ScoringRoutes = require("./src/routes/scoringRoutes");
 const ExternalProfileRoutes = require("./src/routes/externalProfileRoutes");
 const NamespaceRoutes = require("./src/routes/namespaceRoutes");
+const DestinationSyncRoutes = require("./src/routes/destinationSyncRoutes");
+const DashboardRoutes = require("./src/routes/dashboardRoutes");
 
 // Create Express app
 const app = express();
@@ -456,10 +458,7 @@ const externalProfileRouter = express.Router();
 externalProfileRoutes.registerRoutes(externalProfileRouter);
 app.use("/api", externalProfileRouter);
 
-// Dashboard routes (mount AFTER specific routes to avoid catch-all conflicts)
-const DashboardRoutes = require("./src/routes/dashboardRoutes");
-const dashboardRoutes = new DashboardRoutes();
-app.use("/", dashboardRoutes.setupRoutes());
+// Dashboard routes are already defined above
 
 // Product event tracking routes
 let webSocketService = null;  // Will be initialized after server starts
@@ -491,6 +490,12 @@ app.use("/api/scoring", scoringRoutes.setupRoutes());
 // Namespace routes
 const namespaceRoutes = new NamespaceRoutes();
 app.use("/api", namespaceRoutes.setupRoutes());
+
+// Destination sync routes
+app.use("/api", DestinationSyncRoutes);
+
+// Dashboard routes
+app.use("/api/dashboard", DashboardRoutes);
 
 // Configuration management routes
 const EnvConfigRoutes = require("./src/routes/envConfigRoutes");

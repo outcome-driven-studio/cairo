@@ -1,5 +1,6 @@
 const { query } = require("../utils/db");
 const logger = require("../utils/logger");
+const namespaceGenerator = require("../utils/namespaceGenerator");
 
 /**
  * NamespaceService handles namespace detection, management, and routing
@@ -15,16 +16,45 @@ class NamespaceService {
   }
 
   /**
+   * Get or create default namespace
+   * @returns {Promise<string>} - Default namespace name
+   */
+  async getDefaultNamespace() {
+    try {
+      // Check if we have any namespace marked as default (has 'default' keyword)
+      const result = await query(
+        "SELECT name FROM namespaces WHERE keywords @> '\"default\"' AND is_active = true LIMIT 1"
+      );
+
+      if (result.rows.length > 0) {
+        return result.rows[0].name;
+      }
+
+      // No default namespace exists, create one with random name
+      logger.warn("[Namespace] No default namespace found, creating new one");
+      const newNamespace = await this.createNamespace({
+        name: namespaceGenerator.generate(),
+        keywords: ['default']
+      });
+      return newNamespace.name;
+    } catch (error) {
+      logger.error("[Namespace] Error getting default namespace:", error);
+      // Fallback to a generated namespace name
+      return namespaceGenerator.generate();
+    }
+  }
+
+  /**
    * Detect namespace from campaign name using keyword matching
    * @param {string} campaignName - Name of the campaign
-   * @returns {Promise<string>} - Namespace name (defaults to 'playmaker')
+   * @returns {Promise<string>} - Namespace name (defaults to system default)
    */
   async detectNamespaceFromCampaign(campaignName) {
     if (!campaignName) {
       logger.debug(
         "[Namespace] No campaign name provided, using default namespace"
       );
-      return "playmaker";
+      return await this.getDefaultNamespace();
     }
 
     try {
@@ -33,7 +63,8 @@ class NamespaceService {
 
       // Check each namespace's keywords for matches
       for (const namespace of namespaces) {
-        if (namespace.name === "playmaker") continue; // Skip default, check last
+        // Skip default namespace (identified by having 'default' keyword)
+        if (namespace.keywords && namespace.keywords.includes('default')) continue;
 
         const keywords = Array.isArray(namespace.keywords)
           ? namespace.keywords
@@ -53,10 +84,10 @@ class NamespaceService {
       logger.debug(
         `[Namespace] No namespace match found for campaign: ${campaignName}, using default`
       );
-      return "playmaker"; // Default namespace
+      return await this.getDefaultNamespace(); // Default namespace
     } catch (error) {
       logger.error("[Namespace] Error detecting namespace:", error);
-      return "playmaker"; // Failsafe to default
+      return await this.getDefaultNamespace(); // Failsafe to default
     }
   }
 
@@ -128,10 +159,8 @@ class NamespaceService {
       return namespace.table_name;
     }
 
-    // Default fallback
-    if (namespaceName === "playmaker") {
-      return "playmaker_user_source";
-    }
+    // Default fallback - no hardcoded namespace
+    // Generate table name from namespace name
 
     // Generate table name from namespace name
     const sanitizedName = namespaceName
