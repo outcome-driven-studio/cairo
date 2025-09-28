@@ -9,39 +9,45 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
+  Award,
+  Target,
+  Zap,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { format } from 'date-fns';
+import axios from 'axios';
 
-// Mock data - replace with real API calls
-const mockStats = {
-  totalEvents: 15420,
-  totalSources: 3,
-  totalDestinations: 4,
-  totalUsers: 1250,
-  eventsTrend: [
-    { date: '2024-01-01', events: 850 },
-    { date: '2024-01-02', events: 920 },
-    { date: '2024-01-03', events: 1100 },
-    { date: '2024-01-04', events: 980 },
-    { date: '2024-01-05', events: 1250 },
-    { date: '2024-01-06', events: 1420 },
-    { date: '2024-01-07', events: 1350 },
-  ],
-  topEvents: [
-    { name: 'Page Viewed', value: 5420, color: '#3b82f6' },
-    { name: 'Button Clicked', value: 3210, color: '#10b981' },
-    { name: 'Form Submitted', value: 1890, color: '#f59e0b' },
-    { name: 'Purchase Completed', value: 920, color: '#ef4444' },
-    { name: 'User Signed Up', value: 680, color: '#8b5cf6' },
-  ],
-  recentActivity: [
-    { id: 1, type: 'event', message: 'New user signed up', timestamp: new Date(), status: 'success' },
-    { id: 2, type: 'destination', message: 'Slack destination offline', timestamp: new Date(Date.now() - 300000), status: 'error' },
-    { id: 3, type: 'source', message: 'React SDK connected', timestamp: new Date(Date.now() - 600000), status: 'success' },
-    { id: 4, type: 'event', message: 'High volume detected', timestamp: new Date(Date.now() - 900000), status: 'warning' },
-  ],
-};
+interface DashboardData {
+  totalUsers: number;
+  namespace: string;
+  tableName: string;
+  enrichmentRate: number;
+  scoringRate: number;
+  avgLeadScore: number;
+  highQualityLeads: number;
+  leadGradeDistribution: Array<{ name: string; value: number; color: string }>;
+  userTrend: Array<{ date: string; users: number }>;
+  leadScoreDistribution: Array<{ range: string; count: number; avgScore: number }>;
+  enrichmentSources: Array<{ platform: string; count: number; color: string }>;
+  recentActivity: Array<{
+    id: string;
+    email: string;
+    name: string;
+    platform: string;
+    leadScore: number;
+    leadGrade: string;
+    activityType: string;
+    timestamp: string;
+    message: string;
+  }>;
+  syncStats: {
+    totalSyncs: number;
+    successfulSyncs: number;
+    failedSyncs: number;
+    lastSync: string | null;
+    successRate: number;
+  };
+}
 
 const StatCard = ({ title, value, change, icon: Icon, trend = 'up' }: {
   title: string;
@@ -54,7 +60,9 @@ const StatCard = ({ title, value, change, icon: Icon, trend = 'up' }: {
     <div className="flex items-center justify-between">
       <div>
         <p className="text-sm font-medium text-muted-foreground">{title}</p>
-        <p className="text-2xl font-semibold mt-2 text-foreground">{typeof value === 'number' ? value.toLocaleString() : value}</p>
+        <p className="text-2xl font-semibold mt-2 text-foreground">
+          {typeof value === 'number' ? value.toLocaleString() : value}
+        </p>
         {change && (
           <p className={`text-sm mt-2 flex items-center ${
             trend === 'up' ? 'text-green-600' : 'text-red-600'
@@ -71,18 +79,23 @@ const StatCard = ({ title, value, change, icon: Icon, trend = 'up' }: {
   </div>
 );
 
-const ActivityItem = ({ activity }: { activity: typeof mockStats.recentActivity[0] }) => {
+const ActivityItem = ({ activity }: { activity: DashboardData['recentActivity'][0] }) => {
   const getIcon = () => {
-    switch (activity.status) {
-      case 'success':
+    switch (activity.activityType) {
+      case 'new_user':
         return <CheckCircle className="h-5 w-5 text-green-500" />;
-      case 'error':
-        return <AlertCircle className="h-5 w-5 text-red-500" />;
-      case 'warning':
-        return <AlertCircle className="h-5 w-5 text-yellow-500" />;
+      case 'updated':
+        return <Activity className="h-5 w-5 text-blue-500" />;
       default:
         return <Clock className="h-5 w-5 text-gray-500" />;
     }
+  };
+
+  const getStatusColor = () => {
+    if (activity.leadScore >= 80) return 'text-green-600';
+    if (activity.leadScore >= 60) return 'text-blue-600';
+    if (activity.leadScore >= 40) return 'text-yellow-600';
+    return 'text-gray-600';
   };
 
   return (
@@ -92,34 +105,83 @@ const ActivityItem = ({ activity }: { activity: typeof mockStats.recentActivity[
         <p className="text-sm font-medium text-foreground truncate">
           {activity.message}
         </p>
-        <p className="text-sm text-muted-foreground">
-          {format(activity.timestamp, 'MMM d, HH:mm')}
-        </p>
+        <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+          <span>{format(new Date(activity.timestamp), 'MMM d, HH:mm')}</span>
+          {activity.leadScore && (
+            <>
+              <span>•</span>
+              <span className={getStatusColor()}>
+                Score: {activity.leadScore} ({activity.leadGrade})
+              </span>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
 export default function Overview() {
-  // In a real app, these would be actual API calls
-  const { data: stats, isLoading } = useQuery({
-    queryKey: ['overview-stats'],
-    queryFn: () => Promise.resolve(mockStats),
+  const { data: dashboardData, isLoading, error } = useQuery({
+    queryKey: ['dashboard-overview'],
+    queryFn: async () => {
+      const response = await axios.get('/api/dashboard/overview');
+      return response.data as DashboardData;
+    },
+    refetchInterval: 30000, // Refresh every 30 seconds
   });
 
   if (isLoading) {
     return (
-      <div className="animate-pulse">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="animate-pulse space-y-8">
+        <div>
+          <div className="h-8 bg-muted rounded w-64 mb-2"></div>
+          <div className="h-4 bg-muted rounded w-96"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="card p-6">
+            <div key={i} className="border border-border/50 rounded-lg p-6">
               <div className="h-4 bg-muted rounded w-24 mb-4"></div>
               <div className="h-8 bg-muted rounded w-16"></div>
             </div>
           ))}
         </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[1, 2].map(i => (
+            <div key={i} className="border border-border/50 rounded-lg p-6">
+              <div className="h-6 bg-muted rounded w-32 mb-4"></div>
+              <div className="h-64 bg-muted rounded"></div>
+            </div>
+          ))}
+        </div>
       </div>
     );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold cairo-gradient-text">Dashboard Overview</h1>
+          <p className="text-muted-foreground mt-2">Monitor your customer data platform performance</p>
+        </div>
+        <div className="border border-red-200 rounded-lg p-6 bg-red-50">
+          <div className="flex items-center space-x-3">
+            <AlertCircle className="h-6 w-6 text-red-500" />
+            <div>
+              <h3 className="font-semibold text-red-800">Unable to load dashboard data</h3>
+              <p className="text-red-600 mt-1">
+                {error instanceof Error ? error.message : 'Failed to fetch dashboard statistics'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!dashboardData) {
+    return null;
   }
 
   return (
@@ -128,73 +190,50 @@ export default function Overview() {
       <div>
         <h1 className="text-3xl font-bold cairo-gradient-text">Dashboard Overview</h1>
         <p className="text-muted-foreground mt-2">
-          Monitor your customer data platform performance and activity
+          Monitoring {dashboardData.totalUsers.toLocaleString()} users in namespace <span className="font-mono text-blue-600">{dashboardData.namespace}</span>
         </p>
       </div>
 
-      {/* Stats Cards */}
+      {/* Key Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
-          title="Total Events"
-          value={stats?.totalEvents || 0}
-          change="+12.5% from last week"
-          icon={Activity}
+          title="Total Users"
+          value={dashboardData.totalUsers}
+          change={`${dashboardData.scoringRate}% scored`}
+          icon={Users}
         />
         <StatCard
-          title="Active Sources"
-          value={stats?.totalSources || 0}
-          change="+1 new this week"
+          title="Enrichment Rate"
+          value={`${dashboardData.enrichmentRate}%`}
+          change={`${dashboardData.highQualityLeads} high-quality leads`}
           icon={Database}
         />
         <StatCard
-          title="Destinations"
-          value={stats?.totalDestinations || 0}
-          change="All healthy"
-          icon={Send}
+          title="Avg Lead Score"
+          value={dashboardData.avgLeadScore}
+          change={`${dashboardData.syncStats.successRate}% sync success`}
+          icon={Award}
         />
         <StatCard
-          title="Tracked Users"
-          value={stats?.totalUsers || 0}
-          change="+8.2% from last week"
-          icon={Users}
+          title="Total Syncs"
+          value={dashboardData.syncStats.totalSyncs}
+          change={dashboardData.syncStats.lastSync ? `Last: ${format(new Date(dashboardData.syncStats.lastSync), 'MMM d')}` : 'Never synced'}
+          icon={Send}
         />
       </div>
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Events Trend */}
-        <div className="card p-6">
-          <h3 className="text-lg font-semibold mb-4">Events Trend (7 days)</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={stats?.eventsTrend || []}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey="date"
-                tickFormatter={(value) => format(new Date(value), 'MMM dd')}
-              />
-              <YAxis />
-              <Tooltip
-                labelFormatter={(value) => format(new Date(value), 'MMM dd, yyyy')}
-                formatter={(value) => [value.toLocaleString(), 'Events']}
-              />
-              <Line
-                type="monotone"
-                dataKey="events"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                dot={{ r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Top Events */}
-        <div className="card p-6">
-          <h3 className="text-lg font-semibold mb-4">Top Events</h3>
+        {/* Lead Grade Distribution */}
+        <div className="border border-border/50 rounded-lg p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            <Target className="w-5 h-5 mr-2" />
+            Lead Grade Distribution
+          </h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={stats?.topEvents || []}
+                data={dashboardData.leadGradeDistribution}
                 cx="50%"
                 cy="50%"
                 innerRadius={60}
@@ -202,76 +241,142 @@ export default function Overview() {
                 paddingAngle={2}
                 dataKey="value"
               >
-                {(stats?.topEvents || []).map((entry, index) => (
+                {dashboardData.leadGradeDistribution.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => [value.toLocaleString(), 'Events']} />
+              <Tooltip formatter={(value) => [value.toLocaleString(), 'Users']} />
             </PieChart>
           </ResponsiveContainer>
           <div className="mt-4 grid grid-cols-2 gap-2">
-            {(stats?.topEvents || []).map((event, index) => (
+            {dashboardData.leadGradeDistribution.map((grade, index) => (
               <div key={index} className="flex items-center space-x-2">
                 <div
                   className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: event.color }}
+                  style={{ backgroundColor: grade.color }}
                 />
-                <span className="text-sm text-muted-foreground truncate">
-                  {event.name}
+                <span className="text-sm text-muted-foreground">
+                  {grade.name}: {grade.value}
                 </span>
               </div>
             ))}
           </div>
         </div>
+
+        {/* Enrichment Sources */}
+        <div className="border border-border/50 rounded-lg p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            <Zap className="w-5 h-5 mr-2" />
+            Data Sources
+          </h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={dashboardData.enrichmentSources}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="platform" />
+              <YAxis />
+              <Tooltip formatter={(value) => [value.toLocaleString(), 'Users']} />
+              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                {dashboardData.enrichmentSources.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* User Trend and Lead Score Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* User Trend */}
+        {dashboardData.userTrend.length > 0 && (
+          <div className="border border-border/50 rounded-lg p-6">
+            <h3 className="text-lg font-semibold mb-4">User Growth (30 days)</h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={dashboardData.userTrend}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="date"
+                  tickFormatter={(value) => format(new Date(value), 'MMM dd')}
+                />
+                <YAxis />
+                <Tooltip
+                  labelFormatter={(value) => format(new Date(value), 'MMM dd, yyyy')}
+                  formatter={(value) => [value.toLocaleString(), 'New Users']}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="users"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Lead Score Distribution */}
+        <div className="border border-border/50 rounded-lg p-6">
+          <h3 className="text-lg font-semibold mb-4">Lead Score Ranges</h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={dashboardData.leadScoreDistribution}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="range" />
+              <YAxis />
+              <Tooltip
+                formatter={(value, name) => [
+                  value.toLocaleString(),
+                  name === 'count' ? 'Users' : 'Avg Score'
+                ]}
+              />
+              <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <div className="card p-6">
-            <h3 className="text-lg font-semibold mb-4">Event Volume by Hour</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={[
-                { hour: '00', events: 120 },
-                { hour: '04', events: 80 },
-                { hour: '08', events: 350 },
-                { hour: '12', events: 420 },
-                { hour: '16', events: 380 },
-                { hour: '20', events: 280 },
-              ]}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="hour" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="events" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="card p-6">
-          <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
-          <div className="space-y-1 max-h-80 overflow-y-auto scrollbar-thin">
-            {(stats?.recentActivity || []).map((activity) => (
+      <div className="border border-border/50 rounded-lg p-6">
+        <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <Activity className="w-5 h-5 mr-2" />
+          Recent Activity
+        </h3>
+        <div className="space-y-1 max-h-80 overflow-y-auto scrollbar-thin">
+          {dashboardData.recentActivity.length > 0 ? (
+            dashboardData.recentActivity.map((activity) => (
               <ActivityItem key={activity.id} activity={activity} />
-            ))}
-          </div>
+            ))
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p>No recent activity found</p>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="card p-6">
+      <div className="border border-border/50 rounded-lg p-6">
         <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="btn-primary">
-            <Database className="w-4 h-4 mr-2" />
-            Add New Source
-          </button>
-          <button className="btn-secondary">
+          <button
+            onClick={() => window.location.href = '/destinations'}
+            className="btn-primary flex items-center justify-center"
+          >
             <Send className="w-4 h-4 mr-2" />
-            Configure Destination
+            Sync to Destinations
           </button>
-          <button className="btn-outline">
+          <button
+            onClick={() => window.location.href = '/sources'}
+            className="btn-secondary flex items-center justify-center"
+          >
+            <Database className="w-4 h-4 mr-2" />
+            Manage Sources
+          </button>
+          <button
+            onClick={() => window.location.href = '/events'}
+            className="btn-outline flex items-center justify-center"
+          >
             <Activity className="w-4 h-4 mr-2" />
             View Live Events
           </button>

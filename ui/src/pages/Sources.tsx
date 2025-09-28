@@ -71,56 +71,16 @@ export default function Sources() {
 
   const loadSources = async () => {
     try {
-      // In a real app, this would be an API call
-      const mockSources: Source[] = [
-        {
-          id: 'src_1',
-          name: 'Production Website',
-          type: 'javascript',
-          writeKey: 'wk_prod_abc123xyz789',
-          status: 'active',
-          lastSeen: new Date().toISOString(),
-          eventCount: 15420,
-          createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-          settings: {
-            allowedDomains: ['*.myapp.com', 'myapp.com'],
-            rateLimit: 1000,
-            enabled: true
-          }
-        },
-        {
-          id: 'src_2',
-          name: 'Backend API',
-          type: 'nodejs',
-          writeKey: 'wk_api_def456uvw123',
-          status: 'active',
-          lastSeen: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-          eventCount: 8750,
-          createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
-          settings: {
-            rateLimit: 5000,
-            enabled: true
-          }
-        },
-        {
-          id: 'src_3',
-          name: 'Mobile App iOS',
-          type: 'mobile',
-          writeKey: 'wk_ios_ghi789rst456',
-          status: 'inactive',
-          lastSeen: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          eventCount: 3200,
-          createdAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
-          settings: {
-            enabled: false
-          }
-        }
-      ];
-
-      setSources(mockSources);
+      const response = await fetch('/api/sources');
+      if (!response.ok) {
+        throw new Error('Failed to fetch sources');
+      }
+      const data = await response.json();
+      setSources(data.sources || []);
       setLoading(false);
     } catch (error) {
       console.error('Failed to load sources:', error);
+      setSources([]);
       setLoading(false);
     }
   };
