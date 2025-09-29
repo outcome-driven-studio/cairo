@@ -9,6 +9,7 @@ const LeadScoringService = require("./leadScoringService");
 const LemlistSync = require("./sync/lemlistSync");
 const SmartleadSync = require("./sync/smartleadSync");
 const monitoring = require("../utils/monitoring");
+const EventTrackingService = require("./eventTrackingService");
 
 class PeriodicSyncService {
   constructor(options = {}) {
@@ -44,6 +45,9 @@ class PeriodicSyncService {
     this.smartleadSyncService = process.env.SMARTLEAD_API_KEY
       ? new SmartleadSync(trackingOptions)
       : null;
+
+    // Initialize event tracking service
+    this.eventTracking = new EventTrackingService();
 
     // Track statistics
     this.stats = {
@@ -346,6 +350,13 @@ class PeriodicSyncService {
             );
             imported++;
             logger.debug(`[PeriodicSync] Imported new lead: ${email}`);
+
+            // Track lead creation event
+            await this.eventTracking.trackLeadEvent(email, this.eventTracking.eventTypes.LEAD_CREATED, {
+              source: 'attio_import',
+              name: fullName,
+              imported_at: new Date().toISOString()
+            });
           }
         } catch (error) {
           logger.error(

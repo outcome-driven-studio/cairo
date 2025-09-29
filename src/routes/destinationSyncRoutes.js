@@ -3,10 +3,12 @@ const router = express.Router();
 const logger = require('../utils/logger');
 const MixpanelService = require('../services/mixpanelService');
 const AttioService = require('../services/attioService');
+const EventTrackingService = require('../services/eventTrackingService');
 const { query } = require('../utils/db');
 
 // Initialize services
 const mixpanelService = new MixpanelService(process.env.MIXPANEL_PROJECT_TOKEN);
+const eventTracking = new EventTrackingService();
 
 /**
  * Get all destination configurations
@@ -129,14 +131,78 @@ router.post('/sync/:destinationId', async (req, res) => {
               updated_at: record.updated_at
             });
 
-            // Track sync event
+            // Track multiple events for comprehensive analytics
+            // 1. Track lead profile update
+            await eventTracking.trackLeadEvent(record.email, eventTracking.eventTypes.LEAD_UPDATED, {
+              source: 'cairo_cdp',
+              lead_score: record.lead_score,
+              lead_grade: record.lead_grade,
+              icp_score: record.icp_score,
+              has_enrichment: !!record.enrichment_profile,
+              has_apollo_data: !!record.apollo_data,
+              organization: record.apollo_data?.organization?.name,
+              industry: record.apollo_data?.organization?.industry,
+              title: record.apollo_data?.title,
+              location: record.apollo_data?.location,
+              updated_at: record.updated_at
+            });
+
+            // 2. Track lead scoring event if score exists
+            if (record.lead_score !== null && record.lead_score !== undefined) {
+              await eventTracking.trackEvent(record.email, 'Lead Scored', {
+                lead_score: record.lead_score,
+                lead_grade: record.lead_grade,
+                icp_score: record.icp_score,
+                score_threshold: record.lead_score > 70 ? 'high' : record.lead_score > 40 ? 'medium' : 'low',
+                organization: record.apollo_data?.organization?.name
+              });
+            }
+
+            // 3. Track enrichment event if enrichment data exists
+            if (record.enrichment_profile) {
+              await eventTracking.trackEnrichmentCompleted(record.email, {
+                has_name: !!record.enrichment_profile.name,
+                has_company: !!record.enrichment_profile.company,
+                has_title: !!record.enrichment_profile.title,
+                has_linkedin: !!record.enrichment_profile.linkedin_url,
+                enrichment_source: record.enrichment_profile.source || 'apollo',
+                enriched_at: record.enrichment_profile.updated_at || record.updated_at
+              });
+            }
+
+            // 4. Track Apollo data event if Apollo data exists
+            if (record.apollo_data) {
+              await eventTracking.trackEvent(record.email, 'Apollo Data Synced', {
+                organization: record.apollo_data.organization?.name,
+                industry: record.apollo_data.organization?.industry,
+                company_size: record.apollo_data.organization?.estimated_num_employees,
+                title: record.apollo_data.title,
+                seniority: record.apollo_data.seniority,
+                department: record.apollo_data.department,
+                location: record.apollo_data.location,
+                has_phone: !!record.apollo_data.phone,
+                has_linkedin: !!record.apollo_data.linkedin_url
+              });
+            }
+
+            // 5. Track namespace/segment event
+            await eventTracking.trackEvent(record.email, 'Lead Segmented', {
+              namespace: namespace.name,
+              segment: namespace.name,
+              source_table: tableName,
+              total_leads_in_segment: records.length
+            });
+
+            // 6. Track original sync event for backwards compatibility
             await mixpanelService.track(record.email, 'Lead Synced', {
               source: 'cairo_cdp',
               destination: 'mixpanel',
               lead_score: record.lead_score,
               lead_grade: record.lead_grade,
               has_apollo_data: !!record.apollo_data,
-              sync_timestamp: new Date().toISOString()
+              sync_timestamp: new Date().toISOString(),
+              sync_batch_size: records.length,
+              sync_type: fullSync ? 'full' : 'incremental'
             });
 
             syncedCount++;
@@ -282,7 +348,74 @@ router.post('/sync/:destinationId/background', async (req, res) => {
                   updated_at: record.updated_at
                 });
 
-                // Track sync event
+                // Track multiple events for comprehensive analytics
+                // 1. Track lead profile update
+                await eventTracking.trackLeadEvent(record.email, eventTracking.eventTypes.LEAD_UPDATED, {
+                  source: 'cairo_cdp',
+                  lead_score: record.lead_score,
+                  lead_grade: record.lead_grade,
+                  icp_score: record.icp_score,
+                  has_enrichment: !!record.enrichment_profile,
+                  has_apollo_data: !!record.apollo_data,
+                  organization: record.apollo_data?.organization?.name,
+                  industry: record.apollo_data?.organization?.industry,
+                  title: record.apollo_data?.title,
+                  location: record.apollo_data?.location,
+                  updated_at: record.updated_at,
+                  sync_type: 'background'
+                });
+
+                // 2. Track lead scoring event if score exists
+                if (record.lead_score !== null && record.lead_score !== undefined) {
+                  await eventTracking.trackEvent(record.email, 'Lead Scored', {
+                    lead_score: record.lead_score,
+                    lead_grade: record.lead_grade,
+                    icp_score: record.icp_score,
+                    score_threshold: record.lead_score > 70 ? 'high' : record.lead_score > 40 ? 'medium' : 'low',
+                    organization: record.apollo_data?.organization?.name,
+                    sync_type: 'background'
+                  });
+                }
+
+                // 3. Track enrichment event if enrichment data exists
+                if (record.enrichment_profile) {
+                  await eventTracking.trackEnrichmentCompleted(record.email, {
+                    has_name: !!record.enrichment_profile.name,
+                    has_company: !!record.enrichment_profile.company,
+                    has_title: !!record.enrichment_profile.title,
+                    has_linkedin: !!record.enrichment_profile.linkedin_url,
+                    enrichment_source: record.enrichment_profile.source || 'apollo',
+                    enriched_at: record.enrichment_profile.updated_at || record.updated_at,
+                    sync_type: 'background'
+                  });
+                }
+
+                // 4. Track Apollo data event if Apollo data exists
+                if (record.apollo_data) {
+                  await eventTracking.trackEvent(record.email, 'Apollo Data Synced', {
+                    organization: record.apollo_data.organization?.name,
+                    industry: record.apollo_data.organization?.industry,
+                    company_size: record.apollo_data.organization?.estimated_num_employees,
+                    title: record.apollo_data.title,
+                    seniority: record.apollo_data.seniority,
+                    department: record.apollo_data.department,
+                    location: record.apollo_data.location,
+                    has_phone: !!record.apollo_data.phone,
+                    has_linkedin: !!record.apollo_data.linkedin_url,
+                    sync_type: 'background'
+                  });
+                }
+
+                // 5. Track namespace/segment event
+                await eventTracking.trackEvent(record.email, 'Lead Segmented', {
+                  namespace: namespace.name,
+                  segment: namespace.name,
+                  source_table: tableName,
+                  total_leads_in_segment: records.length,
+                  sync_type: 'background'
+                });
+
+                // 6. Track original sync event for backwards compatibility
                 await mixpanelService.track(record.email, 'Lead Synced', {
                   source: 'cairo_cdp',
                   destination: 'mixpanel',
@@ -290,6 +423,7 @@ router.post('/sync/:destinationId/background', async (req, res) => {
                   lead_grade: record.lead_grade,
                   has_apollo_data: !!record.apollo_data,
                   sync_timestamp: new Date().toISOString(),
+                  sync_batch_size: records.length,
                   sync_type: 'background'
                 });
 

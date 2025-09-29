@@ -4,6 +4,7 @@ const { query } = require("../utils/db");
 const LeadScoringService = require("../services/leadScoringService");
 const AttioService = require("../services/attioService");
 const EnrichmentService = require("../services/enrichmentService");
+const EventTrackingService = require("../services/eventTrackingService");
 
 class ScoringRoutes {
   constructor() {
@@ -13,6 +14,7 @@ class ScoringRoutes {
       : null;
     // Use EnrichmentService for cost-optimized enrichment (AI first)
     this.enrichmentService = new EnrichmentService();
+    this.eventTracking = new EventTrackingService();
   }
 
   /**
@@ -24,10 +26,10 @@ class ScoringRoutes {
 
       // Count how many users have zero scores
       const countResult = await query(`
-        SELECT COUNT(*) as count 
-        FROM playmaker_user_source 
-        WHERE apollo_enriched_at IS NOT NULL 
-        AND apollo_data IS NOT NULL 
+        SELECT COUNT(*) as count
+        FROM playmaker_user_source
+        WHERE apollo_enriched_at IS NOT NULL
+        AND apollo_data IS NOT NULL
         AND icp_score = 0
       `);
 
@@ -140,7 +142,7 @@ class ScoringRoutes {
 
       // Update database
       await query(
-        `UPDATE playmaker_user_source 
+        `UPDATE playmaker_user_source
          SET icp_score = $1,
              behaviour_score = $2,
              lead_score = $3,
@@ -149,6 +151,19 @@ class ScoringRoutes {
          WHERE id = $5`,
         [newICPScore, newBehaviorScore, newLeadScore, leadGrade, user.id]
       );
+
+      // Track scoring event
+      await this.eventTracking.trackLeadScoring(user.email, {
+        lead_score: newLeadScore,
+        previous_score: user.lead_score,
+        lead_grade: leadGrade,
+        icp_score: newICPScore,
+        behavior_score: newBehaviorScore,
+        factors: {
+          icp_breakdown: icpResult.breakdown,
+          behavior_breakdown: behaviorResult.breakdown
+        }
+      });
 
       res.json({
         success: true,
@@ -185,7 +200,7 @@ class ScoringRoutes {
   async getScoringStats(req, res) {
     try {
       const stats = await query(`
-        SELECT 
+        SELECT
           COUNT(*) as total_users,
           COUNT(CASE WHEN icp_score = 0 THEN 1 END) as zero_icp_count,
           COUNT(CASE WHEN icp_score > 0 THEN 1 END) as non_zero_icp_count,
@@ -246,26 +261,26 @@ class ScoringRoutes {
    * Background job to recalculate scores
    */
   async runRecalculation(limit, onlyZeroScores, syncToAttio) {
-    logger.info("[Scoring] Starting score recalculation...");
-
     try {
-      let whereClause =
-        "WHERE apollo_enriched_at IS NOT NULL AND apollo_data IS NOT NULL";
+      logger.info("[Scoring] Starting score recalculation...");
+
+      // Build query based on parameters
+      let whereClause = "WHERE apollo_enriched_at IS NOT NULL AND apollo_data IS NOT NULL";
       if (onlyZeroScores === "true") {
         whereClause += " AND icp_score = 0";
       }
 
-      let limitClause = "";
-      if (limit) {
-        limitClause = ` LIMIT ${parseInt(limit)}`;
-      }
+      const limitClause = limit ? `LIMIT ${parseInt(limit)}` : "";
 
-      const users = await query(
-        `SELECT * FROM playmaker_user_source ${whereClause} ORDER BY updated_at DESC${limitClause}`
-      );
+      const users = await query(`
+        SELECT * FROM playmaker_user_source
+        ${whereClause}
+        ORDER BY updated_at DESC
+        ${limitClause}
+      `);
 
       logger.info(
-        `[Scoring] Processing ${users.rows.length} users (onlyZeroScores: ${onlyZeroScores}, syncToAttio: ${syncToAttio})`
+        `[Scoring] Processing ${users.rows.length} users for score recalculation`
       );
 
       let updated = 0;
@@ -276,7 +291,7 @@ class ScoringRoutes {
 
       for (const user of users.rows) {
         try {
-          // Calculate scores
+          // Calculate ICP and behavior scores
           const icpResult = this.leadScoringService.calculateICPScore(user);
           const behaviorResult =
             await this.leadScoringService.calculateBehaviorScore(
@@ -288,10 +303,11 @@ class ScoringRoutes {
           const newBehaviorScore = behaviorResult.score;
           const newLeadScore = newICPScore + newBehaviorScore;
 
-          // Only update if scores changed
+          // Only update if score has changed (for zero-only mode)
           if (
-            newICPScore !== user.icp_score ||
-            newBehaviorScore !== user.behaviour_score
+            onlyZeroScores === "false" ||
+            user.icp_score !== newICPScore ||
+            user.behaviour_score !== newBehaviorScore
           ) {
             let leadGrade = "F";
             if (newLeadScore >= 80) leadGrade = "A";
@@ -300,8 +316,9 @@ class ScoringRoutes {
             else if (newLeadScore >= 20) leadGrade = "D";
 
             // Update database
+            const prevScore = user.lead_score;
             await query(
-              `UPDATE playmaker_user_source 
+              `UPDATE playmaker_user_source
                SET icp_score = $1,
                    behaviour_score = $2,
                    lead_score = $3,
@@ -310,6 +327,15 @@ class ScoringRoutes {
                WHERE id = $5`,
               [newICPScore, newBehaviorScore, newLeadScore, leadGrade, user.id]
             );
+
+            // Track scoring event
+            await this.eventTracking.trackLeadScoring(user.email, {
+              lead_score: newLeadScore,
+              previous_score: prevScore,
+              lead_grade: leadGrade,
+              icp_score: newICPScore,
+              behavior_score: newBehaviorScore
+            });
 
             updated++;
 
