@@ -4,6 +4,7 @@ const { query } = require("../utils/db");
 const LeadScoringService = require("../services/leadScoringService");
 const AttioService = require("../services/attioService");
 const EnrichmentService = require("../services/enrichmentService");
+const EventTrackingService = require("../services/eventTrackingService");
 
 class ScoringRoutes {
   constructor() {
@@ -13,6 +14,7 @@ class ScoringRoutes {
       : null;
     // Use EnrichmentService for cost-optimized enrichment (AI first)
     this.enrichmentService = new EnrichmentService();
+    this.eventTracking = new EventTrackingService();
   }
 
   /**
@@ -300,8 +302,9 @@ class ScoringRoutes {
             else if (newLeadScore >= 20) leadGrade = "D";
 
             // Update database
+            const prevScore = user.lead_score;
             await query(
-              `UPDATE playmaker_user_source 
+              `UPDATE playmaker_user_source
                SET icp_score = $1,
                    behaviour_score = $2,
                    lead_score = $3,
@@ -310,6 +313,15 @@ class ScoringRoutes {
                WHERE id = $5`,
               [newICPScore, newBehaviorScore, newLeadScore, leadGrade, user.id]
             );
+
+            // Track scoring event
+            await this.eventTracking.trackLeadScoring(user.email, {
+              lead_score: newLeadScore,
+              previous_score: prevScore,
+              lead_grade: leadGrade,
+              icp_score: newICPScore,
+              behavior_score: newBehaviorScore
+            });
 
             updated++;
 

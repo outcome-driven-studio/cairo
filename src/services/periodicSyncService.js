@@ -9,6 +9,7 @@ const LeadScoringService = require("./leadScoringService");
 const LemlistSync = require("./sync/lemlistSync");
 const SmartleadSync = require("./sync/smartleadSync");
 const monitoring = require("../utils/monitoring");
+const EventTrackingService = require("./eventTrackingService");
 
 class PeriodicSyncService {
   constructor(options = {}) {
@@ -44,6 +45,9 @@ class PeriodicSyncService {
     this.smartleadSyncService = process.env.SMARTLEAD_API_KEY
       ? new SmartleadSync(trackingOptions)
       : null;
+
+    // Initialize event tracking service
+    this.eventTracking = new EventTrackingService();
 
     // Track statistics
     this.stats = {
@@ -257,21 +261,44 @@ class PeriodicSyncService {
           );
 
           if (existing.rows.length === 0) {
-            // Insert new user
+            // Extract name from Attio structure
+            const nameValue = person.values?.name?.[0];
+            const fullName =
+              nameValue?.full_name ||
+              nameValue?.value ||
+              `${nameValue?.first_name || ""} ${
+                nameValue?.last_name || ""
+              }`.trim() ||
+              person.values.name ||
+              email.split("@")[0];
+
+            // Insert new user (store name in enrichment_profile for compatibility)
+            const enrichmentProfile = {
+              name: fullName,
+              source: "attio_import",
+              imported_at: new Date().toISOString(),
+            };
+
             await query(
-              `INSERT INTO playmaker_user_source 
-               (email, name, created_at, updated_at, original_user_id, platform)
-               VALUES ($1, $2, NOW(), NOW(), $3, $4)
+              `INSERT INTO playmaker_user_source
+               (email, enrichment_profile, created_at, updated_at, original_user_id)
+               VALUES ($1, $2, NOW(), NOW(), $3)
                ON CONFLICT (email) DO NOTHING`,
               [
                 email,
-                person.values.name || email.split("@")[0],
-                person.id.record_id,
-                "attio",
+                JSON.stringify(enrichmentProfile),
+                person.id?.record_id || person.id,
               ]
             );
             imported++;
             logger.debug(`[PeriodicSync] Imported new lead: ${email}`);
+
+            // Track lead creation event
+            await this.eventTracking.trackLeadEvent(email, this.eventTracking.eventTypes.LEAD_CREATED, {
+              source: 'attio_import',
+              name: fullName,
+              imported_at: new Date().toISOString()
+            });
           }
         } catch (error) {
           logger.error(
@@ -364,8 +391,20 @@ class PeriodicSyncService {
       let scored = 0;
       for (const user of users.rows) {
         try {
-          await this.leadScoringService.scoreBehaviorOnly(user);
+          const previousScore = user.lead_score;
+          const scoreResult = await this.leadScoringService.scoreBehaviorOnly(user);
           scored++;
+
+          // Track scoring event if score changed
+          if (scoreResult && user.email) {
+            await this.eventTracking.trackLeadScoring(user.email, {
+              lead_score: scoreResult.lead_score || user.lead_score,
+              previous_score: previousScore,
+              lead_grade: scoreResult.lead_grade || user.lead_grade,
+              behavior_score: scoreResult.behavior_score,
+              engagement_score: scoreResult.engagement_score
+            });
+          }
         } catch (error) {
           logger.error(
             `[PeriodicSync] Failed to score behavior for user ${user.email}:`,

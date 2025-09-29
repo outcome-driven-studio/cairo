@@ -3,7 +3,9 @@ const { query } = require("../utils/db");
 const logger = require("../utils/logger");
 const MixpanelService = require("../services/mixpanelService");
 const AttioService = require("../services/attioService");
+const SlackService = require("../services/slackService");
 const config = require("../config");
+const EventTrackingService = require("../services/eventTrackingService");
 
 /**
  * Product Event Routes
@@ -12,9 +14,31 @@ const config = require("../config");
 class ProductEventRoutes {
   constructor() {
     // Initialize services
-    this.mixpanelService = new MixpanelService(process.env.MIXPANEL_PROJECT_TOKEN);
-    this.attioService = config.attioApiKey ? new AttioService(config.attioApiKey) : null;
-    
+    this.mixpanelService = new MixpanelService(
+      process.env.MIXPANEL_PROJECT_TOKEN
+    );
+    this.attioService = config.attioApiKey
+      ? new AttioService(config.attioApiKey)
+      : null;
+
+    // Initialize Slack service with configuration
+    const slackConfig = {
+      defaultChannel: process.env.SLACK_DEFAULT_CHANNEL,
+      alertEvents: process.env.SLACK_ALERT_EVENTS
+        ? process.env.SLACK_ALERT_EVENTS.split(",").map((e) => e.trim())
+        : undefined,
+      paymentThreshold: process.env.SLACK_PAYMENT_THRESHOLD
+        ? parseFloat(process.env.SLACK_PAYMENT_THRESHOLD)
+        : undefined,
+      maxAlertsPerMinute: process.env.SLACK_MAX_ALERTS_PER_MINUTE
+        ? parseInt(process.env.SLACK_MAX_ALERTS_PER_MINUTE)
+        : undefined,
+    };
+    this.slackService = new SlackService(
+      process.env.SLACK_WEBHOOK_URL,
+      slackConfig
+    );
+    this.eventTracking = new EventTrackingService();
     // Track statistics
     this.stats = {
       eventsReceived: 0,
@@ -130,18 +154,31 @@ class ProductEventRoutes {
         this.stats.errors.push({ type: "db", error: error.message });
       }
 
-      // 3. Send to Mixpanel (async, don't wait)
+      // 3. Send to all tracking destinations via EventTrackingService
+      this.eventTracking
+        .trackUserActivity(user_email, event, properties)
+        .then((result) => {
+          if (result.success) {
+            this.stats.mixpanelSent++;
+            logger.debug(`[Product Event] Tracked via EventTrackingService: ${event}`);
+          }
+        })
+        .catch((error) => {
+          logger.error(`[Product Event] EventTracking error:`, error);
+        });
+      results.tracking = "queued";
+
+      // Also track with legacy service for compatibility
       if (this.mixpanelService.enabled) {
         this.mixpanelService
           .trackProductEvent(user_email, event, properties)
           .then((result) => {
             if (result.success) {
-              this.stats.mixpanelSent++;
-              logger.debug(`[Product Event] Sent to Mixpanel: ${event}`);
+              logger.debug(`[Product Event] Also sent to Mixpanel directly: ${event}`);
             }
           })
           .catch((error) => {
-            logger.error(`[Product Event] Mixpanel error:`, error);
+            logger.error(`[Product Event] Direct Mixpanel error:`, error);
           });
         results.mixpanel = "queued";
       }
