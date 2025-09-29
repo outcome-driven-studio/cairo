@@ -5,6 +5,7 @@ const MixpanelService = require("../services/mixpanelService");
 const AttioService = require("../services/attioService");
 const SlackService = require("../services/slackService");
 const config = require("../config");
+const EventTrackingService = require("../services/eventTrackingService");
 
 /**
  * Product Event Routes
@@ -38,6 +39,7 @@ class ProductEventRoutes {
       process.env.SLACK_WEBHOOK_URL,
       slackConfig
     );
+    this.eventTracking = new EventTrackingService();
 
     // Track statistics
     this.stats = {
@@ -169,18 +171,31 @@ class ProductEventRoutes {
         this.stats.errors.push({ type: "db", error: error.message });
       }
 
-      // 3. Send to Mixpanel (async, don't wait)
+      // 3. Send to all tracking destinations via EventTrackingService
+      this.eventTracking
+        .trackUserActivity(user_email, event, properties)
+        .then((result) => {
+          if (result.success) {
+            this.stats.mixpanelSent++;
+            logger.debug(`[Product Event] Tracked via EventTrackingService: ${event}`);
+          }
+        })
+        .catch((error) => {
+          logger.error(`[Product Event] EventTracking error:`, error);
+        });
+      results.tracking = "queued";
+
+      // Also track with legacy service for compatibility
       if (this.mixpanelService.enabled) {
         this.mixpanelService
           .trackProductEvent(user_email, event, properties)
           .then((result) => {
             if (result.success) {
-              this.stats.mixpanelSent++;
-              logger.debug(`[Product Event] Sent to Mixpanel: ${event}`);
+              logger.debug(`[Product Event] Also sent to Mixpanel directly: ${event}`);
             }
           })
           .catch((error) => {
-            logger.error(`[Product Event] Mixpanel error:`, error);
+            logger.error(`[Product Event] Direct Mixpanel error:`, error);
           });
         results.mixpanel = "queued";
       }
