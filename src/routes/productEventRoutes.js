@@ -160,9 +160,9 @@ class ProductEventRoutes {
               event,
               userId: user?.original_user_id || user_email,
               properties,
-              platform: 'product',
+              platform: "product",
               timestamp,
-              messageId: eventKey
+              messageId: eventKey,
             });
           }
         }
@@ -177,7 +177,9 @@ class ProductEventRoutes {
         .then((result) => {
           if (result.success) {
             this.stats.mixpanelSent++;
-            logger.debug(`[Product Event] Tracked via EventTrackingService: ${event}`);
+            logger.debug(
+              `[Product Event] Tracked via EventTrackingService: ${event}`
+            );
           }
         })
         .catch((error) => {
@@ -191,7 +193,9 @@ class ProductEventRoutes {
           .trackProductEvent(user_email, event, properties)
           .then((result) => {
             if (result.success) {
-              logger.debug(`[Product Event] Also sent to Mixpanel directly: ${event}`);
+              logger.debug(
+                `[Product Event] Also sent to Mixpanel directly: ${event}`
+              );
             }
           })
           .catch((error) => {
@@ -200,29 +204,13 @@ class ProductEventRoutes {
         results.mixpanel = "queued";
       }
 
-      // 4. Send to Attio (async, don't wait)
+      // 4. Attio event tracking - method not implemented yet
+      // TODO: Implement createEvent method in AttioService for event tracking
       if (this.attioService) {
-        const attioEventData = {
-          event_key: `product-${event}-${Date.now()}`,
-          event_type: event,
-          platform: "product",
-          metadata: properties,
-          created_at: timestamp,
-          user_id: user_email,
-        };
-
-        this.attioService
-          .createEvent(attioEventData, user_email)
-          .then((result) => {
-            if (result) {
-              this.stats.attioSent++;
-              logger.debug(`[Product Event] Sent to Attio: ${event}`);
-            }
-          })
-          .catch((error) => {
-            logger.error(`[Product Event] Attio error:`, error);
-          });
-        results.attio = "queued";
+        logger.debug(
+          `[Product Event] Attio event tracking skipped - createEvent method not implemented`
+        );
+        results.attio = "not_implemented";
       }
 
       // 5. Send Slack alert if configured (async, don't wait)
