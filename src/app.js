@@ -322,6 +322,20 @@ const server = app.listen(PORT, "::", async () => {
     cronManager.start();
     logger.info("Cron jobs started");
 
+    // Initialize periodic sync service if enabled
+    if (process.env.USE_PERIODIC_SYNC === "true") {
+      const { getInstance } = require("./services/periodicSyncService");
+      const periodicSyncService = getInstance();
+
+      try {
+        await periodicSyncService.start();
+        logger.info("Periodic sync service started successfully");
+      } catch (error) {
+        logger.error("Failed to start periodic sync service:", error);
+        await monitoring.captureError(error, { type: "periodic_sync_startup" });
+      }
+    }
+
     // Send startup notification
     await monitoring.sendSlackAlert({
       type: "info",
