@@ -192,13 +192,15 @@ const envConfig = {
     },
     {
       key: "JWT_SECRET",
-      description: "JWT secret for authentication",
+      description: "JWT secret for authentication (Optional - reserved for future use)",
       category: "Security",
+      optional: true,
     },
     {
       key: "WEBHOOK_SECRET",
-      description: "Webhook secret for security",
+      description: "Webhook secret for security (Optional - reserved for future use)",
       category: "Security",
+      optional: true,
     },
   ],
 };

@@ -723,7 +723,7 @@ class SmartleadService {
       }
 
       // Log the mappings we're about to store
-      console.log("👀 Smartlead mappings to insert:", mappings);
+      logger.info("👀 Smartlead mappings to insert:", mappings);
       logger.info(`Total mappings to store: ${mappings.length}`);
 
       // Store the mappings

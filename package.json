@@ -24,7 +24,11 @@
     "setup": "node src/migrations/run_migrations.js",
     "setup-env": "node setup-env.js",
     "build:ui": "node build-ui.js",
-    "build": "npm run build:ui",
+    "build": "npm run build:ui && npm run build:sdks",
+    "build:sdks": "npm run build:sdk:node && npm run build:sdk:react && npm run build:sdk:browser",
+    "build:sdk:node": "cd packages/node-sdk && npm install && npm run build",
+    "build:sdk:react": "cd packages/react-sdk && npm install && npm run build",
+    "build:sdk:browser": "cd packages/browser-sdk && npm install && npm run build",
     "postinstall": "node build-ui.js || echo 'UI build failed, continuing...'"
   },
   "devDependencies": {

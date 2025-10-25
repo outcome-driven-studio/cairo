@@ -118,6 +118,16 @@ FULL_SYNC_SYSTEM_SUMMARY.md
 DOCUMENTATION_DEPLOYMENT_SUMMARY.md
 TESTING_AND_VALIDATION_SUMMARY.md
 
+# Internal documentation and troubleshooting (not for public repo)
+CONSISTENCY_AUDIT_SUMMARY.md
+FIXES_APPLIED.md
+QUICK_FIX_SUMMARY.md
+ENV_SETUP_TROUBLESHOOTING.md
+PERIODIC_SYNC_SETUP.md
+GITIGNORE_UPDATE_SUMMARY.md
+src/app.js.README.md
+src/app.js.deprecated
+
 # Keep important files
 !README.md
 !railway.json

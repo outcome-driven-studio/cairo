@@ -275,24 +275,24 @@ class LemlistService {
       activity.recipient?.companyName ||
       activity.leadCompanyName;
 
-    console.log("\n📊 LinkedIn Interaction:");
-    console.log(
+    logger.info("\n📊 LinkedIn Interaction:");
+    logger.info(
       `👤 Lead: ${leadName}${companyName ? ` (${companyName})` : ""}`
     );
-    console.log(`📧 Email: ${leadEmail}`);
-    console.log(`➡️  Status: ${activity.interactionStatus}`);
+    logger.info(`📧 Email: ${leadEmail}`);
+    logger.info(`➡️  Status: ${activity.interactionStatus}`);
 
     if (activity.type === "linkedinReplied" && activity.text) {
-      console.log(`💬 Message: "${activity.text}"`);
-      console.log(
+      logger.info(`💬 Message: "${activity.text}"`);
+      logger.info(
         `${activity.sentimentEmoji} Sentiment: ${activity.sentiment}`
       );
     }
 
     if (activity.createdAt) {
-      console.log(`⏰ Time: ${new Date(activity.createdAt).toLocaleString()}`);
+      logger.info(`⏰ Time: ${new Date(activity.createdAt).toLocaleString()}`);
     }
-    console.log("----------------------------------------");
+    logger.info("----------------------------------------");
   }
 
   /**
@@ -311,7 +311,7 @@ class LemlistService {
         .filter((a) => a.isLinkedIn)
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-      console.log(
+      logger.info(
         `\n📱 Found ${linkedInActivities.length} LinkedIn interactions`
       );
 
@@ -333,14 +333,14 @@ class LemlistService {
           .length,
       };
 
-      console.log("\n📈 Statistics:");
-      console.log(`📤 Sent: ${stats.sent}`);
-      console.log(`👁️  Opened: ${stats.opened}`);
-      console.log(`💬 Replied: ${stats.replied}`);
+      logger.info("\n📈 Statistics:");
+      logger.info(`📤 Sent: ${stats.sent}`);
+      logger.info(`👁️  Opened: ${stats.opened}`);
+      logger.info(`💬 Replied: ${stats.replied}`);
 
       // Print activities in table format
-      console.log("\n📊 Activities Summary:");
-      console.table(
+      logger.info("\n📊 Activities Summary:");
+      logger.info(
         linkedInActivities.map((activity) => {
           const leadName = this.getLeadName(activity);
           const companyName = this.getCompanyName(activity);
@@ -388,24 +388,24 @@ class LemlistService {
 
       // Print grouped activities
       Object.entries(grouped).forEach(([status, items]) => {
-        console.log(
+        logger.info(
           `\n=== ${this.getInteractionStatus(status).toUpperCase()} (${items.length
           }) ===`
         );
         items.forEach((item) => {
           const leadName = this.getLeadName(item);
           const companyName = this.getCompanyName(item);
-          console.log(`${leadName}${companyName ? ` (${companyName})` : ""}`);
+          logger.info(`${leadName}${companyName ? ` (${companyName})` : ""}`);
           if (item.text) {
-            console.log(`Message: "${item.text}"`);
+            logger.info(`Message: "${item.text}"`);
             if (item.sentiment) {
-              console.log(
+              logger.info(
                 `Sentiment: ${item.sentiment} ${item.sentimentEmoji}`
               );
             }
           }
-          console.log(`Time: ${new Date(item.createdAt).toLocaleString()}`);
-          console.log("----------------------------------------");
+          logger.info(`Time: ${new Date(item.createdAt).toLocaleString()}`);
+          logger.info("----------------------------------------");
         });
       });
 
@@ -451,13 +451,13 @@ class LemlistService {
           ].join("\n");
 
           fs.writeFileSync(`${filename}.csv`, csvContent);
-          console.log(`\n💾 Exported data to ${filename}.csv`);
+          logger.info(`\n💾 Exported data to ${filename}.csv`);
         } else {
           fs.writeFileSync(
             `${filename}.json`,
             JSON.stringify(exportData, null, 2)
           );
-          console.log(`\n💾 Exported data to ${filename}.json`);
+          logger.info(`\n💾 Exported data to ${filename}.json`);
         }
       }
     } catch (error) {

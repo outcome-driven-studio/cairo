@@ -693,13 +693,15 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   logger.info(`✅ Server listening on http://0.0.0.0:${PORT}`);
 
   try {
-    // Check if POSTGRES_URL is available
-    if (process.env.POSTGRES_URL) {
+    // Check if database URL is available (either POSTGRES_URL or DATABASE_URL)
+    const databaseUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+    
+    if (databaseUrl) {
       // Check database health before starting - REQUIRED if URL is provided!
       const dbHealth = await db.healthCheck();
       if (!dbHealth.healthy) {
         throw new Error(`Database connection REQUIRED but failed: ${dbHealth.error}.
-          Please ensure POSTGRES_URL environment variable is set correctly.
+          Please ensure POSTGRES_URL or DATABASE_URL environment variable is set correctly.
           Expected format: postgresql://user:pass@host.neon.tech/db?sslmode=require`);
       }
       logger.info("✅ Database connection healthy");
@@ -707,18 +709,17 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
       // Initialize database tables
       await initializeDatabaseTables();
       logger.info("✅ Database tables initialized");
-    } else {
-      logger.warn("⚠️ POSTGRES_URL not set - running without database features");
-      logger.warn("⚠️ Some features will be disabled (event storage, user tracking, etc.)");
-    }
 
-    // Prepare Postgres sync_state table (only if database is available)
-    if (process.env.POSTGRES_URL) {
+      // Prepare Postgres sync_state table
       await syncState.init();
 
       // Prepare sent_events dedup table
       global.dedupStore = dedupStore;
       await dedupStore.init();
+    } else {
+      logger.warn("⚠️ Database URL not set - running without database features");
+      logger.warn("⚠️ Please set POSTGRES_URL or DATABASE_URL in your environment");
+      logger.warn("⚠️ Some features will be disabled (event storage, user tracking, etc.)");
     }
 
     // Start monitoring health checks
@@ -740,6 +741,14 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     }
 
     // Sync configuration
+    // Check for conflicting sync configurations
+    if (process.env.USE_PERIODIC_SYNC === "true" && process.env.ENABLE_CRON_JOBS === "true") {
+      logger.warn("⚠️  WARNING: Both USE_PERIODIC_SYNC and ENABLE_CRON_JOBS are enabled!");
+      logger.warn("⚠️  This will cause duplicate sync operations and may overload your system.");
+      logger.warn("⚠️  Recommended: Set ENABLE_CRON_JOBS=false and use USE_PERIODIC_SYNC=true only.");
+      logger.warn("⚠️  Proceeding with Periodic Sync (legacy cron will be ignored)...");
+    }
+
     // Option 1: Use new periodic sync (recommended - every 4 hours)
     if (process.env.USE_PERIODIC_SYNC === "true") {
       logger.info("[Server] Initializing PeriodicSyncService...");
@@ -763,8 +772,11 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
         throw error; // Re-throw to prevent server from starting with broken sync
       }
     }
-    // Option 2: Use legacy cron jobs (every 10-15 minutes)
+    // Option 2: Use legacy cron jobs (DEPRECATED - every 10-15 minutes)
     else if (process.env.ENABLE_CRON_JOBS === "true") {
+      logger.warn("⚠️  DEPRECATION WARNING: Legacy cron jobs (ENABLE_CRON_JOBS) are deprecated!");
+      logger.warn("⚠️  Please migrate to USE_PERIODIC_SYNC=true for better performance and control.");
+      logger.warn("⚠️  Legacy cron support will be removed in a future version.");
       cronManager.start();
       logger.info("Legacy cron jobs started (10-15 minute intervals)");
     }
