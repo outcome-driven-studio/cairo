@@ -128,7 +128,7 @@ class LinkedInMappingService {
    * Bulk store mappings (more efficient for large syncs)
    */
   async bulkStoreMappings(mappings) {
-    console.log("🟡 Storing LinkedIn mappings:", mappings);
+    logger.info("🟡 Storing LinkedIn mappings:", mappings);
     if (!mappings || mappings.length === 0) return;
 
     // Deduplicate mappings by LinkedIn URL (keep the last occurrence)

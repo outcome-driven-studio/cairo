@@ -177,7 +177,9 @@ class ProductEventRoutes {
         .then((result) => {
           if (result.success) {
             this.stats.mixpanelSent++;
-            logger.debug(`[Product Event] Tracked via EventTrackingService: ${event}`);
+            logger.debug(
+              `[Product Event] Tracked via EventTrackingService: ${event}`
+            );
           }
         })
         .catch((error) => {
@@ -191,7 +193,9 @@ class ProductEventRoutes {
           .trackProductEvent(user_email, event, properties)
           .then((result) => {
             if (result.success) {
-              logger.debug(`[Product Event] Also sent to Mixpanel directly: ${event}`);
+              logger.debug(
+                `[Product Event] Also sent to Mixpanel directly: ${event}`
+              );
             }
           })
           .catch((error) => {
