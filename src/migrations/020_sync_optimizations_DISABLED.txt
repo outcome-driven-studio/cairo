@@ -1,0 +1,3 @@
+This migration has been temporarily disabled due to schema compatibility issues.
+The migration attempted to create indexes on columns that don't exist in the current schema.
+Migration file renamed to prevent execution.
