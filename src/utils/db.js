@@ -1,7 +1,7 @@
 const { Pool } = require("pg");
 const logger = require("./logger");
 
-const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+let connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
 
 if (!connectionString) {
   throw new Error(
@@ -9,16 +9,26 @@ if (!connectionString) {
   );
 }
 
+// Clean up Neon connection string - remove channel_binding param (not supported by node-postgres)
+// Neon includes "channel_binding=require" but node-postgres doesn't support this parameter
+// It's safe to remove as SSL is enforced separately
+if (connectionString.includes('channel_binding=require')) {
+  connectionString = connectionString.replace(/[&?]channel_binding=require/g, '');
+  logger.info('[Database] Removed channel_binding parameter from connection string (not supported by node-postgres)');
+}
+
 // Smart SSL configuration - only use SSL for cloud databases
 const isLocalDatabase = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
 const isCloudDatabase = connectionString.includes('.neon.tech') || connectionString.includes('.railway.app') || connectionString.includes('.supabase.co');
+const isNeonPooler = connectionString.includes('-pooler.') && connectionString.includes('.neon.tech');
 
 const poolConfig = {
   connectionString: connectionString,
 
   // Connection Pool Settings (optimized for Neon)
-  max: isCloudDatabase ? 5 : 8, // Reduced max connections for cloud databases like Neon
-  min: isCloudDatabase ? 1 : 2, // Reduced min connections for cloud databases
+  // Neon pooler endpoints have their own connection pooling, so we use smaller pools
+  max: isNeonPooler ? 3 : (isCloudDatabase ? 5 : 8),
+  min: isNeonPooler ? 1 : (isCloudDatabase ? 1 : 2),
 
   // Timeout Settings (optimized for cloud databases)
   connectionTimeoutMillis: isCloudDatabase ? 10000 : 15000, // Shorter timeout for cloud
@@ -42,6 +52,10 @@ if (isCloudDatabase) {
     rejectUnauthorized: false,
   };
   logger.info('[Database] Using SSL for cloud database');
+  
+  if (isNeonPooler) {
+    logger.info('[Database] Detected Neon pooler endpoint - using optimized pool settings (max: 3)');
+  }
 } else if (isLocalDatabase) {
   // Local databases typically don't use SSL
   poolConfig.ssl = false;
