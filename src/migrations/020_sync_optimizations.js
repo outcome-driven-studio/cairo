@@ -23,31 +23,31 @@ async function up(query) {
     const eventSourceIndexes = [
       {
         name: "idx_event_source_sync_platform_date",
-        query: `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_event_source_sync_platform_date 
+        query: `CREATE INDEX IF NOT EXISTS idx_event_source_sync_platform_date 
                 ON event_source(platform, created_at DESC)`,
         description: "Optimizes platform-specific date range sync queries",
       },
       {
         name: "idx_event_source_event_key_hash",
-        query: `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_event_source_event_key_hash 
+        query: `CREATE INDEX IF NOT EXISTS idx_event_source_event_key_hash 
                 ON event_source USING hash(event_key)`,
         description: "Optimizes event_key deduplication during sync",
       },
       {
         name: "idx_event_source_user_platform_date",
-        query: `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_event_source_user_platform_date 
+        query: `CREATE INDEX IF NOT EXISTS idx_event_source_user_platform_date 
                 ON event_source(user_id, platform, created_at DESC)`,
         description: "Optimizes user-specific sync queries",
       },
       {
         name: "idx_event_source_metadata_namespace",
-        query: `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_event_source_metadata_namespace 
+        query: `CREATE INDEX IF NOT EXISTS idx_event_source_metadata_namespace 
                 ON event_source USING gin((metadata -> 'namespace'))`,
         description: "Optimizes namespace-based filtering for full sync",
       },
       {
         name: "idx_event_source_recent_events",
-        query: `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_event_source_recent_events 
+        query: `CREATE INDEX IF NOT EXISTS idx_event_source_recent_events 
                 ON event_source(platform, event_type, created_at DESC) 
                 WHERE created_at >= NOW() - INTERVAL '30 days'`,
         description:
@@ -74,13 +74,13 @@ async function up(query) {
     const userSourceIndexes = [
       {
         name: "idx_user_source_email_platform",
-        query: `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_user_source_email_platform 
+        query: `CREATE INDEX IF NOT EXISTS idx_user_source_email_platform 
                 ON user_source(email, platform)`,
         description: "Optimizes user deduplication during sync",
       },
       {
         name: "idx_user_source_sync_tracking",
-        query: `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_user_source_sync_tracking 
+        query: `CREATE INDEX IF NOT EXISTS idx_user_source_sync_tracking 
                 ON user_source(platform, updated_at DESC) 
                 INCLUDE (email, created_at)`,
         description: "Optimizes sync progress tracking for users",
