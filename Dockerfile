@@ -23,6 +23,7 @@ RUN npm run build:ui
 # Now copy the rest of the application source
 COPY *.js ./
 COPY src/ ./src/
+COPY scripts/ ./scripts/
 COPY start.sh ./
 
 # Remove dev dependencies after building to keep image small
@@ -30,6 +31,9 @@ RUN npm ci --omit=dev
 
 # Make start script executable
 RUN chmod +x ./start.sh
+
+# Verify migrations directory exists
+RUN ls -la ./src/migrations/ && echo "✅ Migrations directory confirmed"
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
