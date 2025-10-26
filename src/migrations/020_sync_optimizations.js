@@ -49,6 +49,7 @@ async function up(query) {
         name: "idx_event_source_recent_events",
         query: `CREATE INDEX IF NOT EXISTS idx_event_source_recent_events 
                 ON event_source(platform, event_type, created_at DESC)`,
+
         description:
           "Optimizes queries for recent events (most sync operations)",
       },
@@ -181,7 +182,6 @@ async function up(query) {
         COUNT(CASE WHEN error_message IS NOT NULL THEN 1 END) as error_count,
         (COUNT(CASE WHEN error_message IS NULL THEN 1 END) * 100.0 / COUNT(*)) as success_rate
       FROM sync_performance_log
-      WHERE created_at >= NOW() - INTERVAL '7 days'
       GROUP BY platform, sync_type, DATE_TRUNC('hour', created_at)
       ORDER BY hour_bucket DESC, platform, sync_type
     `);
