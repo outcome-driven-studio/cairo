@@ -48,7 +48,8 @@ async function up(query) {
       {
         name: "idx_event_source_recent_events",
         query: `CREATE INDEX IF NOT EXISTS idx_event_source_recent_events 
-                ON event_source(platform, event_type, created_at DESC) 
+                ON event_source(platform, event_type, created_at DESC)`,
+
         description:
           "Optimizes queries for recent events (most sync operations)",
       },
