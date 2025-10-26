@@ -70,31 +70,44 @@ async function up(query) {
     // 2. Create sync-optimized indexes for user tables
     logger.info("Creating sync-optimized indexes for user tables...");
 
-    const userSourceIndexes = [
-      {
-        name: "idx_user_source_email_platform",
-        query: `CREATE INDEX IF NOT EXISTS idx_user_source_email_platform 
-                ON user_source(email, platform)`,
-        description: "Optimizes user deduplication during sync",
-      },
-      {
-        name: "idx_user_source_sync_tracking",
-        query: `CREATE INDEX IF NOT EXISTS idx_user_source_sync_tracking 
-                ON user_source(platform, updated_at DESC) 
-                INCLUDE (email, created_at)`,
-        description: "Optimizes sync progress tracking for users",
-      },
-    ];
+    // Check if user_source table has platform column
+    const userSourceColumns = await query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' AND table_name = 'user_source'
+    `);
+    const userSourceColumnNames = userSourceColumns.rows.map(row => row.column_name);
+    const hasPlatformColumn = userSourceColumnNames.includes('platform');
 
-    for (const index of userSourceIndexes) {
-      try {
-        await query(index.query);
-        logger.info(`✅ ${index.name}: ${index.description}`);
-      } catch (error) {
-        if (error.message.includes("already exists")) {
-          logger.info(`⏭️ ${index.name}: Already exists`);
-        } else {
-          logger.warn(`❌ Failed to create ${index.name}:`, error.message);
+    if (!hasPlatformColumn) {
+      logger.info('⏭️ Skipping user_source platform indexes (platform column does not exist)');
+    } else {
+      const userSourceIndexes = [
+        {
+          name: "idx_user_source_email_platform",
+          query: `CREATE INDEX IF NOT EXISTS idx_user_source_email_platform 
+                  ON user_source(email, platform)`,
+          description: "Optimizes user deduplication during sync",
+        },
+        {
+          name: "idx_user_source_sync_tracking",
+          query: `CREATE INDEX IF NOT EXISTS idx_user_source_sync_tracking 
+                  ON user_source(platform, updated_at DESC) 
+                  INCLUDE (email, created_at)`,
+          description: "Optimizes sync progress tracking for users",
+        },
+      ];
+
+      for (const index of userSourceIndexes) {
+        try {
+          await query(index.query);
+          logger.info(`✅ ${index.name}: ${index.description}`);
+        } catch (error) {
+          if (error.message.includes("already exists")) {
+            logger.info(`⏭️ ${index.name}: Already exists`);
+          } else {
+            logger.warn(`❌ Failed to create ${index.name}:`, error.message);
+          }
         }
       }
     }
