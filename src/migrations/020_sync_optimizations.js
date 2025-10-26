@@ -70,14 +70,21 @@ async function up(query) {
     // 2. Create sync-optimized indexes for user tables
     logger.info("Creating sync-optimized indexes for user tables...");
 
-    // Check if user_source table has platform column
-    const userSourceColumns = await query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_schema = 'public' AND table_name = 'user_source'
-    `);
-    const userSourceColumnNames = userSourceColumns.rows.map(row => row.column_name);
-    const hasPlatformColumn = userSourceColumnNames.includes('platform');
+    const userSourceIndexes = [
+      {
+        name: "idx_user_source_email_platform",
+        query: `CREATE INDEX IF NOT EXISTS idx_user_source_email_platform 
+                ON user_source(email, platform)`,
+        description: "Optimizes user deduplication during sync",
+      },
+      {
+        name: "idx_user_source_sync_tracking",
+        query: `CREATE INDEX IF NOT EXISTS idx_user_source_sync_tracking 
+                ON user_source(platform, updated_at DESC) 
+                INCLUDE (email, created_at)`,
+        description: "Optimizes sync progress tracking for users",
+      },
+    ];
 
     if (!hasPlatformColumn) {
       logger.info('⏭️ Skipping user_source platform indexes (platform column does not exist)');
@@ -194,7 +201,6 @@ async function up(query) {
         COUNT(CASE WHEN error_message IS NOT NULL THEN 1 END) as error_count,
         (COUNT(CASE WHEN error_message IS NULL THEN 1 END) * 100.0 / COUNT(*)) as success_rate
       FROM sync_performance_log
-      WHERE created_at >= NOW() - INTERVAL '7 days'
       GROUP BY platform, sync_type, DATE_TRUNC('hour', created_at)
       ORDER BY hour_bucket DESC, platform, sync_type
     `);
