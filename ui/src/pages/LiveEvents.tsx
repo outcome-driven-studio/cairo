@@ -106,18 +106,9 @@ export default function LiveEvents() {
     );
   }
 
-  if (error || !data) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="backdrop-blur-xl bg-red-500/10 border border-red-500/20 rounded-2xl p-8">
-            <h2 className="text-2xl font-bold text-red-400 mb-2">Events Unavailable</h2>
-            <p className="text-gray-400">Unable to fetch recent events.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Show empty state on error instead of error message
+  const events = data?.events || [];
+  const count = data?.count || 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-8">
@@ -144,7 +135,10 @@ export default function LiveEvents() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-400">Recent Events</p>
-              <p className="text-3xl font-bold text-white mt-1">{data.count}</p>
+              <p className="text-3xl font-bold text-white mt-1">{count}</p>
+              {data?.message && (
+                <p className="text-xs text-yellow-400 mt-2">{data.message}</p>
+              )}
             </div>
             <Activity className="w-12 h-12 text-cyan-400 opacity-50" />
           </div>
@@ -152,8 +146,8 @@ export default function LiveEvents() {
 
         {/* Events List */}
         <div className="space-y-4">
-          {data.events.length > 0 ? (
-            data.events.map((event) => (
+          {events.length > 0 ? (
+            events.map((event) => (
               <EventCard key={event.id} event={event} />
             ))
           ) : (

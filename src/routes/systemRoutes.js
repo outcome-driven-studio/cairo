@@ -56,10 +56,27 @@ router.get('/status', async (req, res) => {
     });
   } catch (error) {
     logger.error('[System] Status check failed:', error);
-    res.status(500).json({
+    
+    // Return partial data even if some queries fail
+    res.status(200).json({
       success: false,
       error: error.message,
-      status: 'unhealthy'
+      status: 'degraded',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: {
+        status: 'error',
+        error: error.message
+      },
+      server: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        memory: {
+          used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
+          total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`
+        },
+        environment: process.env.NODE_ENV || 'development'
+      }
     });
   }
 });
@@ -157,9 +174,31 @@ router.get('/integrations', async (req, res) => {
     });
   } catch (error) {
     logger.error('[System] Integration check failed:', error);
-    res.status(500).json({
+    
+    // Return basic integration info even on error
+    const basicIntegrations = {
+      mixpanel: { name: 'Mixpanel', configured: !!process.env.MIXPANEL_PROJECT_TOKEN, status: 'unknown', description: 'Event tracking and analytics' },
+      lemlist: { name: 'Lemlist', configured: !!process.env.LEMLIST_API_KEY, status: 'unknown', description: 'Cold email outreach platform' },
+      smartlead: { name: 'Smartlead', configured: !!process.env.SMARTLEAD_API_KEY, status: 'unknown', description: 'Email outreach automation' },
+      attio: { name: 'Attio', configured: !!process.env.ATTIO_API_KEY, status: 'unknown', description: 'CRM and relationship management' },
+      apollo: { name: 'Apollo.io', configured: !!process.env.APOLLO_API_KEY, status: 'unknown', description: 'B2B data enrichment' },
+      hunter: { name: 'Hunter.io', configured: !!process.env.HUNTER_API_KEY, status: 'unknown', description: 'Email finder and verification' },
+      slack: { name: 'Slack', configured: !!process.env.SLACK_WEBHOOK_URL, status: 'unknown', description: 'Notification and alerting' },
+      sentry: { name: 'Sentry', configured: !!process.env.SENTRY_DSN, status: 'unknown', description: 'Error tracking and monitoring' }
+    };
+    
+    const configured = Object.values(basicIntegrations).filter(i => i.configured).length;
+    
+    res.status(200).json({
       success: false,
-      error: error.message
+      error: error.message,
+      summary: {
+        total: Object.keys(basicIntegrations).length,
+        configured,
+        active: 0,
+        healthPercentage: 0
+      },
+      integrations: basicIntegrations
     });
   }
 });
@@ -216,9 +255,15 @@ router.get('/tables', async (req, res) => {
     });
   } catch (error) {
     logger.error('[System] Table info failed:', error);
-    res.status(500).json({
+    res.status(200).json({
       success: false,
-      error: error.message
+      error: error.message,
+      summary: {
+        totalTables: 0,
+        totalRows: 0,
+        totalSize: 'unknown'
+      },
+      tables: []
     });
   }
 });
@@ -230,6 +275,24 @@ router.get('/tables', async (req, res) => {
 router.get('/events/recent', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 50;
+
+    // Check if event_source table exists
+    const tableExists = await query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'event_source'
+      )
+    `);
+
+    if (!tableExists.rows[0]?.exists) {
+      // Return empty events if table doesn't exist
+      return res.json({
+        success: true,
+        count: 0,
+        events: [],
+        message: 'No event tracking table found'
+      });
+    }
 
     // Get recent events from event_source table
     const events = await query(`
@@ -255,7 +318,9 @@ router.get('/events/recent', async (req, res) => {
     logger.error('[System] Recent events failed:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
+      count: 0,
+      events: []
     });
   }
 });
