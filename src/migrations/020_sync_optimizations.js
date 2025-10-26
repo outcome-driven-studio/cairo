@@ -49,7 +49,6 @@ async function up(query) {
         name: "idx_event_source_recent_events",
         query: `CREATE INDEX IF NOT EXISTS idx_event_source_recent_events 
                 ON event_source(platform, event_type, created_at DESC)`,
-
         description:
           "Optimizes queries for recent events (most sync operations)",
       },
@@ -87,15 +86,35 @@ async function up(query) {
       },
     ];
 
-    for (const index of userSourceIndexes) {
-      try {
-        await query(index.query);
-        logger.info(`✅ ${index.name}: ${index.description}`);
-      } catch (error) {
-        if (error.message.includes("already exists")) {
-          logger.info(`⏭️ ${index.name}: Already exists`);
-        } else {
-          logger.warn(`❌ Failed to create ${index.name}:`, error.message);
+    if (!hasPlatformColumn) {
+      logger.info('⏭️ Skipping user_source platform indexes (platform column does not exist)');
+    } else {
+      const userSourceIndexes = [
+        {
+          name: "idx_user_source_email_platform",
+          query: `CREATE INDEX IF NOT EXISTS idx_user_source_email_platform 
+                  ON user_source(email, platform)`,
+          description: "Optimizes user deduplication during sync",
+        },
+        {
+          name: "idx_user_source_sync_tracking",
+          query: `CREATE INDEX IF NOT EXISTS idx_user_source_sync_tracking 
+                  ON user_source(platform, updated_at DESC) 
+                  INCLUDE (email, created_at)`,
+          description: "Optimizes sync progress tracking for users",
+        },
+      ];
+
+      for (const index of userSourceIndexes) {
+        try {
+          await query(index.query);
+          logger.info(`✅ ${index.name}: ${index.description}`);
+        } catch (error) {
+          if (error.message.includes("already exists")) {
+            logger.info(`⏭️ ${index.name}: Already exists`);
+          } else {
+            logger.warn(`❌ Failed to create ${index.name}:`, error.message);
+          }
         }
       }
     }
