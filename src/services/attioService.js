@@ -110,6 +110,92 @@ class AttioService {
   }
 
   /**
+   * List people from Attio workspace
+   * @param {number} limit - Number of records to return (max 500)
+   * @param {number} offset - Offset for pagination
+   * @returns {Promise<Object>} List of people
+   */
+  async listPeople(limit = 100, offset = 0) {
+    if (!this.enabled) {
+      return { success: false, error: 'Attio not configured', data: [] };
+    }
+
+    try {
+      // Attio API v2 uses POST for querying records
+      const response = await axios.post(
+        `${this.baseUrl}/objects/people/records/query`,
+        {
+          limit: Math.min(limit, 500), // Max 500 per Attio docs
+          offset
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      logger.debug(`[Attio] Listed ${response.data.data?.length || 0} people (limit: ${limit}, offset: ${offset})`);
+
+      return {
+        success: true,
+        data: response.data.data || [],
+        count: response.data.data?.length || 0
+      };
+
+    } catch (error) {
+      logger.error(`[Attio] Failed to list people:`, error.message);
+      return { success: false, error: error.message, data: [] };
+    }
+  }
+
+  /**
+   * Create an event in Attio as a note/timeline entry
+   * @param {Object} eventData - Event data to create
+   * @param {string} userId - Record ID to associate event with
+   * @returns {Promise<Object>} Event creation result
+   */
+  async createEvent(eventData, userId) {
+    if (!this.enabled) {
+      return { success: false, error: 'Attio not configured' };
+    }
+
+    try {
+      // Attio API v2 - create a note as timeline entry
+      // Note: userId should be the record_id, not email
+      const response = await axios.post(
+        `${this.baseUrl}/notes`,
+        {
+          data: {
+            parent_object: 'people',
+            parent_record_id: userId,
+            title: eventData.event_type || 'Event',
+            format: 'plaintext',
+            content: `Event: ${eventData.event_type}\nPlatform: ${eventData.platform}\nTimestamp: ${eventData.created_at}`,
+            created_at: eventData.created_at || new Date().toISOString()
+          }
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      logger.debug(`[Attio] Created event note for user ${userId}: ${eventData.event_type}`);
+
+      return { success: true, data: response.data };
+
+    } catch (error) {
+      // Log but don't fail - Attio event tracking is optional
+      logger.error(`[Attio] Failed to create event:`, error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Get service statistics
    * @returns {Object} Service stats
    */
