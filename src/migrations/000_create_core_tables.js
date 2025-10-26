@@ -183,10 +183,23 @@ async function up(query) {
         await query('CREATE INDEX IF NOT EXISTS idx_event_source_platform ON event_source(platform)');
         await query('CREATE INDEX IF NOT EXISTS idx_event_source_created_at ON event_source(created_at)');
 
-        // sent_events indexes
+        // sent_events indexes (check if columns exist first)
+        const sentEventsColumns = await query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' AND table_name = 'sent_events'
+    `);
+        const sentEventsColumnNames = sentEventsColumns.rows.map(row => row.column_name);
+
         await query('CREATE INDEX IF NOT EXISTS idx_sent_events_event_key ON sent_events(event_key)');
         await query('CREATE INDEX IF NOT EXISTS idx_sent_events_platform ON sent_events(platform)');
-        await query('CREATE INDEX IF NOT EXISTS idx_sent_events_user_id ON sent_events(user_id)');
+        
+        if (sentEventsColumnNames.includes('user_id')) {
+            await query('CREATE INDEX IF NOT EXISTS idx_sent_events_user_id ON sent_events(user_id)');
+            logger.info('✅ sent_events user_id index created');
+        } else {
+            logger.info('sent_events.user_id column does not exist, skipping index');
+        }
 
         // sync_state indexes (check if columns exist first)
         const syncStateColumns = await query(`
