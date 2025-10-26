@@ -94,7 +94,7 @@ async function up(query) {
                 INSERT INTO sources (name, type, write_key, enabled, settings) VALUES
                 ('JavaScript SDK', 'javascript', 'wk_javascript_default_key_123456789', true, '{"domains": ["localhost"], "autoTrack": {"pageViews": true}}'),
                 ('Node.js SDK', 'nodejs', 'wk_nodejs_default_key_987654321', true, '{"serverSide": true}'),
-                ('React SDK', 'react', 'wk_react_default_key_456789123', true, '{"framework": "react", "autoTrack": {"pageViews": true, "clicks": true}}}')
+                ('React SDK', 'react', 'wk_react_default_key_456789123', true, '{"framework": "react", "autoTrack": {"pageViews": true, "clicks": true}}')
             `);
             logger.info('✅ Default sources inserted');
         }
