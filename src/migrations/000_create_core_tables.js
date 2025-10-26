@@ -142,7 +142,7 @@ async function up(query) {
         const syncStateExists = await query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
-        WHERE table_schema = 'app' AND table_name = 'sync_state'
+        WHERE table_schema = 'public' AND table_name = 'sync_state'
       )
     `);
 
@@ -170,6 +170,7 @@ async function up(query) {
 
         // playmaker_user_source indexes
         await query('CREATE INDEX IF NOT EXISTS idx_playmaker_user_source_email ON playmaker_user_source(email)');
+        logger.debug('✓ Index created: idx_playmaker_user_source_email');
         await query('CREATE INDEX IF NOT EXISTS idx_playmaker_user_source_lead_score ON playmaker_user_source(lead_score DESC)');
         await query('CREATE INDEX IF NOT EXISTS idx_playmaker_user_source_lead_grade ON playmaker_user_source(lead_grade)');
         await query('CREATE INDEX IF NOT EXISTS idx_playmaker_user_source_enrichment_status ON playmaker_user_source(enrichment_status)');
@@ -191,7 +192,7 @@ async function up(query) {
         const syncStateColumns = await query(`
       SELECT column_name 
       FROM information_schema.columns 
-      WHERE table_schema = 'app' AND table_name = 'sync_state'
+      WHERE table_schema = 'public' AND table_name = 'sync_state'
     `);
         const syncStateColumnNames = syncStateColumns.rows.map(row => row.column_name);
 
@@ -213,7 +214,7 @@ async function up(query) {
         const sourceUsersColumns = await query(`
       SELECT column_name 
       FROM information_schema.columns 
-      WHERE table_schema = 'app' AND table_name = 'source_users'
+      WHERE table_schema = 'public' AND table_name = 'source_users'
     `);
         const sourceUsersColumnNames = sourceUsersColumns.rows.map(row => row.column_name);
 
