@@ -1,23 +1,19 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
-import Overview from './pages/Overview';
-import Events from './pages/Events';
-import Sources from './pages/Sources';
-import Destinations from './pages/Destinations';
-import Settings from './pages/Settings';
+import System from './pages/System';
+import Integrations from './pages/Integrations';
+import DatabaseTables from './pages/DatabaseTables';
+import LiveEvents from './pages/LiveEvents';
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<Layout />}>
-        <Route index element={<Overview />} />
-        <Route path="events" element={<Events />} />
-        <Route path="sources" element={<Sources />} />
-        <Route path="destinations" element={<Destinations />} />
-        <Route path="transformations" element={<div className="p-4">Transformations page coming soon...</div>} />
-        <Route path="users" element={<div className="p-4">Users page coming soon...</div>} />
-        <Route path="settings" element={<Settings />} />
+        <Route index element={<System />} />
+        <Route path="integrations" element={<Integrations />} />
+        <Route path="database" element={<DatabaseTables />} />
+        <Route path="events" element={<LiveEvents />} />
       </Route>
     </Routes>
   );
