@@ -30,6 +30,7 @@ const ExternalProfileRoutes = require("./src/routes/externalProfileRoutes");
 const NamespaceRoutes = require("./src/routes/namespaceRoutes");
 const DestinationSyncRoutes = require("./src/routes/destinationSyncRoutes");
 const DashboardRoutes = require("./src/routes/dashboardRoutes");
+const ConfigRoutes = require("./src/routes/configRoutes");
 
 // Create Express app
 const app = express();
@@ -501,6 +502,10 @@ app.use("/api/dashboard", DashboardRoutes);
 const EnvConfigRoutes = require("./src/routes/envConfigRoutes");
 const envConfigRoutes = new EnvConfigRoutes();
 app.use("/api/config", envConfigRoutes.setupRoutes());
+
+// Config routes for sources and destinations
+const configRoutes = new ConfigRoutes();
+app.use("/api", configRoutes.setupRoutes());
 
 // Initialize cron jobs
 const PORT = process.env.PORT || 8080;
