@@ -430,6 +430,228 @@ class ConfigRoutes {
   }
 
   /**
+   * Get all transformations (source-destination mappings)
+   * GET /api/config/transformations
+   */
+  async getTransformations(req, res) {
+    try {
+      const result = await query(`
+        SELECT
+          t.id,
+          t.name,
+          t.enabled,
+          t.conditions,
+          t.mappings,
+          t.code,
+          t.created_at,
+          t.updated_at,
+          s.id as source_id,
+          s.name as source_name,
+          s.type as source_type,
+          d.id as destination_id,
+          d.name as destination_name,
+          d.type as destination_type
+        FROM transformations t
+        LEFT JOIN sources s ON t.source_id = s.id
+        LEFT JOIN destinations d ON t.destination_id = d.id
+        ORDER BY t.created_at DESC
+      `);
+
+      const transformations = result.rows.map(row => ({
+        id: row.id,
+        name: row.name,
+        enabled: row.enabled,
+        conditions: typeof row.conditions === 'string' ? JSON.parse(row.conditions) : row.conditions,
+        mappings: typeof row.mappings === 'string' ? JSON.parse(row.mappings) : row.mappings,
+        code: row.code,
+        source: {
+          id: row.source_id,
+          name: row.source_name,
+          type: row.source_type
+        },
+        destination: {
+          id: row.destination_id,
+          name: row.destination_name,
+          type: row.destination_type
+        },
+        created_at: row.created_at,
+        updated_at: row.updated_at
+      }));
+
+      res.json({
+        success: true,
+        transformations
+      });
+    } catch (error) {
+      logger.error("Failed to get transformations:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Create a new transformation (source-destination mapping)
+   * POST /api/config/transformations
+   */
+  async createTransformation(req, res) {
+    try {
+      const { name, source_id, destination_id, enabled = true, conditions = [], mappings = {}, code = null } = req.body;
+
+      if (!name || !source_id || !destination_id) {
+        return res.status(400).json({
+          success: false,
+          error: "name, source_id, and destination_id are required"
+        });
+      }
+
+      const result = await query(`
+        INSERT INTO transformations (name, source_id, destination_id, enabled, conditions, mappings, code, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+        RETURNING *
+      `, [name, source_id, destination_id, enabled, JSON.stringify(conditions), JSON.stringify(mappings), code]);
+
+      const transformation = {
+        ...result.rows[0],
+        conditions: typeof result.rows[0].conditions === 'string' ? JSON.parse(result.rows[0].conditions) : result.rows[0].conditions,
+        mappings: typeof result.rows[0].mappings === 'string' ? JSON.parse(result.rows[0].mappings) : result.rows[0].mappings
+      };
+
+      logger.info(`Created transformation: ${name}`);
+
+      res.status(201).json({
+        success: true,
+        transformation
+      });
+    } catch (error) {
+      logger.error("Failed to create transformation:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Update a transformation
+   * PUT /api/config/transformations/:id
+   */
+  async updateTransformation(req, res) {
+    try {
+      const { id } = req.params;
+      const { name, enabled, conditions, mappings, code } = req.body;
+
+      const updates = [];
+      const values = [];
+      let paramIndex = 1;
+
+      if (name !== undefined) {
+        updates.push(`name = $${paramIndex}`);
+        values.push(name);
+        paramIndex++;
+      }
+
+      if (enabled !== undefined) {
+        updates.push(`enabled = $${paramIndex}`);
+        values.push(enabled);
+        paramIndex++;
+      }
+
+      if (conditions !== undefined) {
+        updates.push(`conditions = $${paramIndex}`);
+        values.push(JSON.stringify(conditions));
+        paramIndex++;
+      }
+
+      if (mappings !== undefined) {
+        updates.push(`mappings = $${paramIndex}`);
+        values.push(JSON.stringify(mappings));
+        paramIndex++;
+      }
+
+      if (code !== undefined) {
+        updates.push(`code = $${paramIndex}`);
+        values.push(code);
+        paramIndex++;
+      }
+
+      if (updates.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: "No fields to update"
+        });
+      }
+
+      updates.push(`updated_at = NOW()`);
+      values.push(id);
+
+      const result = await query(`
+        UPDATE transformations
+        SET ${updates.join(', ')}
+        WHERE id = $${paramIndex}
+        RETURNING *
+      `, values);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: "Transformation not found"
+        });
+      }
+
+      const transformation = {
+        ...result.rows[0],
+        conditions: typeof result.rows[0].conditions === 'string' ? JSON.parse(result.rows[0].conditions) : result.rows[0].conditions,
+        mappings: typeof result.rows[0].mappings === 'string' ? JSON.parse(result.rows[0].mappings) : result.rows[0].mappings
+      };
+
+      res.json({
+        success: true,
+        transformation
+      });
+    } catch (error) {
+      logger.error("Failed to update transformation:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Delete a transformation
+   * DELETE /api/config/transformations/:id
+   */
+  async deleteTransformation(req, res) {
+    try {
+      const { id } = req.params;
+
+      const result = await query(`
+        DELETE FROM transformations WHERE id = $1 RETURNING *
+      `, [id]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: "Transformation not found"
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Transformation deleted successfully"
+      });
+    } catch (error) {
+      logger.error("Failed to delete transformation:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
    * Get system configuration
    * GET /api/config/system
    */
@@ -511,6 +733,12 @@ class ConfigRoutes {
 
     // Destination types
     router.get('/destination-types', this.getDestinationTypes.bind(this));
+
+    // Transformations (mappings)
+    router.get('/transformations', this.getTransformations.bind(this));
+    router.post('/transformations', this.createTransformation.bind(this));
+    router.put('/transformations/:id', this.updateTransformation.bind(this));
+    router.delete('/transformations/:id', this.deleteTransformation.bind(this));
 
     // System configuration
     router.get('/system', this.getSystemConfig.bind(this));
