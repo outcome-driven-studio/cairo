@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tantml:query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Database, Zap, Plus, Trash2, Power, PowerOff, ArrowRight, Check, Settings, Code } from 'lucide-react';
 
