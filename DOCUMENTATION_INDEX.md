@@ -20,26 +20,23 @@ Quick reference to all documentation files in this repository.
 ### Technical Guides
 - **[DATABASE_SCHEMA_GUIDE.md](./DATABASE_SCHEMA_GUIDE.md)** - Database tables, namespaces, migrations
 - **[KNOWN_ISSUES.md](./KNOWN_ISSUES.md)** - Known bugs and technical debt tracking
-- **[DEPENDENCY_UPDATES.md](./DEPENDENCY_UPDATES.md)** - Dependency management strategy
-- **[PERIODIC_SYNC_TROUBLESHOOTING.md](./PERIODIC_SYNC_TROUBLESHOOTING.md)** - Sync system troubleshooting
-- **[DOCUMENTATION_HOSTING_OPTIONS.md](./DOCUMENTATION_HOSTING_OPTIONS.md)** - Documentation deployment options
+- **[DEPLOYMENT_ARCHITECTURE.md](./DEPLOYMENT_ARCHITECTURE.md)** - Deployment architecture and migration guide
 
 ### SDK Documentation
 - **[packages/README.md](./packages/README.md)** - SDK development status and local usage
 
 ---
 
-## 🔒 Internal Documentation (Gitignored)
+## 🗺️ Additional Resources
 
-These files are specific to your instance and won't be in the public repo:
-
-- `CONSISTENCY_AUDIT_SUMMARY.md` - Repository audit findings
-- `FIXES_APPLIED.md` - Changelog of fixes applied to your instance
-- `QUICK_FIX_SUMMARY.md` - Recent quick fixes log
-- `ENV_SETUP_TROUBLESHOOTING.md` - Environment setup help (instance-specific)
-- `PERIODIC_SYNC_SETUP.md` - Your periodic sync configuration
-- `src/app.js.README.md` - Deprecation notice for removed file
-- `src/app.js.deprecated` - Backup of deprecated entry point
+### Advanced Guides
+- **[docs/](./docs/)** - Detailed guides for event tracking, deployment, and API usage
+  - Event Tracking Guide
+  - Deployment Guide
+  - Usage Guide
+  - API Documentation
+  - Slack Alerts Examples
+  - Production Readiness Checklist
 
 ---
 
@@ -65,9 +62,9 @@ These files are specific to your instance and won't be in the public repo:
 3. [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) → What needs work
 
 **...troubleshoot sync issues**
-1. [PERIODIC_SYNC_TROUBLESHOOTING.md](./PERIODIC_SYNC_TROUBLESHOOTING.md) → Sync debugging
-2. [DATABASE_SCHEMA_GUIDE.md](./DATABASE_SCHEMA_GUIDE.md) → Schema issues
-3. [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) → Known sync bugs
+1. [DATABASE_SCHEMA_GUIDE.md](./DATABASE_SCHEMA_GUIDE.md) → Schema issues
+2. [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) → Known sync bugs
+3. [docs/DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md) → Deployment troubleshooting
 
 **...understand the database schema**
 1. [DATABASE_SCHEMA_GUIDE.md](./DATABASE_SCHEMA_GUIDE.md) → Complete schema reference
@@ -76,10 +73,8 @@ These files are specific to your instance and won't be in the public repo:
 **...deploy Cairo to production**
 1. [README.md](./README.md) → Deployment section
 2. [SETUP_GUIDE.md](./SETUP_GUIDE.md) → Production configuration
-3. [DEPENDENCY_UPDATES.md](./DEPENDENCY_UPDATES.md) → Security updates
-
-**...update dependencies**
-1. [DEPENDENCY_UPDATES.md](./DEPENDENCY_UPDATES.md) → Update strategy and testing
+3. [DEPLOYMENT_ARCHITECTURE.md](./DEPLOYMENT_ARCHITECTURE.md) → Architecture and migrations
+4. [docs/DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md) → Detailed deployment guide
 
 **...see what's coming next**
 1. [CAIRO_CDP_ROADMAP.md](./CAIRO_CDP_ROADMAP.md) → Feature roadmap
@@ -100,9 +95,12 @@ cairo/
 ├── CAIRO_CDP_ROADMAP.md                   # Product roadmap
 ├── DATABASE_SCHEMA_GUIDE.md               # Database reference
 ├── KNOWN_ISSUES.md                        # Technical debt tracker
-├── DEPENDENCY_UPDATES.md                  # Dependency management
-├── PERIODIC_SYNC_TROUBLESHOOTING.md       # Sync debugging
-├── DOCUMENTATION_HOSTING_OPTIONS.md       # Doc deployment options
+├── DEPLOYMENT_ARCHITECTURE.md             # Deployment guide
+├── docs/                                  # Advanced guides
+│   ├── EVENT_TRACKING_GUIDE.md
+│   ├── DEPLOYMENT_GUIDE.md
+│   ├── USAGE_GUIDE.md
+│   └── API_DOCUMENTATION.md
 └── packages/
     └── README.md                          # SDK development guide
 ```
@@ -166,4 +164,4 @@ When adding new documentation:
 
 ---
 
-**Last updated:** October 25, 2025
+**Last updated:** November 1, 2025
