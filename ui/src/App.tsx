@@ -5,6 +5,7 @@ import System from './pages/System';
 import Integrations from './pages/Integrations';
 import DatabaseTables from './pages/DatabaseTables';
 import LiveEvents from './pages/LiveEvents';
+import Connections from './pages/Connections';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         <Route path="integrations" element={<Integrations />} />
         <Route path="database" element={<DatabaseTables />} />
         <Route path="events" element={<LiveEvents />} />
+        <Route path="connections" element={<Connections />} />
       </Route>
     </Routes>
   );
