@@ -186,23 +186,7 @@ class ProductEventRoutes {
           logger.error(`[Product Event] EventTracking error:`, error);
         });
       results.tracking = "queued";
-
-      // Also track with legacy service for compatibility
-      if (this.mixpanelService.enabled) {
-        this.mixpanelService
-          .trackProductEvent(user_email, event, properties)
-          .then((result) => {
-            if (result.success) {
-              logger.debug(
-                `[Product Event] Also sent to Mixpanel directly: ${event}`
-              );
-            }
-          })
-          .catch((error) => {
-            logger.error(`[Product Event] Direct Mixpanel error:`, error);
-          });
-        results.mixpanel = "queued";
-      }
+      results.mixpanel = "queued";
 
       // 4. Attio event tracking - method not implemented yet
       // TODO: Implement createEvent method in AttioService for event tracking
