@@ -187,17 +187,9 @@ class ProductEventRoutes {
         });
       results.tracking = "queued";
       results.mixpanel = "queued";
+      results.attio = this.attioService ? "queued" : "not_configured";
 
-      // 4. Attio event tracking - method not implemented yet
-      // TODO: Implement createEvent method in AttioService for event tracking
-      if (this.attioService) {
-        logger.debug(
-          `[Product Event] Attio event tracking skipped - createEvent method not implemented`
-        );
-        results.attio = "not_implemented";
-      }
-
-      // 5. Send Slack alert if configured (async, don't wait)
+      // 4. Send Slack alert if configured (async, don't wait)
       if (this.slackService.enabled) {
         const slackEventData = {
           user_email,
