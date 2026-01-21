@@ -1,7 +1,8 @@
 /**
  * Configuration loader
+ * Environment variables are loaded in server.js via envLoader
+ * This file just reads from process.env
  */
-require("dotenv").config();
 
 const config = {
   // API Keys

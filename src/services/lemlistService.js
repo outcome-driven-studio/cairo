@@ -4,7 +4,7 @@ const {
   analyzeSentiment,
   getSentimentEmoji,
 } = require("../utils/sentimentAnalyzer");
-const LemlistRateLimiter = require("../utils/lemlistRateLimiter");
+const { createRateLimiter } = require("../utils/unifiedRateLimiter");
 
 const { query } = require("../utils/db");
 const { parse } = require('csv-parse/sync');
@@ -13,10 +13,9 @@ class LemlistService {
   constructor(apiKey) {
     this.apiKey = apiKey || process.env.LEMLIST_API_KEY;
     this.baseUrl = "https://api.lemlist.com/api";
-    this.rateLimiter = new LemlistRateLimiter(60); // 60 requests per minute
+    this.rateLimiter = createRateLimiter("lemlist");
 
-
-    logger.info("LemlistService initialized with advanced rate limiter");
+    logger.info("LemlistService initialized with unified rate limiter");
   }
 
   /**

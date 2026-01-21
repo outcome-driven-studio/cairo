@@ -10,7 +10,7 @@ const {
   SYNC_MODES,
   PLATFORMS,
 } = require("../config/fullSyncConfig");
-const { createRateLimiter } = require("../utils/bulkSyncRateLimiter");
+const { createRateLimiter } = require("../utils/unifiedRateLimiter");
 const { createSqlDateFilter } = require("../utils/dateUtils");
 const logger = require("../utils/logger");
 

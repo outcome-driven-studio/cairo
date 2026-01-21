@@ -1,5 +1,6 @@
 const axios = require("axios");
 const logger = require("../utils/logger");
+const { createRateLimiter } = require("../utils/unifiedRateLimiter");
 
 /**
  * Slack integration service for event alerts
@@ -53,8 +54,8 @@ class SlackService {
       lastAlertTime: null,
     };
 
-    // Rate limiting
-    this.alertTimes = [];
+    // Rate limiting using unified rate limiter
+    this.rateLimiter = createRateLimiter("slack");
 
     logger.info("SlackService initialized", {
       enabled: this.enabled,
@@ -198,27 +199,17 @@ class SlackService {
   }
 
   /**
-   * Check rate limiting
+   * Check rate limiting using unified rate limiter
    * @returns {Boolean} Whether alert can be sent
    */
-  checkRateLimit() {
-    const now = Date.now();
-    const oneMinuteAgo = now - 60000;
-
-    // Remove old entries
-    this.alertTimes = this.alertTimes.filter((time) => time > oneMinuteAgo);
-
-    // Check limit
-    if (this.alertTimes.length >= this.config.maxAlertsPerMinute) {
-      logger.warn("Slack rate limit reached", {
-        current: this.alertTimes.length,
-        limit: this.config.maxAlertsPerMinute,
-      });
+  async checkRateLimit() {
+    try {
+      await this.rateLimiter.waitForToken();
+      return true;
+    } catch (error) {
+      logger.warn("Slack rate limit reached:", error.message);
       return false;
     }
-
-    this.alertTimes.push(now);
-    return true;
   }
 
   /**
@@ -325,7 +316,8 @@ class SlackService {
       }
 
       // Check rate limit
-      if (!this.checkRateLimit()) {
+      const canSend = await this.checkRateLimit();
+      if (!canSend) {
         return { success: false, reason: "rate_limited" };
       }
 

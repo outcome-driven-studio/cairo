@@ -4,6 +4,7 @@ const logger = require("../utils/logger");
 const MixpanelService = require("../services/mixpanelService");
 const AttioService = require("../services/attioService");
 const SlackService = require("../services/slackService");
+const DiscordService = require("../services/discordService");
 const config = require("../config");
 
 /**
@@ -33,6 +34,23 @@ class SDKRoutes {
     this.slackService = new SlackService(
       process.env.SLACK_WEBHOOK_URL,
       slackConfig
+    );
+
+    // Initialize Discord service
+    const discordConfig = {
+      defaultChannel: process.env.DISCORD_DEFAULT_CHANNEL,
+      alertEvents: process.env.DISCORD_ALERT_EVENTS
+        ? process.env.DISCORD_ALERT_EVENTS.split(",").map((e) => e.trim())
+        : undefined,
+      paymentThreshold: process.env.DISCORD_PAYMENT_THRESHOLD
+        ? parseFloat(process.env.DISCORD_PAYMENT_THRESHOLD)
+        : undefined,
+      username: process.env.DISCORD_USERNAME,
+      avatarUrl: process.env.DISCORD_AVATAR_URL,
+    };
+    this.discordService = new DiscordService(
+      process.env.DISCORD_WEBHOOK_URL,
+      discordConfig
     );
 
     logger.info("SDK Routes initialized");
@@ -351,6 +369,16 @@ class SDKRoutes {
     // Send Slack alert if configured
     if (this.slackService.enabled) {
       await this.slackService.sendAlert({
+        user_email: userId || anonymousId,
+        event,
+        properties,
+        timestamp,
+      });
+    }
+
+    // Send Discord alert if configured
+    if (this.discordService.enabled) {
+      await this.discordService.sendAlert({
         user_email: userId || anonymousId,
         event,
         properties,

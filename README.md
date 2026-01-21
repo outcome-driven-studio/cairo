@@ -118,9 +118,16 @@ npm run setup-env
 **Option B: Manual Setup**
 
 ```bash
+# For local development, use .env.local (recommended)
+cp .env.example .env.local
+# Edit .env.local with your actual values
+
+# OR use .env (fallback)
 cp .env.example .env
 # Edit .env with your actual values
 ```
+
+**Note:** `.env.local` takes priority over `.env` for local development. In production/cloud (Railway), environment variables are provided directly and `.env` files are not used.
 
 Key environment variables you need to configure:
 
@@ -134,10 +141,13 @@ DATABASE_URL=postgresql://user:password@localhost:5432/cairo
 APOLLO_API_KEY=your_apollo_api_key  # Primary enrichment service
 HUNTER_API_KEY=your_hunter_api_key  # Fallback enrichment service
 
-# AI Enrichment (Cost-effective alternatives - optional)
-PERPLEXITY_API_KEY=your_perplexity_key  # $0.005/lead
-OPENAI_API_KEY=your_openai_key          # $0.01/lead
-ANTHROPIC_API_KEY=your_anthropic_key    # $0.008/lead
+# AI Enrichment (Required for AI features)
+GEMINI_API_KEY=your_gemini_api_key     # Required - Google Gemini API key ($0.002/lead)
+GEMINI_MODEL_PRO=gemini-1.5-pro         # Optional - Pro model name (default: gemini-1.5-pro)
+GEMINI_MODEL_FLASH=gemini-1.5-flash     # Optional - Flash model name (default: gemini-1.5-flash)
+ENABLE_AI_LEAD_SCORING=false           # Optional - Enable AI-enhanced lead scoring
+ENABLE_AI_INSIGHTS=true                 # Optional - Enable AI insights generation
+ENABLE_AI_QUERIES=true                  # Optional - Enable natural language queries
 
 # CRM Integration (Required for lead sync)
 ATTIO_API_KEY=your_attio_api_key

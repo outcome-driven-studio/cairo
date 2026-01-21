@@ -51,19 +51,40 @@ const envConfig = {
       category: "AI Enrichment",
     },
     {
-      key: "PERPLEXITY_API_KEY",
-      description: "Perplexity API key ($0.005/lead - recommended)",
+      key: "GEMINI_API_KEY",
+      description: "Google Gemini API key (required for AI features - $0.002/lead)",
       category: "AI Enrichment",
+      required: true,
     },
     {
-      key: "OPENAI_API_KEY",
-      description: "OpenAI API key ($0.01/lead)",
+      key: "GEMINI_MODEL_PRO",
+      description: "Gemini Pro model name (default: gemini-1.5-pro)",
       category: "AI Enrichment",
+      default: "gemini-1.5-pro",
     },
     {
-      key: "ANTHROPIC_API_KEY",
-      description: "Anthropic API key ($0.008/lead)",
+      key: "GEMINI_MODEL_FLASH",
+      description: "Gemini Flash model name (default: gemini-1.5-flash)",
       category: "AI Enrichment",
+      default: "gemini-1.5-flash",
+    },
+    {
+      key: "ENABLE_AI_LEAD_SCORING",
+      description: "Enable AI-enhanced lead scoring (default: false)",
+      category: "AI Enrichment",
+      default: "false",
+    },
+    {
+      key: "ENABLE_AI_INSIGHTS",
+      description: "Enable AI insights generation (default: true)",
+      category: "AI Enrichment",
+      default: "true",
+    },
+    {
+      key: "ENABLE_AI_QUERIES",
+      description: "Enable natural language queries (default: true)",
+      category: "AI Enrichment",
+      default: "true",
     },
   ],
   crm: [
@@ -122,6 +143,44 @@ const envConfig = {
       description: "Rate limit for Slack alerts",
       default: "10",
       category: "Slack Alerts",
+    },
+    {
+      key: "DISCORD_WEBHOOK_URL",
+      description: "Discord webhook URL for event alerts",
+      category: "Discord Alerts",
+    },
+    {
+      key: "DISCORD_USERNAME",
+      description: "Discord bot username (optional)",
+      default: "Cairo Events",
+      category: "Discord Alerts",
+    },
+    {
+      key: "DISCORD_AVATAR_URL",
+      description: "Discord bot avatar URL (optional)",
+      default: "",
+      category: "Discord Alerts",
+    },
+    {
+      key: "DISCORD_ALERT_EVENTS",
+      description: "Events to alert on (comma-separated or JSON config)",
+      default:
+        "signup_completed,subscription_created,payment_succeeded,trial_started",
+      example:
+        '{"signup_completed":{"enabled":true},"payment_succeeded":{"threshold":100}}',
+      category: "Discord Alerts",
+    },
+    {
+      key: "DISCORD_PAYMENT_THRESHOLD",
+      description: "Minimum payment amount to trigger alerts",
+      default: "100",
+      category: "Discord Alerts",
+    },
+    {
+      key: "DISCORD_MAX_ALERTS_PER_MINUTE",
+      description: "Rate limit for Discord alerts",
+      default: "10",
+      category: "Discord Alerts",
     },
   ],
   namespaces: [

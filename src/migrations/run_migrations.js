@@ -1,4 +1,6 @@
-require('dotenv').config();
+// Load environment variables (prioritizes .env.local for local dev, uses Railway env vars in cloud)
+const { loadEnv } = require('../utils/envLoader');
+loadEnv();
 
 const fs = require('fs');
 const path = require('path');

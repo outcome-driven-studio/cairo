@@ -2,6 +2,7 @@
   "name": "cairo",
   "version": "1.0.0",
   "dependencies": {
+    "@google/generative-ai": "^0.21.0",
     "@sentry/node": "^7.120.4",
     "@sentry/profiling-node": "^7.120.3",
     "axios": "^1.9.0",

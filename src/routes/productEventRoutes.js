@@ -4,6 +4,7 @@ const logger = require("../utils/logger");
 const MixpanelService = require("../services/mixpanelService");
 const AttioService = require("../services/attioService");
 const SlackService = require("../services/slackService");
+const DiscordService = require("../services/discordService");
 const config = require("../config");
 const EventTrackingService = require("../services/eventTrackingService");
 
@@ -39,6 +40,27 @@ class ProductEventRoutes {
       process.env.SLACK_WEBHOOK_URL,
       slackConfig
     );
+
+    // Initialize Discord service with configuration
+    const discordConfig = {
+      defaultChannel: process.env.DISCORD_DEFAULT_CHANNEL,
+      alertEvents: process.env.DISCORD_ALERT_EVENTS
+        ? process.env.DISCORD_ALERT_EVENTS.split(",").map((e) => e.trim())
+        : undefined,
+      paymentThreshold: process.env.DISCORD_PAYMENT_THRESHOLD
+        ? parseFloat(process.env.DISCORD_PAYMENT_THRESHOLD)
+        : undefined,
+      maxAlertsPerMinute: process.env.DISCORD_MAX_ALERTS_PER_MINUTE
+        ? parseInt(process.env.DISCORD_MAX_ALERTS_PER_MINUTE)
+        : undefined,
+      username: process.env.DISCORD_USERNAME,
+      avatarUrl: process.env.DISCORD_AVATAR_URL,
+    };
+    this.discordService = new DiscordService(
+      process.env.DISCORD_WEBHOOK_URL,
+      discordConfig
+    );
+
     this.eventTracking = new EventTrackingService();
 
     // Track statistics
@@ -48,6 +70,7 @@ class ProductEventRoutes {
       mixpanelSent: 0,
       attioSent: 0,
       slackAlertsSent: 0,
+      discordAlertsSent: 0,
       errors: [],
     };
 
@@ -212,6 +235,31 @@ class ProductEventRoutes {
             logger.error(`[Product Event] Slack error:`, error);
           });
         results.slack = "queued";
+      }
+
+      // 5. Send Discord alert if configured (async, don't wait)
+      if (this.discordService.enabled) {
+        const discordEventData = {
+          user_email,
+          event,
+          properties,
+          timestamp,
+        };
+
+        this.discordService
+          .sendAlert(discordEventData)
+          .then((result) => {
+            if (result.success) {
+              this.stats.discordAlertsSent++;
+              logger.debug(`[Product Event] Discord alert sent: ${event}`);
+            } else if (result.reason === "filtered") {
+              logger.debug(`[Product Event] Discord alert filtered: ${event}`);
+            }
+          })
+          .catch((error) => {
+            logger.error(`[Product Event] Discord error:`, error);
+          });
+        results.discord = "queued";
       }
 
       // Return immediate response
@@ -425,6 +473,7 @@ class ProductEventRoutes {
           db: dbStats.rows[0],
           mixpanel: this.mixpanelService.getStats(),
           slack: this.slackService.getStats(),
+          discord: this.discordService.getStats(),
         },
       });
     } catch (error) {
@@ -462,6 +511,7 @@ class ProductEventRoutes {
           mixpanel: this.mixpanelService?.enabled || false,
           attio: !!this.attioService,
           slack: this.slackService?.enabled || false,
+          discord: this.discordService?.enabled || false,
           database: true,
         },
       });

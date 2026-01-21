@@ -121,6 +121,10 @@ router.get('/integrations', async (req, res) => {
       slack: {
         name: 'Slack',
         configured: !!process.env.SLACK_WEBHOOK_URL,
+      },
+      discord: {
+        name: 'Discord',
+        configured: !!process.env.DISCORD_WEBHOOK_URL,
         description: 'Notification and alerting'
       },
       sentry: {
@@ -144,6 +148,7 @@ router.get('/integrations', async (req, res) => {
             case 'apollo':
             case 'hunter':
             case 'slack':
+            case 'discord':
             case 'sentry':
               integration.status = 'active';
               break;
@@ -184,6 +189,7 @@ router.get('/integrations', async (req, res) => {
       apollo: { name: 'Apollo.io', configured: !!process.env.APOLLO_API_KEY, status: 'unknown', description: 'B2B data enrichment' },
       hunter: { name: 'Hunter.io', configured: !!process.env.HUNTER_API_KEY, status: 'unknown', description: 'Email finder and verification' },
       slack: { name: 'Slack', configured: !!process.env.SLACK_WEBHOOK_URL, status: 'unknown', description: 'Notification and alerting' },
+      discord: { name: 'Discord', configured: !!process.env.DISCORD_WEBHOOK_URL, status: 'unknown', description: 'Notification and alerting' },
       sentry: { name: 'Sentry', configured: !!process.env.SENTRY_DSN, status: 'unknown', description: 'Error tracking and monitoring' }
     };
     

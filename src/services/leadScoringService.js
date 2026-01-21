@@ -1,16 +1,22 @@
 const { query } = require("../utils/db");
 const logger = require("../utils/logger");
+const { getInstance: getGeminiInstance } = require("./geminiService");
 
 class LeadScoringService {
   constructor() {
     this.scoringConfig = null;
     this.loadScoringConfig();
 
+    // Initialize Gemini for AI-enhanced scoring
+    this.geminiService = getGeminiInstance();
+    this.useAIEnhancement = process.env.ENABLE_AI_LEAD_SCORING === "true" && this.geminiService.initialized;
+
     // Statistics
     this.stats = {
       usersScored: 0,
       scoresUpdated: 0,
       errors: 0,
+      aiEnhanced: 0,
     };
   }
 
@@ -488,6 +494,106 @@ class LeadScoringService {
   }
 
   /**
+   * AI-enhanced scoring using Gemini for pattern recognition
+   */
+  async enhanceScoreWithAI(user, icpScore, behaviorScore, icpBreakdown, behaviorBreakdown) {
+    if (!this.useAIEnhancement) {
+      return {
+        aiAdjustment: 0,
+        aiReasoning: null,
+        patterns: [],
+      };
+    }
+
+    try {
+      const prompt = this.buildAIScoringPrompt(user, icpScore, behaviorScore, icpBreakdown, behaviorBreakdown);
+      
+      const result = await this.geminiService.generateJSON(
+        prompt,
+        {
+          aiAdjustment: "number (score adjustment based on patterns, -20 to +20)",
+          aiReasoning: "string (explanation of adjustment)",
+          patterns: "array of strings (patterns detected in lead behavior/data)",
+          riskFactors: "array of strings (potential risk factors)",
+          opportunityFactors: "array of strings (potential opportunity factors)",
+          confidence: "number (0-100, confidence in AI assessment)",
+        },
+        {
+          model: "pro", // Use Pro for complex pattern recognition
+          taskType: "scoring",
+          temperature: 0.3,
+          maxTokens: 1000,
+        }
+      );
+
+      if (result.json) {
+        this.stats.aiEnhanced++;
+        return {
+          aiAdjustment: result.json.aiAdjustment || 0,
+          aiReasoning: result.json.aiReasoning || null,
+          patterns: result.json.patterns || [],
+          riskFactors: result.json.riskFactors || [],
+          opportunityFactors: result.json.opportunityFactors || [],
+          confidence: result.json.confidence || 70,
+        };
+      }
+
+      return {
+        aiAdjustment: 0,
+        aiReasoning: null,
+        patterns: [],
+      };
+    } catch (error) {
+      logger.error("[LeadScoring] Error in AI enhancement:", error.message);
+      return {
+        aiAdjustment: 0,
+        aiReasoning: null,
+        patterns: [],
+      };
+    }
+  }
+
+  /**
+   * Build AI scoring prompt
+   */
+  buildAIScoringPrompt(user, icpScore, behaviorScore, icpBreakdown, behaviorBreakdown) {
+    const apolloData = user.apollo_data
+      ? typeof user.apollo_data === "string"
+        ? JSON.parse(user.apollo_data)
+        : user.apollo_data
+      : null;
+
+    return `Analyze this lead and provide AI-enhanced scoring insights.
+
+Lead Information:
+- Email: ${user.email}
+- ICP Score: ${icpScore} (breakdown: ${JSON.stringify(icpBreakdown)})
+- Behavior Score: ${behaviorScore} (breakdown: ${JSON.stringify(behaviorBreakdown)})
+- Company Data: ${JSON.stringify(apolloData?.organization || {}, null, 2)}
+- Current Total Score: ${icpScore + behaviorScore}
+
+Analyze patterns in:
+1. Company characteristics (size, funding, industry, revenue)
+2. Behavioral signals (engagement patterns, event frequency, sentiment)
+3. Historical patterns (compare to similar successful leads)
+4. Risk indicators (low engagement, poor fit signals)
+5. Opportunity indicators (high engagement, strong fit signals)
+
+Provide:
+1. Score adjustment (-20 to +20) based on detected patterns
+2. Reasoning for the adjustment
+3. Patterns detected
+4. Risk factors
+5. Opportunity factors
+6. Confidence level in your assessment
+
+Focus on patterns that rule-based scoring might miss, such as:
+- Unusual engagement patterns that indicate high intent
+- Company characteristics that suggest growth potential
+- Behavioral anomalies that indicate risk or opportunity`;
+  }
+
+  /**
    * Score a single user
    */
   async scoreUser(user) {
@@ -509,10 +615,30 @@ class LeadScoringService {
         user.email
       );
 
-      // Calculate total score
+      // Calculate base scores
       const icpScore = icpResult.score || 0;
       const behaviorScore = behaviorResult.score || 0;
-      const totalScore = icpScore + behaviorScore;
+      let totalScore = icpScore + behaviorScore;
+
+      // AI enhancement (optional)
+      let aiEnhancement = null;
+      if (this.useAIEnhancement) {
+        aiEnhancement = await this.enhanceScoreWithAI(
+          user,
+          icpScore,
+          behaviorScore,
+          icpResult.breakdown,
+          behaviorResult.breakdown
+        );
+        
+        if (aiEnhancement.aiAdjustment) {
+          totalScore += aiEnhancement.aiAdjustment;
+          logger.debug(
+            `[LeadScoring] AI adjustment for ${user.email}: ${aiEnhancement.aiAdjustment} (${aiEnhancement.aiReasoning})`
+          );
+        }
+      }
+
       const grade = this.calculateGrade(totalScore);
 
       // Debug logging
@@ -558,6 +684,7 @@ class LeadScoringService {
         behaviorBreakdown: behaviorResult.breakdown,
         totalScore,
         grade,
+        aiEnhancement: aiEnhancement,
       };
     } catch (error) {
       logger.error(

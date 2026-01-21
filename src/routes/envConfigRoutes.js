@@ -29,9 +29,12 @@ class EnvConfigRoutes {
         'MIXPANEL_PROJECT_TOKEN',
         'APOLLO_API_KEY',
         'HUNTER_API_KEY',
-        'OPENAI_API_KEY',
-        'ANTHROPIC_API_KEY',
-        'PERPLEXITY_API_KEY',
+        'GEMINI_API_KEY',
+        'GEMINI_MODEL_PRO',
+        'GEMINI_MODEL_FLASH',
+        'ENABLE_AI_LEAD_SCORING',
+        'ENABLE_AI_INSIGHTS',
+        'ENABLE_AI_QUERIES',
 
         // Sync Configuration
         'USE_PERIODIC_SYNC',
@@ -55,6 +58,7 @@ class EnvConfigRoutes {
         'SENTRY_LOG_WARNINGS',
         'SENTRY_TRACK_SYNC',
         'SLACK_WEBHOOK_URL',
+        'DISCORD_WEBHOOK_URL',
 
         // Environment
         'NODE_ENV',
@@ -215,6 +219,9 @@ class EnvConfigRoutes {
         case 'slack':
           result = await this.testSlack();
           break;
+        case 'discord':
+          result = await this.testDiscord();
+          break;
         default:
           result = { success: false, error: "Unknown service: " + service };
       }
@@ -360,6 +367,35 @@ class EnvConfigRoutes {
       return {
         success: true,
         message: "Test message sent to Slack successfully"
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async testDiscord() {
+    try {
+      if (!process.env.DISCORD_WEBHOOK_URL) {
+        return { success: false, error: "Discord webhook URL not configured" };
+      }
+      const axios = require('axios');
+      await axios.post(process.env.DISCORD_WEBHOOK_URL, {
+        username: "Cairo CDP",
+        embeds: [
+          {
+            title: "🧪 Test Message",
+            description: "Test message from Cairo CDP configuration UI",
+            color: 0x3498db,
+            timestamp: new Date().toISOString(),
+            footer: {
+              text: "Cairo CDP"
+            }
+          }
+        ]
+      });
+      return {
+        success: true,
+        message: "Test message sent to Discord successfully"
       };
     } catch (error) {
       return { success: false, error: error.message };

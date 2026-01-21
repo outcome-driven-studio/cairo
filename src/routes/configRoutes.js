@@ -3,6 +3,7 @@ const { query } = require("../utils/db");
 const logger = require("../utils/logger");
 const { DestinationService } = require("../services/destinationService");
 const SlackDestination = require("../destinations/slackDestination");
+const DiscordDestination = require("../destinations/discordDestination");
 const MixpanelDestination = require("../destinations/mixpanelDestination");
 const WebhookDestination = require("../destinations/webhookDestination");
 
@@ -26,6 +27,19 @@ class ConfigRoutes {
         alertEvents: process.env.SLACK_ALERT_EVENTS?.split(',') || [],
       });
       this.destinationService.register(slack);
+    }
+
+    if (process.env.DISCORD_WEBHOOK_URL) {
+      const discord = new DiscordDestination({
+        webhookUrl: process.env.DISCORD_WEBHOOK_URL,
+        username: process.env.DISCORD_USERNAME || 'Cairo CDP',
+        avatarUrl: process.env.DISCORD_AVATAR_URL,
+        alertEvents: process.env.DISCORD_ALERT_EVENTS?.split(',') || [],
+        paymentThreshold: process.env.DISCORD_PAYMENT_THRESHOLD
+          ? parseFloat(process.env.DISCORD_PAYMENT_THRESHOLD)
+          : 100,
+      });
+      this.destinationService.register(discord);
     }
 
     if (process.env.MIXPANEL_PROJECT_TOKEN) {
@@ -400,6 +414,19 @@ class ConfigRoutes {
         ]
       },
       {
+        type: 'discord',
+        name: 'Discord',
+        description: 'Send event notifications to Discord channels via webhooks',
+        icon: '🎮',
+        fields: [
+          { name: 'webhookUrl', type: 'url', required: true, label: 'Webhook URL' },
+          { name: 'username', type: 'text', required: false, label: 'Bot Username' },
+          { name: 'avatarUrl', type: 'url', required: false, label: 'Avatar URL' },
+          { name: 'alertEvents', type: 'tags', required: false, label: 'Alert Events' },
+          { name: 'paymentThreshold', type: 'number', required: false, label: 'Payment Threshold' },
+        ]
+      },
+      {
         type: 'mixpanel',
         name: 'Mixpanel',
         description: 'Send events to Mixpanel analytics platform',
@@ -665,11 +692,12 @@ class ConfigRoutes {
         features: {
           multiTenant: true,
           leadScoring: true,
-          aiEnrichment: !!process.env.PERPLEXITY_API_KEY || !!process.env.OPENAI_API_KEY,
+          aiEnrichment: !!process.env.GEMINI_API_KEY,
           periodicSync: process.env.USE_PERIODIC_SYNC === 'true',
         },
         integrations: {
           slack: !!process.env.SLACK_WEBHOOK_URL,
+          discord: !!process.env.DISCORD_WEBHOOK_URL,
           mixpanel: !!process.env.MIXPANEL_PROJECT_TOKEN,
           attio: !!process.env.ATTIO_API_KEY,
           apollo: !!process.env.APOLLO_API_KEY,
@@ -696,6 +724,8 @@ class ConfigRoutes {
     switch (type) {
       case 'slack':
         return SlackDestination;
+      case 'discord':
+        return DiscordDestination;
       case 'mixpanel':
         return MixpanelDestination;
       case 'webhook':

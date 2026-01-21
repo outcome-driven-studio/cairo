@@ -33,9 +33,9 @@ class EnrichmentService {
     logger.info("[Enrichment] Service initialized", {
       apollo: !!this.apolloService,
       hunter: !!this.hunterService,
-      ai: this.aiService.providers.length > 0,
+      ai: this.aiService.geminiService?.initialized || false,
       strategy: this.strategy,
-      aiProviders: this.aiService.providers.map((p) => p.name),
+      aiProvider: "gemini",
     });
   }
 
@@ -159,9 +159,9 @@ class EnrichmentService {
           break;
 
         case "ai":
-          if (this.aiService.providers.length > 0) {
+          if (this.aiService.geminiService?.initialized) {
             logger.debug(
-              `[Enrichment] Attempting AI enrichment for ${user.email}`
+              `[Enrichment] Attempting Gemini enrichment for ${user.email}`
             );
             this.stats.ai.attempted++;
 
@@ -176,7 +176,6 @@ class EnrichmentService {
                 name,
                 {
                   linkedinUrl: user.linkedin_profile,
-                  preferredProvider: process.env.PREFERRED_AI_PROVIDER,
                 }
               );
 
@@ -192,16 +191,16 @@ class EnrichmentService {
                   // Good confidence, use AI data
                   enrichedData = aiData;
                   this.stats.ai.succeeded++;
-                  cost = aiData.enrichment_cost || 0.01;
+                  cost = aiData.enrichment_cost || 0.002;
                   this.stats.ai.cost += cost;
-                  source = `ai_${aiData.enrichment_provider || "unknown"}`;
+                  source = "ai_gemini";
                   logger.info(
-                    `[Enrichment] AI enrichment successful for ${user.email} using ${aiData.enrichment_provider} (confidence: ${confidence}%, cost: $${cost})`
+                    `[Enrichment] Gemini enrichment successful for ${user.email} (confidence: ${confidence}%, cost: $${cost})`
                   );
                 } else {
                   // Low confidence, log but don't use
                   logger.warn(
-                    `[Enrichment] AI confidence too low for ${user.email}: ${confidence}% < ${minConfidence}%. Will try next provider.`
+                    `[Enrichment] Gemini confidence too low for ${user.email}: ${confidence}% < ${minConfidence}%. Will try next provider.`
                   );
                   this.stats.ai.failed++;
                   // Don't set enrichedData, so it tries next provider
@@ -209,13 +208,13 @@ class EnrichmentService {
               } else {
                 this.stats.ai.failed++;
                 logger.debug(
-                  `[Enrichment] AI returned no data for ${user.email}`
+                  `[Enrichment] Gemini returned no data for ${user.email}`
                 );
               }
             } catch (aiError) {
               this.stats.ai.failed++;
               logger.debug(
-                `[Enrichment] AI failed for ${user.email}: ${aiError.message}`
+                `[Enrichment] Gemini failed for ${user.email}: ${aiError.message}`
               );
             }
           }
@@ -355,13 +354,13 @@ class EnrichmentService {
       credits.hunter = await this.hunterService.checkCredits();
     }
 
-    // AI services typically don't have credit limits, just API rate limits
-    if (this.aiService.providers.length > 0) {
+    // Gemini service (pay-per-use)
+    if (this.aiService.geminiService?.initialized) {
       credits.ai = {
         available: true,
-        providers: this.aiService.providers.map((p) => p.name),
+        provider: "gemini",
         estimatedCostPer1000: this.aiService.estimateCost(1000),
-        message: "AI enrichment available (pay-per-use)",
+        message: "Gemini enrichment available (pay-per-use)",
       };
     }
 
@@ -386,17 +385,17 @@ class EnrichmentService {
       services: {
         apollo: !!this.apolloService,
         hunter: !!this.hunterService,
-        ai: this.aiService.providers.length > 0,
-        aiProviders: this.aiService.providers.map((p) => p.name),
+        ai: this.aiService.geminiService?.initialized || false,
+        aiProvider: "gemini",
       },
       costComparison: {
         apollo: "$150 per 1000 enrichments",
         hunter: "$80 per 1000 enrichments",
         ai: `$${(this.aiService.estimateCost(1000) || 0).toFixed(
           2
-        )} per 1000 enrichments`,
+        )} per 1000 enrichments (Gemini 1.5 Pro)`,
         savings: `${Math.round(
-          (1 - (this.aiService.estimateCost(1000) || 10) / 150) * 100
+          (1 - (this.aiService.estimateCost(1000) || 2) / 150) * 100
         )}% cheaper than Apollo`,
       },
       strategy: this.strategy,
@@ -420,9 +419,7 @@ class EnrichmentService {
         failed: 0,
         totalCost: 0,
         byProvider: {
-          openai: 0,
-          anthropic: 0,
-          perplexity: 0,
+          gemini: 0,
         },
       };
     }

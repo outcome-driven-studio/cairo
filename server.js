@@ -1,4 +1,6 @@
-require("dotenv").config();
+// Load environment variables (prioritizes .env.local for local dev, uses Railway env vars in cloud)
+const { loadEnv } = require("./src/utils/envLoader");
+loadEnv();
 
 // Initialize Sentry FIRST before any other code
 const sentry = require("./src/utils/sentry");
@@ -510,6 +512,11 @@ app.use("/api/config", envConfigRoutes.setupRoutes());
 // Config routes for sources and destinations
 const configRoutes = new ConfigRoutes();
 app.use("/api", configRoutes.setupRoutes());
+
+// AI Query routes (natural language queries)
+const AIQueryRoutes = require("./src/routes/aiQueryRoutes");
+const aiQueryRoutes = new AIQueryRoutes();
+app.use("/api/ai/query", aiQueryRoutes.getRouter());
 
 // Initialize cron jobs
 const PORT = process.env.PORT || 8080;
