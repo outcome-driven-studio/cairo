@@ -5,20 +5,26 @@ const path = require("path");
  * Environment Variable Loader
  * 
  * Loads environment variables with priority:
- * 1. Process environment variables (Railway/cloud) - highest priority
- * 2. .env.local (for local development)
- * 3. .env (fallback for local)
+ * 1. Process environment variables (Railway/GCP/cloud) - highest priority
+ * 2. GCP Secret Manager (if running on Cloud Run) - loaded separately via loadGCPSecrets()
+ * 3. .env.local (for local development)
+ * 4. .env (fallback for local)
  * 
- * In production/cloud (Railway), environment variables are provided directly,
+ * In production/cloud (Railway/GCP), environment variables are provided directly,
  * so .env files are not loaded.
+ * 
+ * Note: GCP secrets are loaded asynchronously via loadGCPSecrets() which should
+ * be called before server startup.
  */
 function loadEnv() {
   const isProduction = process.env.NODE_ENV === "production";
   const isRailway = !!process.env.RAILWAY_ENVIRONMENT || !!process.env.RAILWAY_PROJECT_ID;
+  const isGCP = !!process.env.K_SERVICE; // Cloud Run sets K_SERVICE
   
-  // In production/cloud (Railway), use environment variables directly
+  // In production/cloud (Railway/GCP), use environment variables directly
   // Don't load .env files as they may contain outdated values
-  if (isProduction || isRailway) {
+  // GCP secrets are loaded separately via loadGCPSecrets()
+  if (isProduction || isRailway || isGCP) {
     return;
   }
 
@@ -52,6 +58,27 @@ function loadEnv() {
   }
 }
 
+/**
+ * Load GCP secrets from Secret Manager (async)
+ * Should be called before server startup when running on Cloud Run
+ */
+async function loadGCPSecrets() {
+  const isGCP = !!process.env.K_SERVICE; // Cloud Run sets K_SERVICE
+  
+  if (!isGCP) {
+    return; // Not running on Cloud Run
+  }
+  
+  try {
+    const {loadSecrets} = require('./gcpSecrets');
+    await loadSecrets();
+  } catch (error) {
+    console.warn('Failed to load GCP secrets:', error.message);
+    // Continue without secrets - they may be set via environment variables
+  }
+}
+
 module.exports = {
   loadEnv,
+  loadGCPSecrets,
 };

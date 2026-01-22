@@ -1,0 +1,64 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/cairo-cdp:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/cairo-cdp:latest'
+      - '.'
+
+  # Push the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/cairo-cdp:$COMMIT_SHA']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/cairo-cdp:latest']
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'cairo-cdp'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/cairo-cdp:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--add-cloudsql-instances'
+      - '${_INSTANCE_CONNECTION_NAME}'
+      - '--set-env-vars'
+      - '${_ENV_VARS}'
+      - '--set-secrets'
+      - '${_SECRETS}'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '2'
+      - '--timeout'
+      - '3600'
+      - '--max-instances'
+      - '10'
+      - '--min-instances'
+      - '0'
+
+substitutions:
+  _REGION: us-central1
+  _INSTANCE_CONNECTION_NAME: ''  # Set this: PROJECT_ID:REGION:INSTANCE_NAME
+  _ENV_VARS: 'NODE_ENV=production,PORT=8080,USE_PERIODIC_SYNC=false,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GCP_REGION=us-central1'
+  _SECRETS: 'DB_PASSWORD=db-password:latest,GEMINI_API_KEY=gemini-api-key:latest,APOLLO_API_KEY=apollo-api-key:latest,HUNTER_API_KEY=hunter-api-key:latest,LEMLIST_API_KEY=lemlist-api-key:latest,SMARTLEAD_API_KEY=smartlead-api-key:latest,ATTIO_API_KEY=attio-api-key:latest,MIXPANEL_PROJECT_TOKEN=mixpanel-token:latest,SENTRY_DSN=sentry-dsn:latest'
+
+images:
+  - 'gcr.io/$PROJECT_ID/cairo-cdp:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/cairo-cdp:latest'
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: '1200s'

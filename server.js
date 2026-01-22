@@ -709,6 +709,12 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   logger.info(`✅ Server listening on http://0.0.0.0:${PORT}`);
 
   try {
+    // Load GCP secrets if running on Cloud Run (before database connection)
+    if (process.env.K_SERVICE) {
+      const {loadGCPSecrets} = require("./src/utils/envLoader");
+      await loadGCPSecrets();
+    }
+
     // Check if database URL is available (either POSTGRES_URL or DATABASE_URL)
     const databaseUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
     
@@ -766,7 +772,9 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     }
 
     // Option 1: Use new periodic sync (recommended - every 4 hours)
-    if (process.env.USE_PERIODIC_SYNC === "true") {
+    // Skip on Cloud Run - Cloud Scheduler handles this
+    const isCloudRun = !!process.env.K_SERVICE;
+    if (process.env.USE_PERIODIC_SYNC === "true" && !isCloudRun) {
       logger.info("[Server] Initializing PeriodicSyncService...");
       try {
         const { getInstance } = require("./src/services/periodicSyncService");
@@ -787,6 +795,8 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
         logger.error("[Server] Failed to start periodic sync:", error);
         throw error; // Re-throw to prevent server from starting with broken sync
       }
+    } else if (isCloudRun && process.env.USE_PERIODIC_SYNC === "true") {
+      logger.info("[Server] Running on Cloud Run - periodic sync handled by Cloud Scheduler");
     }
     // Option 2: Use legacy cron jobs (DEPRECATED - every 10-15 minutes)
     else if (process.env.ENABLE_CRON_JOBS === "true") {

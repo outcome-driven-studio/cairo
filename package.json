@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
+    "@google-cloud/secret-manager": "^5.0.0",
+    "@google-cloud/tasks": "^4.0.0",
     "@sentry/node": "^7.120.4",
     "@sentry/profiling-node": "^7.120.3",
     "axios": "^1.9.0",
