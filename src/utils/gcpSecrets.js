@@ -67,7 +67,10 @@ async function loadSecrets() {
     SMARTLEAD_API_KEY: 'smartlead-api-key',
     ATTIO_API_KEY: 'attio-api-key',
     MIXPANEL_PROJECT_TOKEN: 'mixpanel-token',
+    MIXPANEL_API_SECRET: 'mixpanel-api-secret',
     SENTRY_DSN: 'sentry-dsn',
+    SLACK_WEBHOOK_URL: 'slack-webhook-url',
+    DISCORD_WEBHOOK_URL: 'discord-webhook-url',
     DB_PASSWORD: 'db-password',
   };
 

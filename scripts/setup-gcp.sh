@@ -206,6 +206,28 @@ if [ -n "$SENTRY_DSN" ]; then
     echo -e "${GREEN}✓ Created sentry-dsn secret${NC}"
 fi
 
+# Notifications
+echo ""
+echo -e "${BLUE}Notifications:${NC}"
+read -p "Slack Webhook URL (optional, for event alerts): " SLACK_WEBHOOK
+if [ -n "$SLACK_WEBHOOK" ]; then
+    create_secret "slack-webhook-url" "$SLACK_WEBHOOK"
+    echo -e "${GREEN}✓ Created slack-webhook-url secret${NC}"
+fi
+
+read -p "Discord Webhook URL (optional, for event alerts): " DISCORD_WEBHOOK
+if [ -n "$DISCORD_WEBHOOK" ]; then
+    create_secret "discord-webhook-url" "$DISCORD_WEBHOOK"
+    echo -e "${GREEN}✓ Created discord-webhook-url secret${NC}"
+fi
+
+# Mixpanel API Secret (optional, for advanced Mixpanel features)
+read -p "Mixpanel API Secret (optional, for advanced features): " MIXPANEL_SECRET
+if [ -n "$MIXPANEL_SECRET" ]; then
+    create_secret "mixpanel-api-secret" "$MIXPANEL_SECRET"
+    echo -e "${GREEN}✓ Created mixpanel-api-secret secret${NC}"
+fi
+
 echo ""
 
 # Step 6: Grant service account access to secrets
@@ -224,7 +246,7 @@ fi
 echo "Service account: $SERVICE_ACCOUNT"
 
 # Grant access to all secrets
-for secret in db-password gemini-api-key apollo-api-key hunter-api-key lemlist-api-key smartlead-api-key attio-api-key mixpanel-token sentry-dsn; do
+for secret in db-password gemini-api-key apollo-api-key hunter-api-key lemlist-api-key smartlead-api-key attio-api-key mixpanel-token mixpanel-api-secret sentry-dsn slack-webhook-url discord-webhook-url; do
     if gcloud secrets describe $secret --project=$PROJECT_ID &>/dev/null; then
         gcloud secrets add-iam-policy-binding $secret \
           --member="serviceAccount:$SERVICE_ACCOUNT" \

@@ -64,15 +64,19 @@ if [ -n "$SERVICE_URL" ]; then
 fi
 
 # Build secrets string
-SECRETS="DB_PASSWORD=db-password:latest,GEMINI_API_KEY=gemini-api-key:latest,APOLLO_API_KEY=apollo-api-key:latest,HUNTER_API_KEY=hunter-api-key:latest,LEMLIST_API_KEY=lemlist-api-key:latest,SMARTLEAD_API_KEY=smartlead-api-key:latest,ATTIO_API_KEY=attio-api-key:latest,MIXPANEL_PROJECT_TOKEN=mixpanel-token:latest,SENTRY_DSN=sentry-dsn:latest"
+SECRETS="DB_PASSWORD=db-password:latest,GEMINI_API_KEY=gemini-api-key:latest,APOLLO_API_KEY=apollo-api-key:latest,HUNTER_API_KEY=hunter-api-key:latest,LEMLIST_API_KEY=lemlist-api-key:latest,SMARTLEAD_API_KEY=smartlead-api-key:latest,ATTIO_API_KEY=attio-api-key:latest,MIXPANEL_PROJECT_TOKEN=mixpanel-token:latest,MIXPANEL_API_SECRET=mixpanel-api-secret:latest,SENTRY_DSN=sentry-dsn:latest,SLACK_WEBHOOK_URL=slack-webhook-url:latest,DISCORD_WEBHOOK_URL=discord-webhook-url:latest"
 
 echo -e "${GREEN}Building and deploying...${NC}"
 echo ""
 
-# Submit build
+# Base64 encode to prevent Cloud Build from parsing variable names inside the strings
+ENV_VARS_B64=$(echo -n "$ENV_VARS" | base64 | tr -d '\n')
+SECRETS_B64=$(echo -n "$SECRETS" | base64 | tr -d '\n')
+
+# Submit build with base64-encoded values
 gcloud builds submit \
   --config=cloudbuild.yaml \
-  --substitutions=_REGION=$REGION,_INSTANCE_CONNECTION_NAME=$INSTANCE_CONNECTION_NAME,_ENV_VARS="$ENV_VARS",_SECRETS="$SECRETS"
+  --substitutions=_REGION="$REGION",_INSTANCE_CONNECTION_NAME="$INSTANCE_CONNECTION_NAME",_ENV_VARS_B64="$ENV_VARS_B64",_SECRETS_B64="$SECRETS_B64"
 
 echo ""
 echo -e "${GREEN}========================================${NC}"

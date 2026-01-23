@@ -1,60 +1,54 @@
 steps:
-  # Build the container image
+  # Build the container image (use BUILD_ID which is always available)
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/cairo-cdp:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/cairo-cdp:$BUILD_ID'
       - '-t'
       - 'gcr.io/$PROJECT_ID/cairo-cdp:latest'
       - '.'
 
   # Push the container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/cairo-cdp:$COMMIT_SHA']
+    args: ['push', 'gcr.io/$PROJECT_ID/cairo-cdp:$BUILD_ID']
   
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/cairo-cdp:latest']
 
-  # Deploy to Cloud Run
+  # Decode base64 values and deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
+    entrypoint: bash
     args:
-      - 'run'
-      - 'deploy'
-      - 'cairo-cdp'
-      - '--image'
-      - 'gcr.io/$PROJECT_ID/cairo-cdp:$COMMIT_SHA'
-      - '--region'
-      - '${_REGION}'
-      - '--platform'
-      - 'managed'
-      - '--allow-unauthenticated'
-      - '--add-cloudsql-instances'
-      - '${_INSTANCE_CONNECTION_NAME}'
-      - '--set-env-vars'
-      - '${_ENV_VARS}'
-      - '--set-secrets'
-      - '${_SECRETS}'
-      - '--memory'
-      - '2Gi'
-      - '--cpu'
-      - '2'
-      - '--timeout'
-      - '3600'
-      - '--max-instances'
-      - '10'
-      - '--min-instances'
-      - '0'
+      - '-c'
+      - |
+        # Decode base64-encoded values
+        ENV_VARS=$$(echo "${_ENV_VARS_B64}" | base64 -d)
+        SECRETS=$$(echo "${_SECRETS_B64}" | base64 -d)
+        
+        # Deploy to Cloud Run (use BUILD_ID for image tag)
+        gcloud run deploy cairo-cdp \
+          --image gcr.io/$$PROJECT_ID/cairo-cdp:$$BUILD_ID \
+          --region ${_REGION} \
+          --platform managed \
+          --allow-unauthenticated \
+          --add-cloudsql-instances ${_INSTANCE_CONNECTION_NAME} \
+          --set-env-vars "$$ENV_VARS" \
+          --set-secrets "$$SECRETS" \
+          --memory 2Gi \
+          --cpu 2 \
+          --timeout 3600 \
+          --max-instances 10 \
+          --min-instances 0
 
 substitutions:
   _REGION: us-central1
-  _INSTANCE_CONNECTION_NAME: ''  # Set this: PROJECT_ID:REGION:INSTANCE_NAME
-  _ENV_VARS: 'NODE_ENV=production,PORT=8080,USE_PERIODIC_SYNC=false,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GCP_REGION=us-central1'
-  _SECRETS: 'DB_PASSWORD=db-password:latest,GEMINI_API_KEY=gemini-api-key:latest,APOLLO_API_KEY=apollo-api-key:latest,HUNTER_API_KEY=hunter-api-key:latest,LEMLIST_API_KEY=lemlist-api-key:latest,SMARTLEAD_API_KEY=smartlead-api-key:latest,ATTIO_API_KEY=attio-api-key:latest,MIXPANEL_PROJECT_TOKEN=mixpanel-token:latest,SENTRY_DSN=sentry-dsn:latest'
+  _INSTANCE_CONNECTION_NAME: 'cairo-event-tracking:us-central1:cairo-db'  # Set this: PROJECT_ID:REGION:INSTANCE_NAME
+  _ENV_VARS_B64: ''  # Base64-encoded environment variables (set by deploy script)
+  _SECRETS_B64: ''   # Base64-encoded secrets (set by deploy script)
 
 images:
-  - 'gcr.io/$PROJECT_ID/cairo-cdp:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/cairo-cdp:$BUILD_ID'
   - 'gcr.io/$PROJECT_ID/cairo-cdp:latest'
 
 options:
