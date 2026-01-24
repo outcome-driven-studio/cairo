@@ -19,35 +19,47 @@ class ConfigRoutes {
   }
 
   setupDefaultDestinations() {
-    // Register available destination types
-    if (process.env.SLACK_WEBHOOK_URL) {
-      const slack = new SlackDestination({
-        webhookUrl: process.env.SLACK_WEBHOOK_URL,
-        channel: process.env.SLACK_DEFAULT_CHANNEL || '#events',
-        alertEvents: process.env.SLACK_ALERT_EVENTS?.split(',') || [],
-      });
-      this.destinationService.register(slack);
+    // Register available destination types (wrapped in try-catch for graceful handling of invalid configs)
+    if (process.env.SLACK_WEBHOOK_URL && process.env.SLACK_WEBHOOK_URL !== 'placeholder') {
+      try {
+        const slack = new SlackDestination({
+          webhookUrl: process.env.SLACK_WEBHOOK_URL,
+          channel: process.env.SLACK_DEFAULT_CHANNEL || '#events',
+          alertEvents: process.env.SLACK_ALERT_EVENTS?.split(',') || [],
+        });
+        this.destinationService.register(slack);
+      } catch (error) {
+        logger.warn(`[ConfigRoutes] Skipping Slack destination: ${error.message}`);
+      }
     }
 
-    if (process.env.DISCORD_WEBHOOK_URL) {
-      const discord = new DiscordDestination({
-        webhookUrl: process.env.DISCORD_WEBHOOK_URL,
-        username: process.env.DISCORD_USERNAME || 'Cairo CDP',
-        avatarUrl: process.env.DISCORD_AVATAR_URL,
-        alertEvents: process.env.DISCORD_ALERT_EVENTS?.split(',') || [],
-        paymentThreshold: process.env.DISCORD_PAYMENT_THRESHOLD
-          ? parseFloat(process.env.DISCORD_PAYMENT_THRESHOLD)
-          : 100,
-      });
-      this.destinationService.register(discord);
+    if (process.env.DISCORD_WEBHOOK_URL && process.env.DISCORD_WEBHOOK_URL !== 'placeholder') {
+      try {
+        const discord = new DiscordDestination({
+          webhookUrl: process.env.DISCORD_WEBHOOK_URL,
+          username: process.env.DISCORD_USERNAME || 'Cairo CDP',
+          avatarUrl: process.env.DISCORD_AVATAR_URL,
+          alertEvents: process.env.DISCORD_ALERT_EVENTS?.split(',') || [],
+          paymentThreshold: process.env.DISCORD_PAYMENT_THRESHOLD
+            ? parseFloat(process.env.DISCORD_PAYMENT_THRESHOLD)
+            : 100,
+        });
+        this.destinationService.register(discord);
+      } catch (error) {
+        logger.warn(`[ConfigRoutes] Skipping Discord destination: ${error.message}`);
+      }
     }
 
-    if (process.env.MIXPANEL_PROJECT_TOKEN) {
-      const mixpanel = new MixpanelDestination({
-        projectToken: process.env.MIXPANEL_PROJECT_TOKEN,
-        apiSecret: process.env.MIXPANEL_API_SECRET,
-      });
-      this.destinationService.register(mixpanel);
+    if (process.env.MIXPANEL_PROJECT_TOKEN && process.env.MIXPANEL_PROJECT_TOKEN !== 'placeholder') {
+      try {
+        const mixpanel = new MixpanelDestination({
+          projectToken: process.env.MIXPANEL_PROJECT_TOKEN,
+          apiSecret: process.env.MIXPANEL_API_SECRET,
+        });
+        this.destinationService.register(mixpanel);
+      } catch (error) {
+        logger.warn(`[ConfigRoutes] Skipping Mixpanel destination: ${error.message}`);
+      }
     }
   }
 

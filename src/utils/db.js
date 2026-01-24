@@ -17,8 +17,9 @@ if (connectionString.includes('channel_binding=require')) {
   logger.info('[Database] Removed channel_binding parameter from connection string (not supported by node-postgres)');
 }
 
-// Smart SSL configuration - only use SSL for cloud databases
+// Smart SSL configuration - only use SSL for cloud databases that require it
 const isLocalDatabase = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
+const isCloudSQLSocket = connectionString.includes('/cloudsql/'); // Cloud SQL Unix socket doesn't use SSL
 const isCloudDatabase = connectionString.includes('.neon.tech') || connectionString.includes('.railway.app') || connectionString.includes('.supabase.co');
 const isNeonPooler = connectionString.includes('-pooler.') && connectionString.includes('.neon.tech');
 
@@ -47,12 +48,16 @@ const poolConfig = {
 };
 
 // Add SSL configuration conditionally
-if (isCloudDatabase) {
+if (isCloudSQLSocket) {
+  // Cloud SQL Unix socket connections don't use SSL (security is handled by the socket)
+  poolConfig.ssl = false;
+  logger.info('[Database] SSL disabled for Cloud SQL Unix socket connection');
+} else if (isCloudDatabase) {
   poolConfig.ssl = {
     rejectUnauthorized: false,
   };
   logger.info('[Database] Using SSL for cloud database');
-  
+
   if (isNeonPooler) {
     logger.info('[Database] Detected Neon pooler endpoint - using optimized pool settings (max: 3)');
   }

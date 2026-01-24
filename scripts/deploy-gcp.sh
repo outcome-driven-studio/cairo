@@ -38,6 +38,14 @@ fi
 
 echo -e "${GREEN}Project ID:${NC} $PROJECT_ID"
 echo -e "${GREEN}Region:${NC} $REGION"
+
+# Get project number
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)" 2>/dev/null)
+if [ -z "$PROJECT_NUMBER" ]; then
+    echo -e "${RED}Error: Could not determine PROJECT_NUMBER${NC}"
+    exit 1
+fi
+echo -e "${GREEN}Project Number:${NC} $PROJECT_NUMBER"
 echo ""
 
 # Get instance connection name
@@ -56,15 +64,15 @@ SERVICE_URL=$(gcloud run services describe $SERVICE_NAME \
   --region=$REGION \
   --format="value(status.url)" 2>/dev/null || echo "")
 
-# Build environment variables
-ENV_VARS="NODE_ENV=production,PORT=8080,USE_PERIODIC_SYNC=false,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GCP_REGION=$REGION,INSTANCE_CONNECTION_NAME=$INSTANCE_CONNECTION_NAME"
+# Build environment variables (PORT is automatically set by Cloud Run, don't include it)
+ENV_VARS="NODE_ENV=production,USE_PERIODIC_SYNC=false,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GCP_REGION=$REGION,INSTANCE_CONNECTION_NAME=$INSTANCE_CONNECTION_NAME"
 
 if [ -n "$SERVICE_URL" ]; then
     ENV_VARS="$ENV_VARS,BASE_URL=$SERVICE_URL"
 fi
 
-# Build secrets string
-SECRETS="DB_PASSWORD=db-password:latest,GEMINI_API_KEY=gemini-api-key:latest,APOLLO_API_KEY=apollo-api-key:latest,HUNTER_API_KEY=hunter-api-key:latest,LEMLIST_API_KEY=lemlist-api-key:latest,SMARTLEAD_API_KEY=smartlead-api-key:latest,ATTIO_API_KEY=attio-api-key:latest,MIXPANEL_PROJECT_TOKEN=mixpanel-token:latest,MIXPANEL_API_SECRET=mixpanel-api-secret:latest,SENTRY_DSN=sentry-dsn:latest,SLACK_WEBHOOK_URL=slack-webhook-url:latest,DISCORD_WEBHOOK_URL=discord-webhook-url:latest"
+# Build secrets string (POSTGRES_URL is the database connection string)
+SECRETS="POSTGRES_URL=postgres-url:latest,DB_PASSWORD=db-password:latest,GEMINI_API_KEY=gemini-api-key:latest,APOLLO_API_KEY=apollo-api-key:latest,HUNTER_API_KEY=hunter-api-key:latest,LEMLIST_API_KEY=lemlist-api-key:latest,SMARTLEAD_API_KEY=smartlead-api-key:latest,ATTIO_API_KEY=attio-api-key:latest,MIXPANEL_PROJECT_TOKEN=mixpanel-token:latest,MIXPANEL_API_SECRET=mixpanel-api-secret:latest,SENTRY_DSN=sentry-dsn:latest,SLACK_WEBHOOK_URL=slack-webhook-url:latest,DISCORD_WEBHOOK_URL=discord-webhook-url:latest"
 
 echo -e "${GREEN}Building and deploying...${NC}"
 echo ""
@@ -74,9 +82,10 @@ ENV_VARS_B64=$(echo -n "$ENV_VARS" | base64 | tr -d '\n')
 SECRETS_B64=$(echo -n "$SECRETS" | base64 | tr -d '\n')
 
 # Submit build with base64-encoded values
+# Note: _PROJECT_ID will use Cloud Build's built-in $PROJECT_ID variable
 gcloud builds submit \
   --config=cloudbuild.yaml \
-  --substitutions=_REGION="$REGION",_INSTANCE_CONNECTION_NAME="$INSTANCE_CONNECTION_NAME",_ENV_VARS_B64="$ENV_VARS_B64",_SECRETS_B64="$SECRETS_B64"
+  --substitutions=_REGION="$REGION",_INSTANCE_CONNECTION_NAME="$INSTANCE_CONNECTION_NAME",_ENV_VARS_B64="$ENV_VARS_B64",_SECRETS_B64="$SECRETS_B64",_PROJECT_NUMBER="$PROJECT_NUMBER"
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
