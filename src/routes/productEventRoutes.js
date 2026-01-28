@@ -1,6 +1,7 @@
 const express = require("express");
 const { query } = require("../utils/db");
 const logger = require("../utils/logger");
+const { getNotificationsEnabled } = require("../utils/notificationsEnabled");
 const MixpanelService = require("../services/mixpanelService");
 const AttioService = require("../services/attioService");
 const SlackService = require("../services/slackService");
@@ -212,8 +213,10 @@ class ProductEventRoutes {
       results.mixpanel = "queued";
       results.attio = this.attioService ? "queued" : "not_configured";
 
+      const notificationsOn = await getNotificationsEnabled();
+
       // 4. Send Slack alert if configured (async, don't wait)
-      if (this.slackService.enabled) {
+      if (notificationsOn && this.slackService.enabled) {
         const slackEventData = {
           user_email,
           event,
@@ -238,7 +241,7 @@ class ProductEventRoutes {
       }
 
       // 5. Send Discord alert if configured (async, don't wait)
-      if (this.discordService.enabled) {
+      if (notificationsOn && this.discordService.enabled) {
         const discordEventData = {
           user_email,
           event,

@@ -1,6 +1,7 @@
 const express = require("express");
 const { query } = require("../utils/db");
 const logger = require("../utils/logger");
+const { getNotificationsEnabled } = require("../utils/notificationsEnabled");
 const MixpanelService = require("../services/mixpanelService");
 const AttioService = require("../services/attioService");
 const SlackService = require("../services/slackService");
@@ -366,8 +367,10 @@ class SDKRoutes {
       await this.attioService.createEvent(attioEventData, userId);
     }
 
+    const notificationsOn = await getNotificationsEnabled();
+
     // Send Slack alert if configured
-    if (this.slackService.enabled) {
+    if (notificationsOn && this.slackService.enabled) {
       await this.slackService.sendAlert({
         user_email: userId || anonymousId,
         event,
@@ -377,7 +380,7 @@ class SDKRoutes {
     }
 
     // Send Discord alert if configured
-    if (this.discordService.enabled) {
+    if (notificationsOn && this.discordService.enabled) {
       await this.discordService.sendAlert({
         user_email: userId || anonymousId,
         event,

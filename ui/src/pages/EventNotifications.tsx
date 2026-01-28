@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import {
@@ -14,6 +14,8 @@ import {
   X,
   Sparkles,
   PlusCircle,
+  FileText,
+  Link2,
 } from 'lucide-react';
 
 interface DestinationSettings {
@@ -417,6 +419,234 @@ function NotifierCard({
   );
 }
 
+export interface NotionBridgeConfig {
+  webhookUrl?: string;
+  username?: string;
+  avatarUrl?: string;
+  footer?: string;
+  titleKeys?: string[];
+  defaultColor?: string;
+  includePageLink?: boolean;
+}
+
+function NotionBridgeCard({
+  config,
+  discordDestinations,
+  onSave,
+  isSaving,
+}: {
+  config: NotionBridgeConfig;
+  discordDestinations: Destination[];
+  onSave: (c: NotionBridgeConfig) => void;
+  isSaving: boolean;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const [draft, setDraft] = useState<NotionBridgeConfig>(() => ({
+    webhookUrl: config.webhookUrl ?? '',
+    username: config.username ?? 'Notion',
+    avatarUrl: config.avatarUrl ?? '',
+    footer: config.footer ?? 'Cairo · Notion',
+    titleKeys: config.titleKeys?.length ? config.titleKeys : ['Task name', 'Name', 'Title', 'title', 'name'],
+    defaultColor: config.defaultColor ?? '5B4FFF',
+    includePageLink: config.includePageLink !== false,
+  }));
+
+  useEffect(() => {
+    setDraft({
+      webhookUrl: config.webhookUrl ?? '',
+      username: config.username ?? 'Notion',
+      avatarUrl: config.avatarUrl ?? '',
+      footer: config.footer ?? 'Cairo · Notion',
+      titleKeys: config.titleKeys?.length ? config.titleKeys : ['Task name', 'Name', 'Title', 'title', 'name'],
+      defaultColor: config.defaultColor ?? '5B4FFF',
+      includePageLink: config.includePageLink !== false,
+    });
+  }, [
+    config.webhookUrl,
+    config.username,
+    config.avatarUrl,
+    config.footer,
+    Array.isArray(config.titleKeys) ? config.titleKeys.join(',') : '',
+    config.defaultColor,
+    config.includePageLink,
+  ]);
+
+  const hasChanges =
+    draft.webhookUrl !== (config.webhookUrl ?? '') ||
+    draft.username !== (config.username ?? 'Notion') ||
+    draft.avatarUrl !== (config.avatarUrl ?? '') ||
+    draft.footer !== (config.footer ?? 'Cairo · Notion') ||
+    (draft.titleKeys?.join(',') ?? '') !== (config.titleKeys?.join(',') ?? 'Task name,Name,Title,title,name') ||
+    (draft.defaultColor ?? '5B4FFF') !== (config.defaultColor ?? '5B4FFF') ||
+    draft.includePageLink !== (config.includePageLink !== false);
+
+  const handleUseDiscord = (dest: Destination) => {
+    const url = (dest.settings as DestinationSettings)?.webhookUrl;
+    if (url) setDraft((p) => ({ ...p, webhookUrl: url }));
+  };
+
+  return (
+    <div className="rounded-2xl backdrop-blur-xl bg-white/5 border border-white/10 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between p-5 hover:bg-white/5 transition-colors text-left"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/80 to-orange-600 flex items-center justify-center text-2xl shadow-lg">
+            <FileText className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-white">Notion → Discord bridge</h2>
+            <p className="text-sm text-gray-400">
+              Customize how Notion automation webhooks (POST /api/bridge/notion) are sent to Discord.
+            </p>
+          </div>
+        </div>
+        {expanded ? <ChevronDown className="w-5 h-5 text-gray-400" /> : <ChevronRight className="w-5 h-5 text-gray-400" />}
+      </button>
+
+      {expanded && (
+        <div className="px-5 pb-5 space-y-4 border-t border-white/10 pt-5">
+          {discordDestinations.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Use webhook from Discord destination</label>
+              <div className="flex flex-wrap gap-2">
+                {discordDestinations.map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => handleUseDiscord(d)}
+                    className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-sm text-gray-200 border border-white/10"
+                  >
+                    {d.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Discord webhook URL *</label>
+            <input
+              type="url"
+              value={draft.webhookUrl ?? ''}
+              onChange={(e) => setDraft((p) => ({ ...p, webhookUrl: e.target.value }))}
+              placeholder="https://discord.com/api/webhooks/..."
+              className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white placeholder-gray-500 focus:border-cyan-400 focus:outline-none text-sm"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Bot username</label>
+              <input
+                type="text"
+                value={draft.username ?? ''}
+                onChange={(e) => setDraft((p) => ({ ...p, username: e.target.value }))}
+                placeholder="Notion"
+                className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white placeholder-gray-500 focus:border-cyan-400 focus:outline-none text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Avatar URL</label>
+              <input
+                type="url"
+                value={draft.avatarUrl ?? ''}
+                onChange={(e) => setDraft((p) => ({ ...p, avatarUrl: e.target.value }))}
+                placeholder="https://..."
+                className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white placeholder-gray-500 focus:border-cyan-400 focus:outline-none text-sm"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Embed footer text</label>
+            <input
+              type="text"
+              value={draft.footer ?? ''}
+              onChange={(e) => setDraft((p) => ({ ...p, footer: e.target.value }))}
+              placeholder="Cairo · Notion"
+              className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white placeholder-gray-500 focus:border-cyan-400 focus:outline-none text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Title property keys (comma-separated)</label>
+            <input
+              type="text"
+              value={Array.isArray(draft.titleKeys) ? draft.titleKeys.join(', ') : draft.titleKeys ?? ''}
+              onChange={(e) =>
+                setDraft((p) => ({
+                  ...p,
+                  titleKeys: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                }))
+              }
+              placeholder="Task name, Name, Title, title, name"
+              className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white placeholder-gray-500 focus:border-cyan-400 focus:outline-none text-sm"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Default embed color (hex)</label>
+              <input
+                type="text"
+                value={draft.defaultColor ?? ''}
+                onChange={(e) => setDraft((p) => ({ ...p, defaultColor: e.target.value.replace(/^#/, '') }))}
+                placeholder="5B4FFF"
+                className="w-28 px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white placeholder-gray-500 focus:border-cyan-400 focus:outline-none text-sm"
+              />
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={draft.includePageLink !== false}
+                onChange={(e) => setDraft((p) => ({ ...p, includePageLink: e.target.checked }))}
+                className="rounded border-white/20 bg-black/30 text-cyan-500 focus:ring-cyan-400"
+              />
+              <span className="text-sm text-gray-300 flex items-center gap-1">
+                <Link2 className="w-4 h-4" />
+                Include page link in description
+              </span>
+            </label>
+          </div>
+
+          {hasChanges && (
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setDraft({
+                    webhookUrl: config.webhookUrl ?? '',
+                    username: config.username ?? 'Notion',
+                    avatarUrl: config.avatarUrl ?? '',
+                    footer: config.footer ?? 'Cairo · Notion',
+                    titleKeys: config.titleKeys ?? ['Task name', 'Name', 'Title', 'title', 'name'],
+                    defaultColor: config.defaultColor ?? '5B4FFF',
+                    includePageLink: config.includePageLink !== false,
+                  })
+                }
+                className="px-4 py-2 rounded-lg bg-white/10 text-gray-300 hover:bg-white/15 transition-colors text-sm font-medium"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={() => onSave(draft)}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium hover:from-cyan-600 hover:to-blue-700 transition-all disabled:opacity-50 text-sm"
+              >
+                {isSaving ? 'Saving…' : <><Check className="w-4 h-4" /> Save</>}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AddNotifierForm({
   onCreate,
   isCreating,
@@ -634,6 +864,42 @@ export default function EventNotifications() {
     },
   });
 
+  const { data: notionBridgeData } = useQuery<{ success: boolean; config: NotionBridgeConfig }>({
+    queryKey: ['notion-bridge'],
+    queryFn: async () => {
+      const res = await axios.get('/api/config/notion-bridge');
+      return res.data;
+    },
+  });
+
+  const { data: notificationsData } = useQuery<{ success: boolean; enabled: boolean }>({
+    queryKey: ['notifications'],
+    queryFn: async () => {
+      const res = await axios.get('/api/config/notifications');
+      return res.data;
+    },
+  });
+
+  const notificationsMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      await axios.put('/api/config/notifications', { enabled });
+    },
+    onSuccess: (_, enabled) => {
+      queryClient.setQueryData(['notifications'], (old: unknown) =>
+        old && typeof old === 'object' && 'success' in old ? { ...old, enabled } : { success: true, enabled }
+      );
+    },
+  });
+
+  const notionBridgeMutation = useMutation({
+    mutationFn: async (c: NotionBridgeConfig) => {
+      await axios.put('/api/config/notion-bridge', c);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notion-bridge'] });
+    },
+  });
+
   const updateMutation = useMutation({
     mutationFn: async ({ id, settings }: { id: number; settings: DestinationSettings }) => {
       await axios.put(`/api/config/destinations/${id}`, { settings });
@@ -682,11 +948,17 @@ export default function EventNotifications() {
     [destinations]
   );
   const suggestedEvents = eventNamesData?.eventNames ?? DEFAULT_EVENT_NAMES;
+  const notionBridgeConfig = notionBridgeData?.config ?? {};
+  const discordDestinations = useMemo(
+    () => notifiers.filter((d) => d.type?.toLowerCase() === 'discord'),
+    [notifiers]
+  );
+  const notificationsEnabled = notificationsData?.enabled !== false;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-8">
       <div className="max-w-4xl mx-auto space-y-8">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-400 via-orange-400 to-rose-500 bg-clip-text text-transparent mb-2">
               Event notifications
@@ -695,17 +967,48 @@ export default function EventNotifications() {
               Choose which events to push to each connection and customize the notifier and message.
             </p>
           </div>
-          {!showAddNotifier && (
-            <button
-              type="button"
-              onClick={() => setShowAddNotifier(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium hover:from-cyan-600 hover:to-blue-700 transition-all shrink-0"
-            >
-              <PlusCircle className="w-5 h-5" />
-              Add notifier
-            </button>
-          )}
+          <div className="flex items-center gap-4 shrink-0">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <span className="text-sm font-medium text-gray-300">Notifications</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={notificationsEnabled}
+                onClick={() => notificationsMutation.mutate(!notificationsEnabled)}
+                disabled={notificationsMutation.isPending}
+                className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+                  notificationsEnabled ? 'bg-cyan-500' : 'bg-white/20'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform ${
+                    notificationsEnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className={`text-sm font-medium ${notificationsEnabled ? 'text-emerald-400' : 'text-gray-500'}`}>
+                {notificationsEnabled ? 'On' : 'Off'}
+              </span>
+            </label>
+            {!showAddNotifier && (
+              <button
+                type="button"
+                onClick={() => setShowAddNotifier(true)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium hover:from-cyan-600 hover:to-blue-700 transition-all shrink-0"
+              >
+                <PlusCircle className="w-5 h-5" />
+                Add notifier
+              </button>
+            )}
+          </div>
         </div>
+
+        {!notificationsEnabled && (
+          <div className="rounded-xl px-4 py-3 flex items-center gap-3 bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <Bell className="w-5 h-5 shrink-0" />
+            <span>Notifications are paused. No alerts will be sent to Slack, Discord, or the Notion bridge until you turn them back on.</span>
+          </div>
+        )}
 
         {showAddNotifier && (
           <AddNotifierForm
@@ -733,6 +1036,12 @@ export default function EventNotifications() {
           </div>
         ) : (
           <div className="space-y-6">
+            <NotionBridgeCard
+              config={notionBridgeConfig}
+              discordDestinations={discordDestinations}
+              onSave={(c) => notionBridgeMutation.mutate(c)}
+              isSaving={notionBridgeMutation.isPending}
+            />
             {testResult && (
               <div
                 className={`rounded-xl px-4 py-3 flex items-center gap-3 ${
@@ -747,6 +1056,12 @@ export default function EventNotifications() {
               <div className="rounded-xl px-4 py-3 flex items-center gap-3 bg-red-500/20 text-red-400 border border-red-500/30">
                 <X className="w-5 h-5 shrink-0" />
                 <span>{(createMutation.error as Error)?.message || 'Failed to create notifier'}</span>
+              </div>
+            )}
+            {notionBridgeMutation.isError && (
+              <div className="rounded-xl px-4 py-3 flex items-center gap-3 bg-red-500/20 text-red-400 border border-red-500/30">
+                <X className="w-5 h-5 shrink-0" />
+                <span>{(notionBridgeMutation.error as Error)?.message || 'Failed to save Notion bridge'}</span>
               </div>
             )}
             {notifiers.map((dest) => (

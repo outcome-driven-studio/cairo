@@ -1,5 +1,7 @@
 const express = require("express");
 const logger = require("../utils/logger");
+const { query } = require("../utils/db");
+const { getNotificationsEnabled } = require("../utils/notificationsEnabled");
 const DiscordService = require("../services/discordService");
 
 /**
@@ -24,6 +26,25 @@ class EventBridgeRoutes {
       process.env.DISCORD_WEBHOOK_URL,
       discordConfig
     );
+
+    // Notion bridge: optional dedicated webhook and display options
+    const notionWebhook =
+      process.env.NOTION_BRIDGE_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL;
+    this.notionDiscordService =
+      notionWebhook && notionWebhook !== "placeholder"
+        ? new DiscordService(notionWebhook, {
+            username: process.env.NOTION_BRIDGE_USERNAME || process.env.DISCORD_USERNAME || "Notion",
+            avatarUrl: process.env.NOTION_BRIDGE_AVATAR_URL || process.env.DISCORD_AVATAR_URL,
+          })
+        : this.discordService;
+
+    this.notionBridgeConfig = {
+      titleKeys: process.env.NOTION_BRIDGE_TITLE_KEYS
+        ? process.env.NOTION_BRIDGE_TITLE_KEYS.split(",").map((s) => s.trim()).filter(Boolean)
+        : ["Task name", "Name", "Title", "title", "name"],
+      defaultColor: (process.env.NOTION_BRIDGE_DEFAULT_COLOR || "5B4FFF").replace(/^#/, ""),
+      includePageLink: process.env.NOTION_BRIDGE_INCLUDE_LINK !== "false",
+    };
   }
 
   /**
@@ -107,12 +128,16 @@ class EventBridgeRoutes {
 
   /**
    * Normalize Notion webhook payload (flat or nested under properties) into title + description for Discord.
+   * Uses optional override config (from DB or env); falls back to this.notionBridgeConfig.
    */
-  normalizeNotionPayload(body) {
+  normalizeNotionPayload(body, overrideConfig = null) {
     const raw = body || {};
     const props = raw.properties && typeof raw.properties === "object" ? raw.properties : raw;
     const skip = new Set(["properties", "message", "eventType", "color", "id", "url"]);
-    const titleKeys = ["Task name", "Name", "Title", "title", "name"];
+    const config = overrideConfig || this.notionBridgeConfig;
+    const titleKeys = config.titleKeys || this.notionBridgeConfig.titleKeys;
+    const defaultColor = config.defaultColor ?? this.notionBridgeConfig.defaultColor;
+    const includePageLink = config.includePageLink !== false;
     let title = "Notion update";
     const lines = [];
 
@@ -133,11 +158,11 @@ class EventBridgeRoutes {
       if (text) lines.push(`**${label}:** ${text}`);
     }
 
-    if (raw.url) lines.push(`**Link:** ${raw.url}`);
+    if (includePageLink && raw.url) lines.push(`**Link:** ${raw.url}`);
     if (raw.id) lines.push(`**Page ID:** \`${raw.id}\``);
 
     const description = lines.length ? lines.join("\n") : "No details";
-    const color = (typeof raw.color === "string" ? raw.color : "5B4FFF").replace(/^#/, "");
+    const color = (typeof raw.color === "string" ? raw.color : defaultColor).replace(/^#/, "");
     return { title, description, color };
   }
 
@@ -148,20 +173,62 @@ class EventBridgeRoutes {
    */
   async notion(req, res) {
     try {
-      if (!this.discordService.enabled) {
+      if (!(await getNotificationsEnabled())) {
+        return res.status(200).json({
+          success: true,
+          message: "Notion event accepted; notifications are currently disabled.",
+        });
+      }
+      let config = null;
+      try {
+        const result = await query("SELECT value FROM app_settings WHERE key = $1", ["notion_bridge"]);
+        const stored = result.rows[0]?.value;
+        if (stored && typeof stored === "object" && stored.webhookUrl) {
+          config = stored;
+          if (!Array.isArray(config.titleKeys) && typeof config.titleKeys === "string") {
+            config.titleKeys = config.titleKeys.split(",").map((s) => s.trim()).filter(Boolean);
+          }
+          if (config.defaultColor && config.defaultColor.startsWith("#")) {
+            config.defaultColor = config.defaultColor.slice(1);
+          }
+        }
+      } catch (e) {
+        // Table may not exist; use env
+      }
+
+      const discordService =
+        config?.webhookUrl
+          ? new DiscordService(config.webhookUrl, {
+              username: config.username || "Notion",
+              avatarUrl: config.avatarUrl || null,
+            })
+          : this.notionDiscordService;
+
+      if (!discordService.enabled) {
         return res.status(503).json({
           success: false,
-          error: "Discord is not configured. Set DISCORD_WEBHOOK_URL.",
+          error: "Discord is not configured. Set webhook in Event Notifications → Notion bridge, or NOTION_BRIDGE_WEBHOOK_URL / DISCORD_WEBHOOK_URL.",
         });
       }
 
-      const { title, description, color } = this.normalizeNotionPayload(req.body);
+      const bridgeConfig = config || this.notionBridgeConfig;
+      const { title, description, color } = this.normalizeNotionPayload(req.body, bridgeConfig);
 
-      const result = await this.discordService.sendCustomAlert({
+      const alertPayload = {
         title: String(title).slice(0, 256),
         message: description.slice(0, 4096),
         color: color.startsWith("#") ? color : `#${color}`,
-      });
+      };
+      if (config?.username) alertPayload.username = config.username;
+      if (config?.avatarUrl) alertPayload.avatar_url = config.avatarUrl;
+      if (config?.footer) alertPayload.footer = config.footer;
+      if (!config) {
+        if (process.env.NOTION_BRIDGE_USERNAME) alertPayload.username = process.env.NOTION_BRIDGE_USERNAME;
+        if (process.env.NOTION_BRIDGE_AVATAR_URL) alertPayload.avatar_url = process.env.NOTION_BRIDGE_AVATAR_URL;
+        if (process.env.NOTION_BRIDGE_FOOTER) alertPayload.footer = process.env.NOTION_BRIDGE_FOOTER;
+      }
+
+      const result = await discordService.sendCustomAlert(alertPayload);
 
       if (!result.success) {
         if (result.reason === "rate_limited") {
@@ -194,6 +261,12 @@ class EventBridgeRoutes {
    */
   async send(req, res) {
     try {
+      if (!(await getNotificationsEnabled())) {
+        return res.status(200).json({
+          success: true,
+          message: "Event accepted; notifications are currently disabled.",
+        });
+      }
       if (!this.discordService.enabled) {
         return res.status(503).json({
           success: false,

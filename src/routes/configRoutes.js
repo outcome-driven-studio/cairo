@@ -1,6 +1,7 @@
 const express = require("express");
 const { query } = require("../utils/db");
 const logger = require("../utils/logger");
+const { getNotificationsEnabled } = require("../utils/notificationsEnabled");
 const { DestinationService } = require("../services/destinationService");
 const SlackDestination = require("../destinations/slackDestination");
 const DiscordDestination = require("../destinations/discordDestination");
@@ -881,6 +882,160 @@ class ConfigRoutes {
     }
   }
 
+  /**
+   * Get global notifications enabled state. GET /api/config/notifications
+   */
+  async getNotifications(req, res) {
+    try {
+      const enabled = await getNotificationsEnabled();
+      res.json({ success: true, enabled });
+    } catch (error) {
+      logger.error("Failed to get notifications state:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * Update global notifications enabled state. PUT /api/config/notifications
+   */
+  async updateNotifications(req, res) {
+    try {
+      const enabled = req.body?.enabled !== false;
+      await query(
+        `INSERT INTO app_settings (key, value, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+        ["notifications_enabled", JSON.stringify({ enabled })]
+      );
+      res.json({ success: true, enabled });
+    } catch (error) {
+      logger.error("Failed to update notifications state:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * Get Notion bridge settings (for POST /api/bridge/notion). Merges DB with env defaults.
+   * GET /api/config/notion-bridge
+   */
+  async getNotionBridge(req, res) {
+    try {
+      const defaults = {
+        webhookUrl: process.env.NOTION_BRIDGE_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL || "",
+        username: process.env.NOTION_BRIDGE_USERNAME || process.env.DISCORD_USERNAME || "Notion",
+        avatarUrl: process.env.NOTION_BRIDGE_AVATAR_URL || process.env.DISCORD_AVATAR_URL || "",
+        footer: process.env.NOTION_BRIDGE_FOOTER || "Cairo · Notion",
+        titleKeys: process.env.NOTION_BRIDGE_TITLE_KEYS
+          ? process.env.NOTION_BRIDGE_TITLE_KEYS.split(",").map((s) => s.trim()).filter(Boolean)
+          : ["Task name", "Name", "Title", "title", "name"],
+        defaultColor: (process.env.NOTION_BRIDGE_DEFAULT_COLOR || "5B4FFF").replace(/^#/, ""),
+        includePageLink: process.env.NOTION_BRIDGE_INCLUDE_LINK !== "false",
+      };
+
+      let value = defaults;
+      try {
+        const result = await query(
+          "SELECT value FROM app_settings WHERE key = $1",
+          ["notion_bridge"]
+        );
+        const stored = result.rows[0]?.value;
+        if (stored && typeof stored === "object") {
+          value = { ...defaults, ...stored };
+        }
+      } catch (e) {
+        // app_settings table may not exist yet; use env defaults
+      }
+
+      // Ensure titleKeys is array and defaultColor has no leading #
+      if (!Array.isArray(value.titleKeys)) {
+        value.titleKeys =
+          typeof value.titleKeys === "string"
+            ? value.titleKeys.split(",").map((s) => s.trim()).filter(Boolean)
+            : defaults.titleKeys;
+      }
+      if (value.defaultColor && value.defaultColor.startsWith("#")) {
+        value.defaultColor = value.defaultColor.slice(1);
+      }
+
+      res.json({ success: true, config: value });
+    } catch (error) {
+      logger.error("Failed to get Notion bridge config:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * Update Notion bridge settings. Persisted to app_settings; used by POST /api/bridge/notion.
+   * PUT /api/config/notion-bridge
+   */
+  async updateNotionBridge(req, res) {
+    try {
+      const {
+        webhookUrl,
+        username,
+        avatarUrl,
+        footer,
+        titleKeys,
+        defaultColor,
+        includePageLink,
+      } = req.body || {};
+
+      const value = {};
+      if (webhookUrl !== undefined) value.webhookUrl = String(webhookUrl).trim();
+      if (username !== undefined) value.username = String(username).trim();
+      if (avatarUrl !== undefined) value.avatarUrl = String(avatarUrl).trim();
+      if (footer !== undefined) value.footer = String(footer).trim();
+      if (titleKeys !== undefined) {
+        value.titleKeys = Array.isArray(titleKeys)
+          ? titleKeys.map((s) => String(s).trim()).filter(Boolean)
+          : String(titleKeys)
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean);
+      }
+      if (defaultColor !== undefined) {
+        value.defaultColor = String(defaultColor).replace(/^#/, "").trim();
+      }
+      if (includePageLink !== undefined) value.includePageLink = !!includePageLink;
+
+      let existing = {};
+      try {
+        const result = await query(
+          "SELECT value FROM app_settings WHERE key = $1",
+          ["notion_bridge"]
+        );
+        existing = result.rows[0]?.value || {};
+      } catch (e) {
+        // Table may not exist; run migrations first. Will still try INSERT.
+      }
+      const merged =
+        typeof existing === "object" ? { ...existing, ...value } : value;
+
+      await query(
+        `INSERT INTO app_settings (key, value, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+        ["notion_bridge", JSON.stringify(merged)]
+      );
+
+      const config = { ...merged };
+      if (!Array.isArray(config.titleKeys)) {
+        config.titleKeys =
+          typeof config.titleKeys === "string"
+            ? config.titleKeys.split(",").map((s) => s.trim()).filter(Boolean)
+            : ["Task name", "Name", "Title", "title", "name"];
+      }
+      if (config.defaultColor && config.defaultColor.startsWith("#")) {
+        config.defaultColor = config.defaultColor.slice(1);
+      }
+
+      res.json({ success: true, config });
+    } catch (error) {
+      logger.error("Failed to update Notion bridge config:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
   // Helper methods
 
   getDestinationClass(type) {
@@ -928,6 +1083,14 @@ class ConfigRoutes {
 
     // Event names (for notification config)
     router.get('/event-names', this.getEventNames.bind(this));
+
+    // Notion bridge (UI-configurable; used by POST /api/bridge/notion)
+    router.get('/notion-bridge', this.getNotionBridge.bind(this));
+    router.put('/notion-bridge', this.updateNotionBridge.bind(this));
+
+    // Global notifications on/off switch
+    router.get('/notifications', this.getNotifications.bind(this));
+    router.put('/notifications', this.updateNotifications.bind(this));
 
     // Destination types
     router.get('/destination-types', this.getDestinationTypes.bind(this));

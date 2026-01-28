@@ -421,7 +421,7 @@ class DiscordService {
       }
 
       const payload = {
-        username: this.config.username,
+        username: alertData.username ?? this.config.username,
         embeds: [
           {
             title: alertData.title || "Alert",
@@ -431,14 +431,15 @@ class DiscordService {
               : 0x3498db,
             timestamp: new Date().toISOString(),
             footer: {
-              text: "Cairo CDP",
+              text: alertData.footer ?? "Cairo CDP",
             },
           },
         ],
       };
 
-      if (this.config.avatarUrl) {
-        payload.avatar_url = this.config.avatarUrl;
+      const avatarUrl = alertData.avatar_url ?? this.config.avatarUrl;
+      if (avatarUrl) {
+        payload.avatar_url = avatarUrl;
       }
 
       await axios.post(this.webhookUrl, payload, {
