@@ -13,6 +13,7 @@ import {
   Check,
   X,
   Sparkles,
+  PlusCircle,
 } from 'lucide-react';
 
 interface DestinationSettings {
@@ -416,9 +417,206 @@ function NotifierCard({
   );
 }
 
+function AddNotifierForm({
+  onCreate,
+  isCreating,
+  onCancel,
+}: {
+  onCreate: (payload: { name: string; type: 'slack' | 'discord'; settings: DestinationSettings }) => void;
+  isCreating: boolean;
+  onCancel: () => void;
+}) {
+  const [type, setType] = useState<'slack' | 'discord'>('discord');
+  const [name, setName] = useState('');
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [channel, setChannel] = useState('');
+  const [username, setUsername] = useState('');
+  const [iconEmoji, setIconEmoji] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [paymentThreshold, setPaymentThreshold] = useState<number>(100);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !webhookUrl.trim()) return;
+    const settings: DestinationSettings = {
+      webhookUrl: webhookUrl.trim(),
+      username: username.trim() || undefined,
+      alertEvents: [],
+      paymentThreshold: type === 'discord' ? paymentThreshold : undefined,
+    };
+    if (type === 'slack') {
+      settings.channel = channel.trim() || undefined;
+      settings.iconEmoji = iconEmoji.trim() || undefined;
+    } else {
+      settings.avatarUrl = avatarUrl.trim() || undefined;
+    }
+    onCreate({
+      name: name.trim(),
+      type,
+      settings,
+    });
+  };
+
+  const slackMeta = getTypeMeta('slack');
+  const discordMeta = getTypeMeta('discord');
+
+  return (
+    <div className="rounded-2xl backdrop-blur-xl bg-white/5 border border-white/10 overflow-hidden">
+      <div className="p-5 border-b border-white/10">
+        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <PlusCircle className="w-5 h-5 text-cyan-400" />
+          Add notifier
+        </h2>
+        <p className="text-sm text-gray-400 mt-1">
+          Add Slack or Discord to receive event notifications. You can configure which events to send after creating.
+        </p>
+      </div>
+      <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Type</label>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setType('slack')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${
+                type === 'slack'
+                  ? `bg-gradient-to-br ${slackMeta.gradient} border-transparent text-white`
+                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
+              }`}
+            >
+              <span className="text-xl">{slackMeta.icon}</span>
+              <span>Slack</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setType('discord')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${
+                type === 'discord'
+                  ? `bg-gradient-to-br ${discordMeta.gradient} border-transparent text-white`
+                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
+              }`}
+            >
+              <span className="text-xl">{discordMeta.icon}</span>
+              <span>Discord</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={type === 'slack' ? 'e.g. Team Slack' : 'e.g. Alerts Discord'}
+            className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white placeholder-gray-500 focus:border-cyan-400 focus:outline-none text-sm"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Webhook URL *</label>
+          <input
+            type="url"
+            value={webhookUrl}
+            onChange={(e) => setWebhookUrl(e.target.value)}
+            placeholder={type === 'slack' ? 'https://hooks.slack.com/...' : 'https://discord.com/api/webhooks/...'}
+            className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white placeholder-gray-500 focus:border-cyan-400 focus:outline-none text-sm"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Bot username (optional)</label>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Cairo CDP"
+            className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white placeholder-gray-500 focus:border-cyan-400 focus:outline-none text-sm"
+          />
+        </div>
+
+        {type === 'slack' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Default channel (optional)</label>
+              <input
+                type="text"
+                value={channel}
+                onChange={(e) => setChannel(e.target.value)}
+                placeholder="#events"
+                className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white placeholder-gray-500 focus:border-cyan-400 focus:outline-none text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Icon emoji (optional)</label>
+              <input
+                type="text"
+                value={iconEmoji}
+                onChange={(e) => setIconEmoji(e.target.value)}
+                placeholder=":rocket:"
+                className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white placeholder-gray-500 focus:border-cyan-400 focus:outline-none text-sm"
+              />
+            </div>
+          </>
+        )}
+
+        {type === 'discord' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Avatar URL (optional)</label>
+              <input
+                type="url"
+                value={avatarUrl}
+                onChange={(e) => setAvatarUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white placeholder-gray-500 focus:border-cyan-400 focus:outline-none text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Payment threshold (min amount to alert)</label>
+              <input
+                type="number"
+                min={0}
+                value={paymentThreshold}
+                onChange={(e) => setPaymentThreshold(Number(e.target.value) || 100)}
+                className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white focus:border-cyan-400 focus:outline-none text-sm"
+              />
+            </div>
+          </>
+        )}
+
+        <div className="flex gap-2 pt-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 rounded-lg bg-white/10 text-gray-300 hover:bg-white/15 transition-colors text-sm font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isCreating}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium hover:from-cyan-600 hover:to-blue-700 transition-all disabled:opacity-50 text-sm"
+          >
+            {isCreating ? 'Creating…' : (
+              <>
+                <Plus className="w-4 h-4" />
+                Add {type === 'slack' ? 'Slack' : 'Discord'}
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export default function EventNotifications() {
   const queryClient = useQueryClient();
   const [testResult, setTestResult] = useState<{ id: number; success: boolean; message?: string } | null>(null);
+  const [showAddNotifier, setShowAddNotifier] = useState(false);
 
   const { data: destinationsData } = useQuery<{ success: boolean; destinations: Destination[] }>({
     queryKey: ['destinations'],
@@ -442,6 +640,22 @@ export default function EventNotifications() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['destinations'] });
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (payload: { name: string; type: 'slack' | 'discord'; settings: DestinationSettings }) => {
+      const res = await axios.post('/api/config/destinations', {
+        name: payload.name,
+        type: payload.type,
+        settings: payload.settings,
+        enabled: true,
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['destinations'] });
+      setShowAddNotifier(false);
     },
   });
 
@@ -472,22 +686,50 @@ export default function EventNotifications() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-8">
       <div className="max-w-4xl mx-auto space-y-8">
-        <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-400 via-orange-400 to-rose-500 bg-clip-text text-transparent mb-2">
-            Event notifications
-          </h1>
-          <p className="text-gray-400">
-            Choose which events to push to each connection and customize the notifier and message.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-400 via-orange-400 to-rose-500 bg-clip-text text-transparent mb-2">
+              Event notifications
+            </h1>
+            <p className="text-gray-400">
+              Choose which events to push to each connection and customize the notifier and message.
+            </p>
+          </div>
+          {!showAddNotifier && (
+            <button
+              type="button"
+              onClick={() => setShowAddNotifier(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium hover:from-cyan-600 hover:to-blue-700 transition-all shrink-0"
+            >
+              <PlusCircle className="w-5 h-5" />
+              Add notifier
+            </button>
+          )}
         </div>
 
-        {notifiers.length === 0 ? (
+        {showAddNotifier && (
+          <AddNotifierForm
+            onCreate={(payload) => createMutation.mutate(payload)}
+            isCreating={createMutation.isPending}
+            onCancel={() => setShowAddNotifier(false)}
+          />
+        )}
+
+        {notifiers.length === 0 && !showAddNotifier ? (
           <div className="rounded-2xl backdrop-blur-xl bg-white/5 border border-white/10 p-12 text-center">
             <Bell className="w-16 h-16 text-gray-600 mx-auto mb-4 opacity-50" />
             <h2 className="text-xl font-bold text-gray-300 mb-2">No notifier connections</h2>
-            <p className="text-gray-500 max-w-md mx-auto">
-              Add a Slack or Discord destination in Connections first. Then you can configure which events to send and how they look here.
+            <p className="text-gray-500 max-w-md mx-auto mb-6">
+              Add Slack or Discord using the button above to start receiving event notifications.
             </p>
+            <button
+              type="button"
+              onClick={() => setShowAddNotifier(true)}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium hover:from-cyan-600 hover:to-blue-700 transition-all"
+            >
+              <PlusCircle className="w-5 h-5" />
+              Add Slack or Discord
+            </button>
           </div>
         ) : (
           <div className="space-y-6">
@@ -499,6 +741,12 @@ export default function EventNotifications() {
               >
                 {testResult.success ? <Check className="w-5 h-5" /> : <X className="w-5 h-5" />}
                 <span>{testResult.message}</span>
+              </div>
+            )}
+            {createMutation.isError && (
+              <div className="rounded-xl px-4 py-3 flex items-center gap-3 bg-red-500/20 text-red-400 border border-red-500/30">
+                <X className="w-5 h-5 shrink-0" />
+                <span>{(createMutation.error as Error)?.message || 'Failed to create notifier'}</span>
               </div>
             )}
             {notifiers.map((dest) => (
