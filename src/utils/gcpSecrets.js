@@ -76,15 +76,38 @@ async function loadSecrets() {
 
   const loaded = {};
 
-  // Load secrets in parallel
+  // Cloud Run injects secrets via --set-secrets; skip API calls when already set to avoid timeouts
+  const alreadySet = Object.keys(secrets).filter((envVar) => process.env[envVar]);
+  if (alreadySet.length > 0) {
+    alreadySet.forEach((envVar) => { loaded[envVar] = true; });
+    console.log('[GCP] Using secrets from environment (Cloud Run --set-secrets)');
+  }
+
+  const toFetch = Object.entries(secrets).filter(([envVar]) => !process.env[envVar]);
+  if (toFetch.length === 0) {
+    const loadedCount = Object.keys(loaded).length;
+    console.log(`[GCP] Loaded ${loadedCount} secrets from environment`);
+    return;
+  }
+
+  // Load missing secrets from Secret Manager (with timeout to avoid DEADLINE_EXCEEDED on cold start)
+  const fetchTimeoutMs = 15000;
   await Promise.all(
-    Object.entries(secrets).map(async ([envVar, secretName]) => {
-      const value = await loadSecret(secretName);
-      if (value) {
-        process.env[envVar] = value;
-        loaded[envVar] = true;
-      }
-    })
+    toFetch.map(([envVar, secretName]) =>
+      Promise.race([
+        loadSecret(secretName).then((value) => {
+          if (value) {
+            process.env[envVar] = value;
+            loaded[envVar] = true;
+          }
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), fetchTimeoutMs)
+        ),
+      ]).catch((err) => {
+        if (err.message !== 'timeout') console.warn(`Error loading secret ${secretName}:`, err.message);
+      })
+    )
   );
 
   // Construct database URL if we have the password
