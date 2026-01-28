@@ -1,0 +1,75 @@
+# CI/CD build: deploy on push/merge to main.
+# Uses same image build as cloudbuild.yaml but computes env/secrets inside the build
+# so no substitutions are needed from the trigger.
+
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/cairo-cdp:$BUILD_ID'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/cairo-cdp:latest'
+      - '.'
+
+  # Push the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/cairo-cdp:$BUILD_ID']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/cairo-cdp:latest']
+
+  # Compute env/secrets (same as deploy-gcp.sh) and deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        set -e
+        REGION="${_REGION:-us-central1}"
+        DB_INSTANCE_NAME="${_DB_INSTANCE_NAME:-cairo-db}"
+        SERVICE_NAME="cairo-cdp"
+
+        PROJECT_ID=$$(gcloud config get-value project 2>/dev/null)
+        PROJECT_NUMBER=$$(gcloud projects describe $$PROJECT_ID --format="value(projectNumber)" 2>/dev/null)
+        INSTANCE_CONNECTION_NAME=$$(gcloud sql instances describe $$DB_INSTANCE_NAME --format="value(connectionName)" 2>/dev/null) || true
+        if [ -z "$$INSTANCE_CONNECTION_NAME" ]; then
+          INSTANCE_CONNECTION_NAME="$$PROJECT_ID:$$REGION:$$DB_INSTANCE_NAME"
+        fi
+        SERVICE_URL=$$(gcloud run services describe $$SERVICE_NAME --region=$$REGION --format="value(status.url)" 2>/dev/null) || true
+
+        ENV_VARS="NODE_ENV=production,USE_PERIODIC_SYNC=false,GOOGLE_CLOUD_PROJECT=$$PROJECT_ID,GCP_REGION=$$REGION,INSTANCE_CONNECTION_NAME=$$INSTANCE_CONNECTION_NAME"
+        [ -n "$$SERVICE_URL" ] && ENV_VARS="$$ENV_VARS,BASE_URL=$$SERVICE_URL"
+
+        SECRETS="POSTGRES_URL=postgres-url:latest,DB_PASSWORD=db-password:latest,GEMINI_API_KEY=gemini-api-key:latest,APOLLO_API_KEY=apollo-api-key:latest,HUNTER_API_KEY=hunter-api-key:latest,LEMLIST_API_KEY=lemlist-api-key:latest,SMARTLEAD_API_KEY=smartlead-api-key:latest,ATTIO_API_KEY=attio-api-key:latest,MIXPANEL_PROJECT_TOKEN=mixpanel-token:latest,MIXPANEL_API_SECRET=mixpanel-api-secret:latest,SENTRY_DSN=sentry-dsn:latest,SLACK_WEBHOOK_URL=slack-webhook-url:latest,DISCORD_WEBHOOK_URL=discord-webhook-url:latest"
+
+        SERVICE_ACCOUNT="$$PROJECT_NUMBER-compute@developer.gserviceaccount.com"
+        echo "Deploying to Cloud Run ($$REGION)..."
+        gcloud run deploy $$SERVICE_NAME \
+          --image gcr.io/$$PROJECT_ID/cairo-cdp:latest \
+          --region $$REGION \
+          --platform managed \
+          --allow-unauthenticated \
+          --add-cloudsql-instances $$INSTANCE_CONNECTION_NAME \
+          --set-env-vars "$$ENV_VARS" \
+          --set-secrets "$$SECRETS" \
+          --memory 2Gi \
+          --cpu 2 \
+          --timeout 3600 \
+          --max-instances 10 \
+          --min-instances 0 \
+          --service-account $$SERVICE_ACCOUNT
+
+substitutions:
+  _REGION: us-central1
+  _DB_INSTANCE_NAME: cairo-db
+
+images:
+  - 'gcr.io/$PROJECT_ID/cairo-cdp:$BUILD_ID'
+  - 'gcr.io/$PROJECT_ID/cairo-cdp:latest'
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: '1200s'

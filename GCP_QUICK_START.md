@@ -157,6 +157,43 @@ gcloud sql connect cairo-db --user=cairo_app --database=cairo_db
 
 **Total**: ~$7-10/month for small deployments
 
+## CI/CD: Deploy on push or merge to main
+
+Each push or merge to `main` can deploy to Cloud Run automatically using `cloudbuild.ci.yaml` (no manual substitution variables needed).
+
+### 1. Connect your GitHub repo (one-time)
+
+1. Open [Cloud Build Triggers](https://console.cloud.google.com/cloud-build/triggers).
+2. Click **Connect repository** and choose **GitHub (Cloud Build GitHub App)** or **GitHub (Mirror)**.
+3. Authenticate and select the repository (e.g. `outcome-driven-studio/cairo` or your fork).
+
+### 2. Create the trigger
+
+**In the Console:**
+
+1. In Cloud Build → Triggers, click **Create trigger**.
+2. Name: e.g. `deploy-main`.
+3. Event: **Push to a branch**.
+4. Source: the repo you connected; Branch: `^main$`.
+5. Configuration: **Cloud Build configuration file (yaml or json)**; path: `cloudbuild.ci.yaml`.
+6. Click **Create**.
+
+**Or via gcloud** (after repo is connected):
+
+```bash
+# List repos to get REPO_NAME if needed
+gcloud builds repositories list
+
+# Create trigger (replace REPO_NAME with your connected repo resource name, e.g. github_OWNER_REPO)
+gcloud builds triggers create github \
+  --name="deploy-main" \
+  --repo-name="REPO_NAME" \
+  --branch-pattern="^main$" \
+  --build-config="cloudbuild.ci.yaml"
+```
+
+After this, every push or merge to `main` will build the image and deploy to Cloud Run with the same env and secrets as `./scripts/deploy-gcp.sh`. Manual deploys still work: run `./scripts/deploy-gcp.sh` (uses `cloudbuild.yaml`).
+
 ## Next Steps
 
 1. Set up custom domain
