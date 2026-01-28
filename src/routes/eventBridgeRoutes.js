@@ -44,6 +44,152 @@ class EventBridgeRoutes {
   }
 
   /**
+   * Convert a single Notion property value to a display string.
+   * Handles Notion API / automation payload shapes: title, rich_text, people, date, select, status, etc.
+   */
+  parseNotionPropertyValue(value) {
+    if (value === undefined || value === null) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    if (!Array.isArray(value) && typeof value === "object") {
+      // title / rich_text: array of { plain_text } or { text: { content } }
+      if (value.title && Array.isArray(value.title)) {
+        return value.title.map((t) => t.plain_text ?? t.text?.content ?? "").join("").trim() || "";
+      }
+      if (value.rich_text && Array.isArray(value.rich_text)) {
+        return value.rich_text.map((t) => t.plain_text ?? t.text?.content ?? "").join("").trim() || "";
+      }
+      // people
+      if (value.people && Array.isArray(value.people)) {
+        return value.people.map((p) => p.name ?? p.id ?? "").filter(Boolean).join(", ") || "";
+      }
+      // date
+      if (value.date) {
+        const d = value.date;
+        const start = d.start ?? "";
+        const end = d.end ? ` — ${d.end}` : "";
+        return start ? `${start}${end}` : "";
+      }
+      if (value.start != null && !value.people) return value.end ? `${value.start} — ${value.end}` : String(value.start);
+      // select / status
+      if (value.select && typeof value.select === "object") return value.select.name ?? "";
+      if (value.status && typeof value.status === "object") return value.status.name ?? "";
+      // multi_select
+      if (value.multi_select && Array.isArray(value.multi_select)) {
+        return value.multi_select.map((s) => s.name ?? "").filter(Boolean).join(", ") || "";
+      }
+      // created_by / last_edited_by (user object)
+      if (value.name && (value.object === "user" || value.type === "person" || value.type === "bot")) return value.name;
+      if (value.created_by && typeof value.created_by === "object") return this.parseNotionPropertyValue(value.created_by);
+      if (value.last_edited_by && typeof value.last_edited_by === "object") return this.parseNotionPropertyValue(value.last_edited_by);
+      // formula
+      if (value.formula && typeof value.formula === "object") {
+        const f = value.formula;
+        return String(f.string ?? f.number ?? f.boolean ?? f.date ?? "");
+      }
+      // checkbox, number, email, url, phone_number
+      if (typeof value.checkbox === "boolean") return value.checkbox ? "Yes" : "No";
+      if (typeof value.number === "number") return String(value.number);
+      if (value.email) return value.email;
+      if (value.url) return value.url;
+      if (value.phone_number) return value.phone_number;
+      // created_time / last_edited_time
+      if (value.created_time) return value.created_time;
+      if (value.last_edited_time) return value.last_edited_time;
+      // type wrapper (e.g. { type: "title", title: [...] })
+      if (value.type && value[value.type] !== undefined) return this.parseNotionPropertyValue(value[value.type]);
+    }
+    if (Array.isArray(value)) {
+      return value.map((v) => this.parseNotionPropertyValue(v)).filter(Boolean).join(", ") || "";
+    }
+    return "";
+  }
+
+  /**
+   * Normalize Notion webhook payload (flat or nested under properties) into title + description for Discord.
+   */
+  normalizeNotionPayload(body) {
+    const raw = body || {};
+    const props = raw.properties && typeof raw.properties === "object" ? raw.properties : raw;
+    const skip = new Set(["properties", "message", "eventType", "color", "id", "url"]);
+    const titleKeys = ["Task name", "Name", "Title", "title", "name"];
+    let title = "Notion update";
+    const lines = [];
+
+    for (const key of titleKeys) {
+      if (props[key] !== undefined) {
+        const t = this.parseNotionPropertyValue(props[key]);
+        if (t) {
+          title = t.slice(0, 256);
+          break;
+        }
+      }
+    }
+
+    for (const [key, value] of Object.entries(props)) {
+      if (skip.has(key) || value === undefined || value === null) continue;
+      const label = key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
+      const text = this.parseNotionPropertyValue(value);
+      if (text) lines.push(`**${label}:** ${text}`);
+    }
+
+    if (raw.url) lines.push(`**Link:** ${raw.url}`);
+    if (raw.id) lines.push(`**Page ID:** \`${raw.id}\``);
+
+    const description = lines.length ? lines.join("\n") : "No details";
+    const color = (typeof raw.color === "string" ? raw.color : "5B4FFF").replace(/^#/, "");
+    return { title, description, color };
+  }
+
+  /**
+   * POST /api/bridge/notion — Notion automation webhook: normalizes Notion payload and sends to Discord only.
+   * Use this URL in Notion’s “Send webhook” action; you can’t customize the payload there, so this endpoint
+   * understands Notion property shapes (title, rich_text, people, date, select, status, etc.).
+   */
+  async notion(req, res) {
+    try {
+      if (!this.discordService.enabled) {
+        return res.status(503).json({
+          success: false,
+          error: "Discord is not configured. Set DISCORD_WEBHOOK_URL.",
+        });
+      }
+
+      const { title, description, color } = this.normalizeNotionPayload(req.body);
+
+      const result = await this.discordService.sendCustomAlert({
+        title: String(title).slice(0, 256),
+        message: description.slice(0, 4096),
+        color: color.startsWith("#") ? color : `#${color}`,
+      });
+
+      if (!result.success) {
+        if (result.reason === "rate_limited") {
+          return res.status(429).json({
+            success: false,
+            error: "Rate limited. Try again shortly.",
+          });
+        }
+        return res.status(500).json({
+          success: false,
+          error: result.error || "Failed to send to Discord",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Notion event sent to Discord",
+      });
+    } catch (error) {
+      logger.error("[EventBridge] Notion handler error:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  /**
    * POST /api/bridge — send event through bridge (Discord only, not persisted)
    */
   async send(req, res) {
@@ -99,6 +245,7 @@ class EventBridgeRoutes {
   setupRoutes() {
     const router = express.Router();
     router.post("/", this.send.bind(this));
+    router.post("/notion", this.notion.bind(this));
     return router;
   }
 }

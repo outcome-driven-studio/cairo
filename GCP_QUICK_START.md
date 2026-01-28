@@ -88,6 +88,12 @@ Secrets are loaded from Secret Manager:
 - `SLACK_WEBHOOK_URL` → `slack-webhook-url` secret
 - `DISCORD_WEBHOOK_URL` → `discord-webhook-url` secret (for event bridge / Notion → Discord)
 
+**Discord webhook name and avatar** (for `/api/bridge` messages in Discord): set env vars so the bot name and picture are yours, not "Event Bridge":
+- `DISCORD_USERNAME` – e.g. `VibeTM HQ` or `Notion Tasks`
+- `DISCORD_AVATAR_URL` – direct URL to an image (e.g. your logo; must be a public image URL)
+Set via Cloud Run: `gcloud run services update cairo-cdp --region=us-central1 --set-env-vars "DISCORD_USERNAME=VibeTM HQ,DISCORD_AVATAR_URL=https://example.com/your-logo.png"`  
+Or when deploying: `DISCORD_USERNAME="VibeTM" DISCORD_AVATAR_URL="https://..." ./scripts/deploy-gcp.sh`
+
 **Add or update Discord webhook** (e.g. for `/api/bridge`):
 ```bash
 # If secret doesn't exist: create it

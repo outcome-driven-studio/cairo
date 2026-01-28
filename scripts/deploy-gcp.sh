@@ -70,6 +70,12 @@ ENV_VARS="NODE_ENV=production,USE_PERIODIC_SYNC=false,GOOGLE_CLOUD_PROJECT=$PROJ
 if [ -n "$SERVICE_URL" ]; then
     ENV_VARS="$ENV_VARS,BASE_URL=$SERVICE_URL"
 fi
+if [ -n "$DISCORD_USERNAME" ]; then
+    ENV_VARS="$ENV_VARS,DISCORD_USERNAME=$DISCORD_USERNAME"
+fi
+if [ -n "$DISCORD_AVATAR_URL" ]; then
+    ENV_VARS="$ENV_VARS,DISCORD_AVATAR_URL=$DISCORD_AVATAR_URL"
+fi
 
 # Build secrets string (POSTGRES_URL is the database connection string)
 SECRETS="POSTGRES_URL=postgres-url:latest,DB_PASSWORD=db-password:latest,GEMINI_API_KEY=gemini-api-key:latest,APOLLO_API_KEY=apollo-api-key:latest,HUNTER_API_KEY=hunter-api-key:latest,LEMLIST_API_KEY=lemlist-api-key:latest,SMARTLEAD_API_KEY=smartlead-api-key:latest,ATTIO_API_KEY=attio-api-key:latest,MIXPANEL_PROJECT_TOKEN=mixpanel-token:latest,MIXPANEL_API_SECRET=mixpanel-api-secret:latest,SENTRY_DSN=sentry-dsn:latest,SLACK_WEBHOOK_URL=slack-webhook-url:latest,DISCORD_WEBHOOK_URL=discord-webhook-url:latest"

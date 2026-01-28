@@ -376,11 +376,14 @@ curl -X PUT http://localhost:8080/api/namespaces/acme-corp \
 
 #### Webhooks
 
-| Endpoint               | Method | Description                                   |
-| ---------------------- | ------ | --------------------------------------------- |
-| `/webhook/lemlist`     | POST   | Receive Lemlist webhook events                |
-| `/webhook/smartlead`   | POST   | Receive Smartlead webhook events              |
-| `/api/bridge`          | POST   | Event bridge: forward to Discord only (not persisted) |
+| Endpoint               | Method | Description                                                   |
+| ---------------------- | ------ | ------------------------------------------------------------- |
+| `/webhook/lemlist`     | POST   | Receive Lemlist webhook events                                |
+| `/webhook/smartlead`   | POST   | Receive Smartlead webhook events                              |
+| `/api/bridge`          | POST   | Event bridge: forward to Discord only (not persisted)         |
+| `/api/bridge/notion`   | POST   | Notion automation webhook → Discord (parses Notion payloads)  |
+
+Notion setup and payload types: [Notion bridge guide](./docs/NOTION_BRIDGE.md).
 
 #### Testing & Debugging
 
