@@ -14,6 +14,7 @@ import {
   Sun,
   ChevronRight,
   ArrowRightLeft,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useTheme } from '@/hooks/useTheme';
@@ -21,6 +22,7 @@ import { useTheme } from '@/hooks/useTheme';
 const navigation = [
   { name: 'System Status', href: '/', icon: LayoutDashboard },
   { name: 'Connections', href: '/connections', icon: ArrowRightLeft },
+  { name: 'Event Notifications', href: '/notifications', icon: Bell },
   { name: 'Integrations', href: '/integrations', icon: Send },
   { name: 'Database', href: '/database', icon: Database },
   { name: 'Live Events', href: '/events', icon: Activity },
