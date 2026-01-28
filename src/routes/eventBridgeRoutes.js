@@ -173,6 +173,12 @@ class EventBridgeRoutes {
    */
   async notion(req, res) {
     try {
+      const isDebug =
+        req.query.debug === "1" || req.get("X-Notion-Debug") === "1";
+      if (process.env.LOG_LEVEL === "debug" && req.body) {
+        logger.debug("[EventBridge] Notion raw body:", JSON.stringify(req.body, null, 2));
+      }
+
       if (!(await getNotificationsEnabled())) {
         return res.status(200).json({
           success: true,
@@ -213,6 +219,16 @@ class EventBridgeRoutes {
 
       const bridgeConfig = config || this.notionBridgeConfig;
       const { title, description, color } = this.normalizeNotionPayload(req.body, bridgeConfig);
+
+      if (isDebug) {
+        return res.status(200).json({
+          success: true,
+          debug: true,
+          message: "Debug mode: no message sent to Discord.",
+          rawBody: req.body,
+          normalized: { title, description, color },
+        });
+      }
 
       const alertPayload = {
         title: String(title).slice(0, 256),

@@ -508,6 +508,9 @@ function NotionBridgeCard({
 
       {expanded && (
         <div className="px-5 pb-5 space-y-4 border-t border-white/10 pt-5">
+          <p className="text-xs text-gray-500 rounded-lg bg-black/20 px-3 py-2 border border-white/5">
+            <strong className="text-gray-400">Inspect payload:</strong> To see the exact data Notion sends, call your bridge URL with <code className="bg-white/10 px-1 rounded">?debug=1</code> (e.g. POST <code className="bg-white/10 px-1 rounded">/api/bridge/notion?debug=1</code>). The response returns <code className="bg-white/10 px-1 rounded">rawBody</code> and <code className="bg-white/10 px-1 rounded">normalized</code> (no message is sent to Discord). Or set <code className="bg-white/10 px-1 rounded">LOG_LEVEL=debug</code> and check server logs when Notion triggers the webhook.
+          </p>
           {discordDestinations.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Use webhook from Discord destination</label>
