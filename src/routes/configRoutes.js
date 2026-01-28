@@ -362,6 +362,121 @@ class ConfigRoutes {
   }
 
   /**
+   * Get a single destination by id
+   * GET /api/config/destinations/:id
+   */
+  async getDestination(req, res) {
+    try {
+      const { id } = req.params;
+
+      const result = await query(`
+        SELECT id, name, type, enabled, settings, created_at, updated_at
+        FROM destinations WHERE id = $1
+      `, [id]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: "Destination not found",
+        });
+      }
+
+      const row = result.rows[0];
+      const destination = {
+        ...row,
+        settings: typeof row.settings === "string" ? JSON.parse(row.settings) : row.settings,
+      };
+
+      res.json({
+        success: true,
+        destination,
+      });
+    } catch (error) {
+      logger.error("Failed to get destination:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Update a destination
+   * PUT /api/config/destinations/:id
+   */
+  async updateDestination(req, res) {
+    try {
+      const { id } = req.params;
+      const { name, enabled, settings } = req.body;
+
+      const updates = [];
+      const values = [];
+      let paramIndex = 1;
+
+      if (name !== undefined) {
+        updates.push(`name = $${paramIndex}`);
+        values.push(name);
+        paramIndex++;
+      }
+
+      if (enabled !== undefined) {
+        updates.push(`enabled = $${paramIndex}`);
+        values.push(enabled);
+        paramIndex++;
+      }
+
+      if (settings !== undefined) {
+        updates.push(`settings = $${paramIndex}`);
+        values.push(JSON.stringify(settings));
+        paramIndex++;
+      }
+
+      if (updates.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: "No fields to update",
+        });
+      }
+
+      updates.push(`updated_at = NOW()`);
+      values.push(id);
+
+      const result = await query(`
+        UPDATE destinations
+        SET ${updates.join(", ")}
+        WHERE id = $${paramIndex}
+        RETURNING *
+      `, values);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: "Destination not found",
+        });
+      }
+
+      const destination = {
+        ...result.rows[0],
+        settings:
+          typeof result.rows[0].settings === "string"
+            ? JSON.parse(result.rows[0].settings)
+            : result.rows[0].settings,
+      };
+
+      res.json({
+        success: true,
+        destination,
+      });
+    } catch (error) {
+      logger.error("Failed to update destination:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  /**
    * Test a destination
    * POST /api/config/destinations/:id/test
    */
@@ -405,6 +520,42 @@ class ConfigRoutes {
         error: error.message,
       });
     }
+  }
+
+  /**
+   * Get suggested event names for notification configuration
+   * GET /api/config/event-names
+   */
+  async getEventNames(req, res) {
+    const eventNames = [
+      "identify",
+      "page",
+      "group",
+      "Sign Up",
+      "Signup",
+      "Login",
+      "Purchase",
+      "Payment Completed",
+      "Subscription Created",
+      "Subscription Upgraded",
+      "Subscription Cancelled",
+      "Trial Started",
+      "Lead Created",
+      "Lead Qualified",
+      "Email Opened",
+      "Email Clicked",
+      "Campaign Started",
+      "Sync Completed",
+      "Error Occurred",
+      "User Action",
+      "Page Viewed",
+      "Feature Used",
+    ];
+
+    res.json({
+      success: true,
+      eventNames,
+    });
   }
 
   /**
@@ -770,8 +921,13 @@ class ConfigRoutes {
 
     // Destinations
     router.get('/destinations', this.getDestinations.bind(this));
+    router.get('/destinations/:id', this.getDestination.bind(this));
     router.post('/destinations', this.createDestination.bind(this));
+    router.put('/destinations/:id', this.updateDestination.bind(this));
     router.post('/destinations/:id/test', this.testDestination.bind(this));
+
+    // Event names (for notification config)
+    router.get('/event-names', this.getEventNames.bind(this));
 
     // Destination types
     router.get('/destination-types', this.getDestinationTypes.bind(this));

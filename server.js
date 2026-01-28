@@ -514,9 +514,11 @@ const EnvConfigRoutes = require("./src/routes/envConfigRoutes");
 const envConfigRoutes = new EnvConfigRoutes();
 app.use("/api/config", envConfigRoutes.setupRoutes());
 
-// Config routes for sources and destinations
+// Config routes for sources and destinations (both /api and /api/config for UI compatibility)
 const configRoutes = new ConfigRoutes();
-app.use("/api", configRoutes.setupRoutes());
+const configRouter = configRoutes.setupRoutes();
+app.use("/api", configRouter);
+app.use("/api/config", configRouter);
 
 // AI Query routes (natural language queries)
 const AIQueryRoutes = require("./src/routes/aiQueryRoutes");

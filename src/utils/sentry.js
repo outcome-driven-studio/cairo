@@ -1,6 +1,16 @@
 const Sentry = require("@sentry/node");
-const { ProfilingIntegration } = require("@sentry/profiling-node");
 const logger = require("./logger");
+
+// Profiling uses a native addon that may be missing on some Node/OS combinations
+let ProfilingIntegration = null;
+try {
+  ProfilingIntegration = require("@sentry/profiling-node").ProfilingIntegration;
+} catch (err) {
+  logger.warn(
+    "[Sentry] Profiling not loaded (native module missing for this Node/OS). Error tracking still enabled.",
+    err.message
+  );
+}
 
 /**
  * Initialize Sentry for error tracking and performance monitoring
@@ -16,18 +26,26 @@ function initSentry(app = null) {
   }
 
   try {
+    const integrations = [
+      // Automatically instrument Node.js libraries and frameworks
+      ...Sentry.autoDiscoverNodePerformanceMonitoringIntegrations(),
+    ];
+    if (ProfilingIntegration) {
+      integrations.push(new ProfilingIntegration());
+    }
+
     Sentry.init({
       dsn: process.env.SENTRY_DSN,
       environment: process.env.NODE_ENV || "production",
-      integrations: [
-        // Automatically instrument Node.js libraries and frameworks
-        ...Sentry.autoDiscoverNodePerformanceMonitoringIntegrations(),
-        new ProfilingIntegration(),
-      ],
+      integrations,
       // Performance Monitoring
       tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
-      // Set sampling rate for profiling
-      profilesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
+      // Set sampling rate for profiling (only used if ProfilingIntegration loaded)
+      profilesSampleRate: ProfilingIntegration
+        ? process.env.NODE_ENV === "production"
+          ? 0.1
+          : 1.0
+        : undefined,
       // Release tracking
       release: process.env.SENTRY_RELEASE || "cairo@1.0.0",
       // Server name
