@@ -85,6 +85,20 @@ Secrets are loaded from Secret Manager:
 - `ATTIO_API_KEY` → `attio-api-key` secret
 - `MIXPANEL_PROJECT_TOKEN` → `mixpanel-token` secret
 - `SENTRY_DSN` → `sentry-dsn` secret
+- `SLACK_WEBHOOK_URL` → `slack-webhook-url` secret
+- `DISCORD_WEBHOOK_URL` → `discord-webhook-url` secret (for event bridge / Notion → Discord)
+
+**Add or update Discord webhook** (e.g. for `/api/bridge`):
+```bash
+# If secret doesn't exist: create it
+echo -n "https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN" | \
+  gcloud secrets create discord-webhook-url --data-file=-
+# If it already exists: add a new version
+echo -n "https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN" | \
+  gcloud secrets versions add discord-webhook-url --data-file=-
+# Then redeploy so Cloud Run picks it up
+./scripts/deploy-gcp.sh
+```
 
 ## Architecture
 

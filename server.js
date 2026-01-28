@@ -469,6 +469,11 @@ let webSocketService = null;  // Will be initialized after server starts
 const productEventRoutes = new ProductEventRoutes();
 app.use("/api/events", productEventRoutes.setupRoutes());
 
+// Event bridge: forward events to Discord (and other destinations) without persisting
+const EventBridgeRoutes = require("./src/routes/eventBridgeRoutes");
+const eventBridgeRoutes = new EventBridgeRoutes();
+app.use("/api/bridge", eventBridgeRoutes.setupRoutes());
+
 // Periodic sync routes
 try {
   const periodicSyncRoutes = new PeriodicSyncRoutes();

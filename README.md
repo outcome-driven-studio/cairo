@@ -376,10 +376,11 @@ curl -X PUT http://localhost:8080/api/namespaces/acme-corp \
 
 #### Webhooks
 
-| Endpoint             | Method | Description                      |
-| -------------------- | ------ | -------------------------------- |
-| `/webhook/lemlist`   | POST   | Receive Lemlist webhook events   |
-| `/webhook/smartlead` | POST   | Receive Smartlead webhook events |
+| Endpoint               | Method | Description                                   |
+| ---------------------- | ------ | --------------------------------------------- |
+| `/webhook/lemlist`     | POST   | Receive Lemlist webhook events                |
+| `/webhook/smartlead`   | POST   | Receive Smartlead webhook events              |
+| `/api/bridge`          | POST   | Event bridge: forward to Discord only (not persisted) |
 
 #### Testing & Debugging
 

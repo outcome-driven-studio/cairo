@@ -711,10 +711,79 @@ gcloud run services update cairo-cdp \
 gcloud secrets get-iam-policy db-password
 ```
 
+## Custom subdomain
+
+You can serve the Cloud Run service on a custom subdomain (e.g. `api.yourdomain.com` or `cairo.yourdomain.com`). Two practical options:
+
+### Option A: Cloud Run domain mapping (simplest)
+
+Good for getting a subdomain live quickly. Supports **us-central1** (where Cairo is deployed). Google provisions and renews the HTTPS certificate. This feature is in **Preview**; for strict production use, prefer Option B.
+
+1. **Verify domain ownership** (once per base domain)
+
+   If the subdomain is `api.yourdomain.com`, verify `yourdomain.com`:
+
+   ```bash
+   gcloud domains verify yourdomain.com
+   ```
+
+   Complete verification in [Search Console](https://search.google.com/search-console) as prompted.
+
+2. **Create the domain mapping**
+
+   ```bash
+   export REGION=us-central1
+   gcloud beta run domain-mappings create \
+     --service=cairo-cdp \
+     --domain=api.yourdomain.com \
+     --region=$REGION
+   ```
+
+   Use your actual subdomain instead of `api.yourdomain.com`.
+
+3. **Get DNS records from GCP**
+
+   ```bash
+   gcloud beta run domain-mappings describe \
+     --domain=api.yourdomain.com \
+     --region=$REGION
+   ```
+
+   In the output, use the `resourceRecords` (A, AAAA, or CNAME) shown there.
+
+4. **Add DNS records at your registrar**
+
+   At your DNS provider (e.g. Cloud DNS, Namecheap, Google Domains), add each record from step 3. For a subdomain:
+
+   - **Name/host**: the subdomain part only (e.g. `api` for `api.yourdomain.com`), or the full subdomain if your registrar requires it.
+   - **Type and value**: exactly as in `resourceRecords`.
+
+   Wait for DNS to propagate (minutes to a few hours). Google will then issue the managed SSL certificate (often ~15 minutes, up to 24 hours).
+
+5. **Optional: custom audience for IAM**
+
+   If the service is **invoker-only** (IAM) and clients send an audience, you may need to [configure a custom audience](https://cloud.google.com/run/docs/configuring/custom-audiences) so the custom domain URL is accepted.
+
+### Option B: Application Load Balancer (recommended for production)
+
+For production, better control over TLS, CDN, and routing:
+
+- Follow [Set up a global external Application Load Balancer with Cloud Run](https://cloud.google.com/load-balancing/docs/https/setup-global-ext-https-serverless).
+- Create a global HTTPS load balancer, add a backend that points to your Cloud Run service (`cairo-cdp` in `us-central1`), then add a frontend with your custom subdomain and (optionally) a Google-managed or your own TLS cert.
+- In DNS, point the subdomain to the load balancer’s frontend IP (or CNAME if using a custom hostname).
+
+### Checklist
+
+- [ ] Domain verified (Option A) or load balancer created (Option B)
+- [ ] Domain mapping or LB frontend uses your subdomain
+- [ ] DNS records added and propagated
+- [ ] HTTPS works in a browser or `curl`
+- [ ] If using IAM invoker auth, custom audience set (Option A)
+
 ## Next Steps
 
-1. Set up custom domain
-2. Configure SSL certificates
+1. ~~Set up custom domain~~ (see [Custom subdomain](#custom-subdomain) above)
+2. Configure SSL certificates (handled by domain mapping or load balancer)
 3. Set up monitoring dashboards
 4. Configure backup policies for Cloud SQL
 5. Set up staging environment
