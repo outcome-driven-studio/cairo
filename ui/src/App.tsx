@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import System from './pages/System';
 import Integrations from './pages/Integrations';
@@ -18,6 +18,9 @@ function App() {
         <Route path="events" element={<LiveEvents />} />
         <Route path="connections" element={<Connections />} />
         <Route path="notifications" element={<EventNotifications />} />
+        {/* Legacy routes: sources/destinations live under Connections */}
+        <Route path="sources" element={<Navigate to="/connections" replace />} />
+        <Route path="destinations" element={<Navigate to="/connections" replace />} />
       </Route>
     </Routes>
   );

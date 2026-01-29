@@ -87,6 +87,7 @@ export default function LiveEvents() {
       return response.data;
     },
     refetchInterval: 5000, // Refresh every 5 seconds for "live" feel
+    retry: 1,
   });
 
   if (isLoading) {
@@ -106,9 +107,32 @@ export default function LiveEvents() {
     );
   }
 
-  // Show empty state on error instead of error message
   const events = data?.events || [];
-  const count = data?.count || 0;
+  const count = data?.count ?? 0;
+  const message = data?.message;
+
+  // Show error state when the API fails (e.g. backend down or wrong schema)
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="backdrop-blur-xl bg-amber-500/10 border border-amber-500/20 rounded-2xl p-8">
+            <h2 className="text-2xl font-bold text-amber-400 mb-2">Could not load live events</h2>
+            <p className="text-gray-400 mb-4">
+              The server may be unavailable or the event store is not set up yet. Events will appear here once tracking is enabled and data is flowing.
+            </p>
+            <p className="text-sm text-gray-500">
+              {axios.isAxiosError(error) && error.response?.data?.error
+                ? String(error.response.data.error)
+                : error instanceof Error
+                  ? error.message
+                  : 'Unknown error'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-8">
@@ -136,8 +160,8 @@ export default function LiveEvents() {
             <div>
               <p className="text-sm text-gray-400">Recent Events</p>
               <p className="text-3xl font-bold text-white mt-1">{count}</p>
-              {data?.message && (
-                <p className="text-xs text-yellow-400 mt-2">{data.message}</p>
+              {message && (
+                <p className="text-xs text-yellow-400 mt-2">{message}</p>
               )}
             </div>
             <Activity className="w-12 h-12 text-cyan-400 opacity-50" />

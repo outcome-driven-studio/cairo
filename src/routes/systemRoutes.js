@@ -121,6 +121,7 @@ router.get('/integrations', async (req, res) => {
       slack: {
         name: 'Slack',
         configured: !!process.env.SLACK_WEBHOOK_URL,
+        description: 'Notification and alerting',
       },
       discord: {
         name: 'Discord',
@@ -300,25 +301,39 @@ router.get('/events/recent', async (req, res) => {
       });
     }
 
-    // Get recent events from event_source table
-    const events = await query(`
+    // Get recent events from event_source table (columns: id, event_key, event_type, platform, user_id, metadata, created_at)
+    const eventsResult = await query(`
       SELECT 
         id,
         event_type,
         platform,
         user_id,
-        email,
         created_at,
-        meta
+        metadata
       FROM event_source
       ORDER BY created_at DESC
       LIMIT $1
     `, [limit]);
 
+    // Map to UI shape: add email from metadata if present, expose metadata as meta
+    const events = eventsResult.rows.map((row) => {
+      const meta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+      const email = meta.email ?? meta.properties?.email;
+      return {
+        id: row.id,
+        event_type: row.event_type,
+        platform: row.platform,
+        user_id: row.user_id,
+        email: email || undefined,
+        created_at: row.created_at,
+        meta,
+      };
+    });
+
     res.json({
       success: true,
-      count: events.rows.length,
-      events: events.rows
+      count: events.length,
+      events,
     });
   } catch (error) {
     logger.error('[System] Recent events failed:', error);
