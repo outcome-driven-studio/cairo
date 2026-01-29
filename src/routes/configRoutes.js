@@ -7,6 +7,8 @@ const SlackDestination = require("../destinations/slackDestination");
 const DiscordDestination = require("../destinations/discordDestination");
 const MixpanelDestination = require("../destinations/mixpanelDestination");
 const WebhookDestination = require("../destinations/webhookDestination");
+const ResendDestination = require("../destinations/resendDestination");
+const { ResendService } = require("../services/resendService");
 
 /**
  * Configuration Routes
@@ -60,6 +62,20 @@ class ConfigRoutes {
         this.destinationService.register(mixpanel);
       } catch (error) {
         logger.warn(`[ConfigRoutes] Skipping Mixpanel destination: ${error.message}`);
+      }
+    }
+
+    if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 'placeholder' && process.env.RESEND_FROM_EMAIL) {
+      try {
+        const resend = new ResendDestination({
+          apiKey: process.env.RESEND_API_KEY,
+          fromEmail: process.env.RESEND_FROM_EMAIL,
+          audienceId: process.env.RESEND_AUDIENCE_ID,
+          alertEvents: process.env.RESEND_ALERT_EVENTS?.split(',') || [],
+        });
+        this.destinationService.register(resend);
+      } catch (error) {
+        logger.warn(`[ConfigRoutes] Skipping Resend destination: ${error.message}`);
       }
     }
   }
@@ -560,6 +576,22 @@ class ConfigRoutes {
   }
 
   /**
+   * Get available source types
+   * GET /api/config/source-types
+   */
+  async getSourceTypes(req, res) {
+    const types = [
+      { type: 'javascript', name: 'JavaScript/Browser', description: 'Track website visitors via browser snippet', icon: '🌐', fields: [{ name: 'allowedDomains', type: 'text', required: false, label: 'Allowed Domains (comma-separated)' }] },
+      { type: 'nodejs', name: 'Node.js', description: 'Server-side tracking from Node.js applications', icon: '🟢', fields: [] },
+      { type: 'react', name: 'React/Next.js', description: 'Single-page and React applications', icon: '⚛️', fields: [] },
+      { type: 'mobile', name: 'Mobile App', description: 'iOS and Android applications', icon: '📱', fields: [] },
+      { type: 'server', name: 'Server-side', description: 'Backend and server-side tracking', icon: '🖥️', fields: [] },
+      { type: 'http', name: 'HTTP API', description: 'Events sent via HTTP API', icon: '🔌', fields: [] },
+    ];
+    res.json({ success: true, types });
+  }
+
+  /**
    * Get available destination types
    * GET /api/config/destination-types
    */
@@ -611,6 +643,18 @@ class ConfigRoutes {
           { name: 'signatureSecret', type: 'password', required: false, label: 'Signature Secret' },
           { name: 'timeout', type: 'number', required: false, label: 'Timeout (ms)' },
         ]
+      },
+      {
+        type: 'resend',
+        name: 'Resend',
+        description: 'Send emails and sync contacts with Resend',
+        icon: '📧',
+        fields: [
+          { name: 'apiKey', type: 'password', required: true, label: 'API Key' },
+          { name: 'fromEmail', type: 'text', required: true, label: 'From Email' },
+          { name: 'audienceId', type: 'text', required: false, label: 'Audience ID (optional)' },
+          { name: 'alertEvents', type: 'tags', required: false, label: 'Alert Events (comma-separated)' },
+        ]
       }
     ];
 
@@ -618,6 +662,41 @@ class ConfigRoutes {
       success: true,
       types,
     });
+  }
+
+  /**
+   * Get Resend contacts for a Resend destination
+   * GET /api/config/destinations/:id/resend/contacts
+   */
+  async getResendContacts(req, res) {
+    try {
+      const { id } = req.params;
+      const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+      const result = await query(`
+        SELECT id, name, type, settings FROM destinations WHERE id = $1
+      `, [id]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, error: "Destination not found" });
+      }
+      const row = result.rows[0];
+      if (row.type !== 'resend') {
+        return res.status(400).json({ success: false, error: "Destination is not a Resend destination" });
+      }
+      const settings = typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings || {};
+      const apiKey = settings.apiKey;
+      if (!apiKey) {
+        return res.status(400).json({ success: false, error: "Resend destination has no API key configured" });
+      }
+      const resendService = new ResendService(apiKey);
+      const listResult = await resendService.listContacts({ limit });
+      if (!listResult.success) {
+        return res.status(502).json({ success: false, error: listResult.error || "Failed to fetch contacts" });
+      }
+      res.json({ success: true, contacts: listResult.data, has_more: listResult.has_more });
+    } catch (error) {
+      logger.error("Failed to get Resend contacts:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
   }
 
   /**
@@ -1048,6 +1127,8 @@ class ConfigRoutes {
         return MixpanelDestination;
       case 'webhook':
         return WebhookDestination;
+      case 'resend':
+        return ResendDestination;
       default:
         return null;
     }
@@ -1076,6 +1157,7 @@ class ConfigRoutes {
 
     // Destinations
     router.get('/destinations', this.getDestinations.bind(this));
+    router.get('/destinations/:id/resend/contacts', this.getResendContacts.bind(this));
     router.get('/destinations/:id', this.getDestination.bind(this));
     router.post('/destinations', this.createDestination.bind(this));
     router.put('/destinations/:id', this.updateDestination.bind(this));
@@ -1091,6 +1173,9 @@ class ConfigRoutes {
     // Global notifications on/off switch
     router.get('/notifications', this.getNotifications.bind(this));
     router.put('/notifications', this.updateNotifications.bind(this));
+
+    // Source types
+    router.get('/source-types', this.getSourceTypes.bind(this));
 
     // Destination types
     router.get('/destination-types', this.getDestinationTypes.bind(this));

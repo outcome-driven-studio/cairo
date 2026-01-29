@@ -69,6 +69,20 @@ export default function Sources() {
     loadSources();
   }, []);
 
+  const mapApiSourceToSource = (row: Record<string, unknown>): Source => ({
+    id: String(row.id),
+    name: String(row.name),
+    type: (row.type as SourceType) || 'javascript',
+    writeKey: String(row.write_key ?? row.writeKey ?? ''),
+    status: row.enabled === false ? 'inactive' : 'active',
+    eventCount: Number(row.event_count ?? row.eventCount ?? 0),
+    createdAt: String(row.created_at ?? row.createdAt ?? new Date().toISOString()),
+    settings: {
+      enabled: row.enabled !== false,
+      ...(typeof row.settings === 'object' && row.settings !== null ? (row.settings as Source['settings']) : {}),
+    },
+  });
+
   const loadSources = async () => {
     try {
       const response = await fetch('/api/sources');
@@ -76,7 +90,8 @@ export default function Sources() {
         throw new Error('Failed to fetch sources');
       }
       const data = await response.json();
-      setSources(data.sources || []);
+      const list = (data.sources || []).map(mapApiSourceToSource);
+      setSources(list);
       setLoading(false);
     } catch (error) {
       console.error('Failed to load sources:', error);
@@ -85,37 +100,64 @@ export default function Sources() {
     }
   };
 
-  const handleAddSource = (source: Partial<Source>) => {
-    const newSource: Source = {
-      id: `src_${Date.now()}`,
-      name: source.name || 'New Source',
-      type: source.type || 'javascript',
-      writeKey: `wk_${source.type}_${Math.random().toString(36).substr(2, 9)}`,
-      status: 'inactive',
-      eventCount: 0,
-      createdAt: new Date().toISOString(),
-      settings: {
-        enabled: true,
-        ...source.settings
+  const [addError, setAddError] = useState<string | null>(null);
+
+  const handleAddSource = async (source: Partial<Source>) => {
+    setAddError(null);
+    try {
+      const response = await fetch('/api/config/sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: source.name || 'New Source',
+          type: source.type || 'javascript',
+          settings: { enabled: true, ...source.settings },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create source');
       }
-    };
-
-    setSources([...sources, newSource]);
-    setShowAddModal(false);
-  };
-
-  const handleDeleteSource = (id: string) => {
-    if (confirm('Are you sure you want to delete this source? This action cannot be undone.')) {
-      setSources(sources.filter(s => s.id !== id));
+      setShowAddModal(false);
+      await loadSources();
+    } catch (error) {
+      console.error('Failed to add source:', error);
+      setAddError(error instanceof Error ? error.message : 'Failed to create source');
     }
   };
 
-  const handleToggleSource = (id: string) => {
-    setSources(sources.map(s =>
-      s.id === id
-        ? { ...s, settings: { ...s.settings, enabled: !s.settings.enabled }, status: s.settings.enabled ? 'inactive' : 'active' }
-        : s
-    ));
+  const handleDeleteSource = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this source? This action cannot be undone.')) return;
+    try {
+      const response = await fetch(`/api/config/sources/${id}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to delete source');
+      }
+      await loadSources();
+    } catch (error) {
+      console.error('Failed to delete source:', error);
+    }
+  };
+
+  const handleToggleSource = async (id: string) => {
+    const source = sources.find(s => s.id === id);
+    if (!source) return;
+    const newEnabled = !source.settings.enabled;
+    try {
+      const response = await fetch(`/api/config/sources/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newEnabled }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to update source');
+      }
+      await loadSources();
+    } catch (error) {
+      console.error('Failed to toggle source:', error);
+    }
   };
 
   const copyToClipboard = (text: string) => {
@@ -294,7 +336,8 @@ export default function Sources() {
       {showAddModal && (
         <AddSourceModal
           onAdd={handleAddSource}
-          onClose={() => setShowAddModal(false)}
+          onClose={() => { setShowAddModal(false); setAddError(null); }}
+          error={addError}
         />
       )}
 
@@ -310,30 +353,41 @@ export default function Sources() {
 }
 
 // Add Source Modal Component
-function AddSourceModal({ onAdd, onClose }: {
-  onAdd: (source: Partial<Source>) => void;
+function AddSourceModal({ onAdd, onClose, error }: {
+  onAdd: (source: Partial<Source>) => void | Promise<void>;
   onClose: () => void;
+  error?: string | null;
 }) {
   const [name, setName] = useState('');
   const [type, setType] = useState<SourceType>('javascript');
   const [allowedDomains, setAllowedDomains] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAdd({
-      name,
-      type,
-      settings: {
-        allowedDomains: allowedDomains ? allowedDomains.split(',').map(d => d.trim()) : [],
-        enabled: true
-      }
-    });
+    setSubmitting(true);
+    try {
+      await onAdd({
+        name,
+        type,
+        settings: {
+          allowedDomains: allowedDomains ? allowedDomains.split(',').map(d => d.trim()) : [],
+          enabled: true
+        }
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-background rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-semibold mb-4">Add New Source</h2>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-red-500/10 text-red-500 text-sm">{error}</div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -377,11 +431,11 @@ function AddSourceModal({ onAdd, onClose }: {
           )}
 
           <div className="flex justify-end space-x-2 pt-4">
-            <button type="button" onClick={onClose} className="btn-outline">
+            <button type="button" onClick={onClose} className="btn-outline" disabled={submitting}>
               Cancel
             </button>
-            <button type="submit" className="btn-primary">
-              Create Source
+            <button type="submit" className="btn-primary" disabled={submitting}>
+              {submitting ? 'Creating...' : 'Create Source'}
             </button>
           </div>
         </form>
