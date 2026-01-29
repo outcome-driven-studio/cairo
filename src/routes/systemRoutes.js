@@ -82,54 +82,68 @@ router.get('/status', async (req, res) => {
 });
 
 /**
+ * True only if the env value is set and not a placeholder (e.g. from .env.example).
+ */
+function isEnvConfigured(value) {
+  if (value === undefined || value === null || typeof value !== 'string') return false;
+  const v = value.trim();
+  if (!v) return false;
+  if (v === 'placeholder') return false;
+  if (/^your_.*_here$/i.test(v)) return false;
+  if (/^https?:\/\/example\.com/i.test(v)) return false;
+  return true;
+}
+
+/**
  * GET /api/system/integrations
- * Check status of all configured integrations
+ * Check status of all configured integrations (ignores placeholder / example values).
  */
 router.get('/integrations', async (req, res) => {
   try {
     const integrations = {
       mixpanel: {
         name: 'Mixpanel',
-        configured: !!process.env.MIXPANEL_PROJECT_TOKEN,
+        configured: isEnvConfigured(process.env.MIXPANEL_PROJECT_TOKEN),
         description: 'Event tracking and analytics'
       },
       lemlist: {
         name: 'Lemlist',
-        configured: !!process.env.LEMLIST_API_KEY,
+        configured: isEnvConfigured(process.env.LEMLIST_API_KEY),
         description: 'Cold email outreach platform'
       },
       smartlead: {
         name: 'Smartlead',
-        configured: !!process.env.SMARTLEAD_API_KEY,
+        configured: isEnvConfigured(process.env.SMARTLEAD_API_KEY),
         description: 'Email outreach automation'
       },
       attio: {
         name: 'Attio',
-        configured: !!process.env.ATTIO_API_KEY,
+        configured: isEnvConfigured(process.env.ATTIO_API_KEY),
         description: 'CRM and relationship management'
       },
       apollo: {
         name: 'Apollo.io',
-        configured: !!process.env.APOLLO_API_KEY,
+        configured: isEnvConfigured(process.env.APOLLO_API_KEY),
         description: 'B2B data enrichment'
       },
       hunter: {
         name: 'Hunter.io',
-        configured: !!process.env.HUNTER_API_KEY,
+        configured: isEnvConfigured(process.env.HUNTER_API_KEY),
         description: 'Email finder and verification'
       },
       slack: {
         name: 'Slack',
-        configured: !!process.env.SLACK_WEBHOOK_URL,
+        configured: isEnvConfigured(process.env.SLACK_WEBHOOK_URL),
+        description: 'Notification and alerting',
       },
       discord: {
         name: 'Discord',
-        configured: !!process.env.DISCORD_WEBHOOK_URL,
+        configured: isEnvConfigured(process.env.DISCORD_WEBHOOK_URL),
         description: 'Notification and alerting'
       },
       sentry: {
         name: 'Sentry',
-        configured: !!process.env.SENTRY_DSN,
+        configured: isEnvConfigured(process.env.SENTRY_DSN),
         description: 'Error tracking and monitoring'
       }
     };
@@ -180,17 +194,17 @@ router.get('/integrations', async (req, res) => {
   } catch (error) {
     logger.error('[System] Integration check failed:', error);
     
-    // Return basic integration info even on error
+    // Return basic integration info even on error (same placeholder logic)
     const basicIntegrations = {
-      mixpanel: { name: 'Mixpanel', configured: !!process.env.MIXPANEL_PROJECT_TOKEN, status: 'unknown', description: 'Event tracking and analytics' },
-      lemlist: { name: 'Lemlist', configured: !!process.env.LEMLIST_API_KEY, status: 'unknown', description: 'Cold email outreach platform' },
-      smartlead: { name: 'Smartlead', configured: !!process.env.SMARTLEAD_API_KEY, status: 'unknown', description: 'Email outreach automation' },
-      attio: { name: 'Attio', configured: !!process.env.ATTIO_API_KEY, status: 'unknown', description: 'CRM and relationship management' },
-      apollo: { name: 'Apollo.io', configured: !!process.env.APOLLO_API_KEY, status: 'unknown', description: 'B2B data enrichment' },
-      hunter: { name: 'Hunter.io', configured: !!process.env.HUNTER_API_KEY, status: 'unknown', description: 'Email finder and verification' },
-      slack: { name: 'Slack', configured: !!process.env.SLACK_WEBHOOK_URL, status: 'unknown', description: 'Notification and alerting' },
-      discord: { name: 'Discord', configured: !!process.env.DISCORD_WEBHOOK_URL, status: 'unknown', description: 'Notification and alerting' },
-      sentry: { name: 'Sentry', configured: !!process.env.SENTRY_DSN, status: 'unknown', description: 'Error tracking and monitoring' }
+      mixpanel: { name: 'Mixpanel', configured: isEnvConfigured(process.env.MIXPANEL_PROJECT_TOKEN), status: 'unknown', description: 'Event tracking and analytics' },
+      lemlist: { name: 'Lemlist', configured: isEnvConfigured(process.env.LEMLIST_API_KEY), status: 'unknown', description: 'Cold email outreach platform' },
+      smartlead: { name: 'Smartlead', configured: isEnvConfigured(process.env.SMARTLEAD_API_KEY), status: 'unknown', description: 'Email outreach automation' },
+      attio: { name: 'Attio', configured: isEnvConfigured(process.env.ATTIO_API_KEY), status: 'unknown', description: 'CRM and relationship management' },
+      apollo: { name: 'Apollo.io', configured: isEnvConfigured(process.env.APOLLO_API_KEY), status: 'unknown', description: 'B2B data enrichment' },
+      hunter: { name: 'Hunter.io', configured: isEnvConfigured(process.env.HUNTER_API_KEY), status: 'unknown', description: 'Email finder and verification' },
+      slack: { name: 'Slack', configured: isEnvConfigured(process.env.SLACK_WEBHOOK_URL), status: 'unknown', description: 'Notification and alerting' },
+      discord: { name: 'Discord', configured: isEnvConfigured(process.env.DISCORD_WEBHOOK_URL), status: 'unknown', description: 'Notification and alerting' },
+      sentry: { name: 'Sentry', configured: isEnvConfigured(process.env.SENTRY_DSN), status: 'unknown', description: 'Error tracking and monitoring' }
     };
     
     const configured = Object.values(basicIntegrations).filter(i => i.configured).length;
@@ -300,25 +314,39 @@ router.get('/events/recent', async (req, res) => {
       });
     }
 
-    // Get recent events from event_source table
-    const events = await query(`
+    // Get recent events from event_source table (columns: id, event_key, event_type, platform, user_id, metadata, created_at)
+    const eventsResult = await query(`
       SELECT 
         id,
         event_type,
         platform,
         user_id,
-        email,
         created_at,
-        meta
+        metadata
       FROM event_source
       ORDER BY created_at DESC
       LIMIT $1
     `, [limit]);
 
+    // Map to UI shape: add email from metadata if present, expose metadata as meta
+    const events = eventsResult.rows.map((row) => {
+      const meta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+      const email = meta.email ?? meta.properties?.email;
+      return {
+        id: row.id,
+        event_type: row.event_type,
+        platform: row.platform,
+        user_id: row.user_id,
+        email: email || undefined,
+        created_at: row.created_at,
+        meta,
+      };
+    });
+
     res.json({
       success: true,
-      count: events.rows.length,
-      events: events.rows
+      count: events.length,
+      events,
     });
   } catch (error) {
     logger.error('[System] Recent events failed:', error);
