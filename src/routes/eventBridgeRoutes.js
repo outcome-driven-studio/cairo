@@ -225,15 +225,15 @@ class EventBridgeRoutes {
 
     // Resolve metadata from multiple possible payload locations (Notion sends different shapes)
     const data = raw.data && typeof raw.data === "object" ? raw.data : raw;
-    const body = raw.body && typeof raw.body === "object" ? raw.body : raw;
-    const entry = body.entry;
+    const payloadBody = raw.body && typeof raw.body === "object" ? raw.body : raw;
+    const entry = payloadBody.entry;
     const entryOne = Array.isArray(entry) ? entry?.[0] : entry;
     const entityId =
-      raw.entity?.id ?? data.entity?.id ?? body.entity?.id ?? entryOne?.id ?? raw.id ?? data.id ?? body.id;
-    const eventType = raw.type ?? data.type ?? body.type ?? entryOne?.type;
-    const timestamp = raw.timestamp ?? data.timestamp ?? body.timestamp ?? entryOne?.timestamp;
-    const workspaceName = raw.workspace_name ?? data.workspace_name ?? body.workspace_name;
-    const url = raw.url ?? data.url ?? body.url ?? entryOne?.url;
+      raw.entity?.id ?? data.entity?.id ?? payloadBody.entity?.id ?? entryOne?.id ?? raw.id ?? data.id ?? payloadBody.id;
+    const eventType = raw.type ?? data.type ?? payloadBody.type ?? entryOne?.type;
+    const timestamp = raw.timestamp ?? data.timestamp ?? payloadBody.timestamp ?? entryOne?.timestamp;
+    const workspaceName = raw.workspace_name ?? data.workspace_name ?? payloadBody.workspace_name;
+    const url = raw.url ?? data.url ?? payloadBody.url ?? entryOne?.url;
 
     if (includePageLink && url) lines.push(`**Link:** ${url}`);
     if (entityId) lines.push(`**Entry ID:** \`${entityId}\``);
