@@ -80,6 +80,17 @@ class EventBridgeRoutes {
       if (value.rich_text && Array.isArray(value.rich_text)) {
         return value.rich_text.map((t) => t.plain_text ?? t.text?.content ?? "").join("").trim() || "";
       }
+      // Some webhook payloads send a single content string or content array
+      if (value.content !== undefined) {
+        if (typeof value.content === "string") return value.content.trim() || "";
+        if (Array.isArray(value.content)) {
+          return value.content
+            .map((c) => (typeof c === "string" ? c : c?.plain_text ?? c?.text?.content ?? ""))
+            .filter(Boolean)
+            .join(" ")
+            .trim() || "";
+        }
+      }
       // people
       if (value.people && Array.isArray(value.people)) {
         return value.people.map((p) => p.name ?? p.id ?? "").filter(Boolean).join(", ") || "";
@@ -127,12 +138,66 @@ class EventBridgeRoutes {
   }
 
   /**
+   * Resolve the object that holds "properties" from various Notion payload shapes.
+   * Automation "Send webhook" and integration webhooks use different structures.
+   */
+  resolveNotionProps(raw) {
+    if (!raw || typeof raw !== "object") return {};
+    const findProps = (obj) => {
+      if (!obj || typeof obj !== "object") return null;
+      if (obj.properties && typeof obj.properties === "object") return obj.properties;
+      return null;
+    };
+    // Wrapper: body / event (e.g. some clients send { body: { ... } })
+    const body = raw.body && typeof raw.body === "object" ? raw.body : raw;
+    // Direct properties (API-style or flat)
+    if (body.properties && typeof body.properties === "object") return body.properties;
+    // Nested under entry (e.g. automation payload); entry can be array or single object
+    const entry = body.entry;
+    if (entry !== undefined && entry !== null) {
+      const single = Array.isArray(entry) ? entry[0] : entry;
+      if (single && typeof single === "object") {
+        if (single.properties && typeof single.properties === "object") return single.properties;
+        return single;
+      }
+    }
+    // content / payload wrapper
+    if (body.content && typeof body.content === "object") return body.content.properties || body.content;
+    if (body.payload && typeof body.payload === "object") return body.payload.properties || body.payload;
+    // data may hold event payload or selected properties
+    if (body.data && typeof body.data === "object") {
+      const fromData = findProps(body.data) || body.data;
+      if (typeof fromData === "object" && Object.keys(fromData).length > 0) return fromData;
+    }
+    // event (integration webhook style)
+    if (body.event && typeof body.event === "object") {
+      const fromEvent = findProps(body.event) || body.event;
+      if (typeof fromEvent === "object" && Object.keys(fromEvent).length > 0) return fromEvent;
+    }
+    // Top-level flat (selected properties at root when Send webhook sends property keys at top level)
+    const meta = new Set([
+      "type", "entity", "timestamp", "workspace_id", "workspace_name", "subscription_id",
+      "integration_id", "authors", "accessible_by", "attempt_number", "url", "message",
+      "eventType", "color", "automation_id", "action_id", "event_id", "created_time",
+      "last_edited_time", "created_by", "last_edited_by", "parent", "icon", "cover",
+      "body", "entry", "content", "payload", "data", "event",
+    ]);
+    const fromRaw = {};
+    for (const [k, v] of Object.entries(body)) {
+      if (meta.has(k) || v === undefined || v === null) continue;
+      fromRaw[k] = v;
+    }
+    if (Object.keys(fromRaw).length > 0) return fromRaw;
+    return body;
+  }
+
+  /**
    * Normalize Notion webhook payload (flat or nested under properties) into title + description for Discord.
-   * Uses optional override config (from DB or env); falls back to this.notionBridgeConfig.
+   * Supports automation "Send webhook" and integration-style payloads; uses fallback when no properties.
    */
   normalizeNotionPayload(body, overrideConfig = null) {
     const raw = body || {};
-    const props = raw.properties && typeof raw.properties === "object" ? raw.properties : raw;
+    const props = this.resolveNotionProps(raw);
     const skip = new Set(["properties", "message", "eventType", "color", "id", "url"]);
     const config = overrideConfig || this.notionBridgeConfig;
     const titleKeys = config.titleKeys || this.notionBridgeConfig.titleKeys;
@@ -158,10 +223,39 @@ class EventBridgeRoutes {
       if (text) lines.push(`**${label}:** ${text}`);
     }
 
-    if (includePageLink && raw.url) lines.push(`**Link:** ${raw.url}`);
-    if (raw.id) lines.push(`**Page ID:** \`${raw.id}\``);
+    // Resolve metadata from multiple possible payload locations (Notion sends different shapes)
+    const data = raw.data && typeof raw.data === "object" ? raw.data : raw;
+    const body = raw.body && typeof raw.body === "object" ? raw.body : raw;
+    const entry = body.entry;
+    const entryOne = Array.isArray(entry) ? entry?.[0] : entry;
+    const entityId =
+      raw.entity?.id ?? data.entity?.id ?? body.entity?.id ?? entryOne?.id ?? raw.id ?? data.id ?? body.id;
+    const eventType = raw.type ?? data.type ?? body.type ?? entryOne?.type;
+    const timestamp = raw.timestamp ?? data.timestamp ?? body.timestamp ?? entryOne?.timestamp;
+    const workspaceName = raw.workspace_name ?? data.workspace_name ?? body.workspace_name;
+    const url = raw.url ?? data.url ?? body.url ?? entryOne?.url;
 
-    const description = lines.length ? lines.join("\n") : "No details";
+    if (includePageLink && url) lines.push(`**Link:** ${url}`);
+    if (entityId) lines.push(`**Entry ID:** \`${entityId}\``);
+    if (eventType) lines.push(`**Event:** ${eventType}`);
+    if (timestamp) lines.push(`**Time:** ${timestamp}`);
+    if (workspaceName) lines.push(`**Workspace:** ${workspaceName}`);
+
+    // Never show "No details" when we have any metadata; fallback to generic message with payload hint
+    let description;
+    if (lines.length > 0) {
+      description = lines.join("\n");
+    } else {
+      const fallbackParts = [];
+      if (eventType) fallbackParts.push(`Event: ${eventType}`);
+      if (timestamp) fallbackParts.push(`Time: ${timestamp}`);
+      if (workspaceName) fallbackParts.push(`Workspace: ${workspaceName}`);
+      if (entityId) fallbackParts.push(`ID: ${entityId}`);
+      description =
+        fallbackParts.length > 0
+          ? fallbackParts.join(" · ")
+          : "Notion event received. (No properties or metadata could be extracted. Check webhook payload or use ?debug=1 to inspect.)";
+    }
     const color = (typeof raw.color === "string" ? raw.color : defaultColor).replace(/^#/, "");
     return { title, description, color };
   }
