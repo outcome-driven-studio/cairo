@@ -34,6 +34,8 @@ const DestinationSyncRoutes = require("./src/routes/destinationSyncRoutes");
 const DashboardRoutes = require("./src/routes/dashboardRoutes");
 const ConfigRoutes = require("./src/routes/configRoutes");
 const SystemRoutes = require("./src/routes/systemRoutes");
+const FullSyncRoutes = require("./src/routes/fullSyncRoutes");
+const fullSyncJobRoutes = require("./src/routes/fullSyncJobRoutes");
 
 // Create Express app
 const app = express();
@@ -500,6 +502,11 @@ app.use("/api/scoring", scoringRoutes.setupRoutes());
 const namespaceRoutes = new NamespaceRoutes();
 app.use("/api", namespaceRoutes.setupRoutes());
 
+// Full sync routes (bulk historical sync from Lemlist/Smartlead)
+const fullSyncRoutes = new FullSyncRoutes();
+app.use("/api/full-sync", fullSyncRoutes.setupRoutes());
+app.use("/api/full-sync", fullSyncJobRoutes);
+
 // Destination sync routes
 app.use("/api", DestinationSyncRoutes);
 
@@ -524,6 +531,52 @@ app.use("/api/config", configRouter);
 const AIQueryRoutes = require("./src/routes/aiQueryRoutes");
 const aiQueryRoutes = new AIQueryRoutes();
 app.use("/api/ai/query", aiQueryRoutes.getRouter());
+
+// === V2 CDP Routes ===
+
+// Identity Resolution
+const IdentityRoutes = require("./src/routes/identityRoutes");
+const identityRoutes = new IdentityRoutes();
+app.use("/api/v2/identities", identityRoutes.setupRoutes());
+
+// Transformations
+const TransformationRoutes = require("./src/routes/transformationRoutes");
+const transformationRoutes = new TransformationRoutes();
+app.use("/api/v2/transformations", transformationRoutes.setupRoutes());
+
+// Tracking Plans
+const TrackingPlanRoutes = require("./src/routes/trackingPlanRoutes");
+const trackingPlanRoutes = new TrackingPlanRoutes();
+app.use("/api/v2/tracking-plans", trackingPlanRoutes.setupRoutes());
+
+// GDPR Compliance (user deletion, suppression)
+const GDPRRoutes = require("./src/routes/gdprRoutes");
+const gdprRoutes = new GDPRRoutes();
+app.use("/api/v2", gdprRoutes.setupRoutes());
+
+// Destination Configuration (v2)
+const DestinationConfigRoutes = require("./src/routes/destinationConfigRoutes");
+const destinationConfigRoutes = new DestinationConfigRoutes();
+app.use("/api/v2/destinations", destinationConfigRoutes.setupRoutes());
+
+// Event Replay
+const EventReplayRoutes = require("./src/routes/eventReplayRoutes");
+const eventReplayRoutes = new EventReplayRoutes();
+app.use("/api/v2/replay", eventReplayRoutes.setupRoutes());
+
+// Agent Tools API (OpenAI-compatible)
+const AgentToolsRoutes = require("./src/routes/agentToolsRoutes");
+const agentToolsRoutes = new AgentToolsRoutes();
+app.use("/api/agent", agentToolsRoutes.setupRoutes());
+
+// Agent Context API
+try {
+  const AgentContextRoutes = require("./src/routes/agentContextRoutes");
+  const agentContextRoutes = new AgentContextRoutes();
+  app.use("/api/agent/context", agentContextRoutes.setupRoutes());
+} catch (e) {
+  logger.warn("Agent context routes not available:", e.message);
+}
 
 // Initialize cron jobs
 const PORT = process.env.PORT || 8080;

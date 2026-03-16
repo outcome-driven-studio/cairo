@@ -8,6 +8,13 @@ const SlackService = require("../services/slackService");
 const DiscordService = require("../services/discordService");
 const config = require("../config");
 
+// V2 CDP Pipeline Services
+const IdentityService = require("../services/identityService");
+const TransformationService = require("../services/transformationService");
+const TrackingPlanService = require("../services/trackingPlanService");
+const GDPRService = require("../services/gdprService");
+const EventReplayService = require("../services/eventReplayService");
+
 /**
  * SDK Routes - Handle events from Cairo SDKs
  * Compatible with Segment-like API structure
@@ -53,6 +60,13 @@ class SDKRoutes {
       process.env.DISCORD_WEBHOOK_URL,
       discordConfig
     );
+
+    // V2 CDP Pipeline Services
+    this.identityService = new IdentityService();
+    this.transformationService = new TransformationService();
+    this.trackingPlanService = new TrackingPlanService();
+    this.gdprService = new GDPRService();
+    this.eventReplayService = new EventReplayService();
 
     logger.info("SDK Routes initialized");
   }
@@ -283,13 +297,95 @@ class SDKRoutes {
   }
 
   /**
-   * Process a single message based on type
+   * Process a single message through the full CDP pipeline:
+   * 1. Suppression check
+   * 2. Store raw event (for replay)
+   * 3. Identity resolution
+   * 4. Tracking plan validation
+   * 5. Transformations
+   * 6. Route to type-specific handler
    */
   async processMessage(message, writeKey) {
     const { type, messageId, timestamp, context } = message;
+    const userId = message.userId || message.anonymousId || "anonymous";
+    const namespace = message.namespace || context?.namespace || "default";
 
     logger.debug(`[SDK] Processing ${type} message: ${messageId}`);
 
+    // 1. Suppression check - silently drop events for suppressed users
+    try {
+      const suppressed = await this.gdprService.isSuppressed(userId, namespace);
+      if (suppressed) {
+        logger.debug(`[SDK] Event dropped: user ${userId} is suppressed`);
+        return;
+      }
+    } catch (e) {
+      // Fail-open: if suppression check fails, process the event
+      logger.warn(`[SDK] Suppression check failed, proceeding:`, e.message);
+    }
+
+    // 2. Store raw event for replay capability
+    try {
+      this.eventReplayService.storeRawEvent(message, namespace, writeKey);
+    } catch (e) {
+      logger.warn(`[SDK] Raw event storage failed:`, e.message);
+    }
+
+    // 3. Identity resolution - link userId, anonymousId, email
+    try {
+      const identifiers = {
+        userId: message.userId,
+        anonymousId: message.anonymousId,
+        email: message.traits?.email || message.properties?.email,
+        namespace,
+      };
+      if (identifiers.userId || identifiers.anonymousId || identifiers.email) {
+        const resolution = await this.identityService.resolve(identifiers);
+        message._canonicalId = resolution.canonicalId;
+        if (resolution.merged) {
+          logger.info(`[SDK] Identity merged for ${userId}, canonical: ${resolution.canonicalId}`);
+        }
+      }
+    } catch (e) {
+      // Fail-open: identity resolution failure shouldn't block events
+      logger.warn(`[SDK] Identity resolution failed, proceeding:`, e.message);
+    }
+
+    // 4. Tracking plan validation (for track events)
+    if (type === "track" && message.event) {
+      try {
+        const validation = await this.trackingPlanService.validate(message, namespace);
+        if (!validation.valid) {
+          if (validation.action === "drop") {
+            logger.info(`[SDK] Event dropped by tracking plan: ${message.event} - ${validation.violations.map(v => v.message).join(", ")}`);
+            return;
+          }
+          if (validation.action === "warn") {
+            logger.warn(`[SDK] Tracking plan violation (warn): ${message.event} - ${validation.violations.map(v => v.message).join(", ")}`);
+          }
+          // 'allow' mode: log violation but continue
+        }
+      } catch (e) {
+        logger.warn(`[SDK] Tracking plan validation failed, proceeding:`, e.message);
+      }
+    }
+
+    // 5. Transformations - run user-defined transforms
+    try {
+      const transformed = await this.transformationService.transform(message, namespace);
+      if (transformed === null) {
+        logger.debug(`[SDK] Event dropped by transformation`);
+        return;
+      }
+      // Replace message properties with transformed values (keep type/identity fields)
+      if (transformed.properties) message.properties = transformed.properties;
+      if (transformed.traits) message.traits = transformed.traits;
+    } catch (e) {
+      // Fail-open: transformation failure uses original event
+      logger.warn(`[SDK] Transformation failed, using original:`, e.message);
+    }
+
+    // 6. Route to type-specific handler
     switch (type) {
       case "track":
         await this.processTrack(message, writeKey);
@@ -577,8 +673,13 @@ class SDKRoutes {
       ]
     );
 
-    // TODO: Implement user merging logic
-    // This would involve merging data from previousId user to userId user
+    // Merge identities via identity resolution
+    try {
+      await this.identityService.alias({ previousId, userId, namespace: "default" });
+      logger.info(`[SDK] Alias created: ${previousId} -> ${userId}`);
+    } catch (e) {
+      logger.error(`[SDK] Alias identity merge failed:`, e.message);
+    }
   }
 
   /**
@@ -611,6 +712,11 @@ class SDKRoutes {
           attio: !!this.attioService,
           slack: this.slackService?.enabled || false,
           database: true,
+          identityResolution: true,
+          transformations: true,
+          trackingPlans: true,
+          gdprCompliance: true,
+          eventReplay: true,
         },
       });
     });

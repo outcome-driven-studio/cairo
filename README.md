@@ -9,10 +9,28 @@
 
 ## 🚀 Overview
 
-Cairo CDP is an open-source Customer Data Platform that collects, processes, and routes customer data from any source to any destination. Transform your applications into a comprehensive data ecosystem with real-time event tracking, intelligent routing, and powerful analytics.
+**Cairo CDP** is an open-source **Customer Data Platform (CDP)** that collects, processes, and routes customer data from multiple sources to your CRM, analytics, and notifications. It started as a lead enrichment and scoring pipeline (Lemlist/Smartlead → Apollo/Hunter/AI → Attio) and has grown into a full data hub with product event tracking, multi-tenant namespaces, bulk sync, and a modern dashboard.
+
+**In short:** ingest leads and events from email campaigns and your product, enrich and score leads (with optional AI), sync to Attio and Mixpanel, and get Slack/Discord alerts—all with optional multi-tenant separation by client/campaign.
+
+### 📁 Codebase at a glance
+
+| Area | Location | Purpose |
+|------|----------|---------|
+| **Server** | `server.js` | Express app, env load, route mounting, cron/periodic sync bootstrap |
+| **API & services** | `src/routes/`, `src/services/` | REST endpoints and business logic (scoring, sync, events, AI, destinations) |
+| **Config & migrations** | `src/config/`, `src/migrations/`, `src/utils/` | Cron, full-sync config, DB migrations, db/logger/env/sentry |
+| **Destinations** | `src/destinations/` | Plugin-style integrations (Slack, Mixpanel, Webhook, Discord, Resend) |
+| **Sync pipelines** | `src/services/sync/`, `src/services/fullSyncService.js` | Lemlist/Smartlead sync, bulk full-sync with rate limiting |
+| **Dashboard UI** | `ui/` | React (Vite) SPA: System, Integrations, Database, Live Events, Connections, Notifications |
+| **SDKs** | `packages/node-sdk`, `packages/react-sdk`, `packages/browser-sdk` | TypeScript SDKs for Node, React, and browser (Segment-like API; build locally, not yet on npm) |
+| **Docs & examples** | `docs/`, `USER_GUIDE.md`, `SDK_QUICK_START.md`, `examples/` | Technical docs, user guide, SDK quick start, Next.js demo |
+
+**Stack:** Node.js (Express), PostgreSQL, React (UI), optional Sentry/Mixpanel/Attio/Apollo/Hunter/Gemini. Deploy via Railway, Docker, or GCP (see `GCP_DEPLOYMENT_GUIDE.md`).
 
 ## 📖 Documentation
 
+- **🔬 [Deep Dive](./DEEP_DIVE.md)** - Full technical deep dive: architecture, data model, services, and data flow
 - **👤 [User Guide](./USER_GUIDE.md)** - Complete guide for non-technical users
 - **⚡ [Quick Start](./SDK_QUICK_START.md)** - Get started with SDKs in 5 minutes
 - **🛣️ [Roadmap](./CAIRO_CDP_ROADMAP.md)** - Platform evolution and features
