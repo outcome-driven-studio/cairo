@@ -2,11 +2,7 @@ const express = require("express");
 const { query } = require("../utils/db");
 const logger = require("../utils/logger");
 const { getNotificationsEnabled } = require("../utils/notificationsEnabled");
-const MixpanelService = require("../services/mixpanelService");
-const AttioService = require("../services/attioService");
-const SlackService = require("../services/slackService");
-const DiscordService = require("../services/discordService");
-const config = require("../config");
+const { getServices } = require("../services/serviceFactory");
 
 // V2 CDP Pipeline Services
 const IdentityService = require("../services/identityService");
@@ -29,45 +25,11 @@ try {
  */
 class SDKRoutes {
   constructor() {
-    // Initialize services
-    this.mixpanelService = new MixpanelService(
-      process.env.MIXPANEL_PROJECT_TOKEN
-    );
-    this.attioService = config.attioApiKey
-      ? new AttioService(config.attioApiKey)
-      : null;
-
-    // Initialize Slack service
-    const slackConfig = {
-      defaultChannel: process.env.SLACK_DEFAULT_CHANNEL,
-      alertEvents: process.env.SLACK_ALERT_EVENTS
-        ? process.env.SLACK_ALERT_EVENTS.split(",").map((e) => e.trim())
-        : undefined,
-      paymentThreshold: process.env.SLACK_PAYMENT_THRESHOLD
-        ? parseFloat(process.env.SLACK_PAYMENT_THRESHOLD)
-        : undefined,
-    };
-    this.slackService = new SlackService(
-      process.env.SLACK_WEBHOOK_URL,
-      slackConfig
-    );
-
-    // Initialize Discord service
-    const discordConfig = {
-      defaultChannel: process.env.DISCORD_DEFAULT_CHANNEL,
-      alertEvents: process.env.DISCORD_ALERT_EVENTS
-        ? process.env.DISCORD_ALERT_EVENTS.split(",").map((e) => e.trim())
-        : undefined,
-      paymentThreshold: process.env.DISCORD_PAYMENT_THRESHOLD
-        ? parseFloat(process.env.DISCORD_PAYMENT_THRESHOLD)
-        : undefined,
-      username: process.env.DISCORD_USERNAME,
-      avatarUrl: process.env.DISCORD_AVATAR_URL,
-    };
-    this.discordService = new DiscordService(
-      process.env.DISCORD_WEBHOOK_URL,
-      discordConfig
-    );
+    const services = getServices();
+    this.mixpanelService = services.mixpanelService;
+    this.attioService = services.attioService;
+    this.slackService = services.slackService;
+    this.discordService = services.discordService;
 
     // V2 CDP Pipeline Services
     this.identityService = new IdentityService();
@@ -601,7 +563,7 @@ class SDKRoutes {
    * Process page event
    */
   async processPage(message, writeKey) {
-    const { userId, anonymousId, category, name, properties = {}, timestamp, context } = message;
+    const { category, name, properties = {} } = message;
 
     // Convert to track event
     const trackMessage = {
@@ -621,7 +583,7 @@ class SDKRoutes {
    * Process screen event
    */
   async processScreen(message, writeKey) {
-    const { userId, anonymousId, category, name, properties = {}, timestamp, context } = message;
+    const { category, name, properties = {} } = message;
 
     // Convert to track event
     const trackMessage = {
@@ -688,7 +650,7 @@ class SDKRoutes {
    * Process alias event
    */
   async processAlias(message, writeKey) {
-    const { userId, previousId, timestamp, context } = message;
+    const { userId, previousId, timestamp } = message;
 
     // Store alias mapping
     await query(

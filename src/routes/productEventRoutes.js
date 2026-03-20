@@ -2,11 +2,7 @@ const express = require("express");
 const { query } = require("../utils/db");
 const logger = require("../utils/logger");
 const { getNotificationsEnabled } = require("../utils/notificationsEnabled");
-const MixpanelService = require("../services/mixpanelService");
-const AttioService = require("../services/attioService");
-const SlackService = require("../services/slackService");
-const DiscordService = require("../services/discordService");
-const config = require("../config");
+const { getServices } = require("../services/serviceFactory");
 const EventTrackingService = require("../services/eventTrackingService");
 
 /**
@@ -16,51 +12,12 @@ const EventTrackingService = require("../services/eventTrackingService");
 class ProductEventRoutes {
   constructor(webSocketService = null) {
     this.webSocketService = webSocketService;
-    // Initialize services
-    this.mixpanelService = new MixpanelService(
-      process.env.MIXPANEL_PROJECT_TOKEN
-    );
-    this.attioService = config.attioApiKey
-      ? new AttioService(config.attioApiKey)
-      : null;
 
-    // Initialize Slack service with configuration
-    const slackConfig = {
-      defaultChannel: process.env.SLACK_DEFAULT_CHANNEL,
-      alertEvents: process.env.SLACK_ALERT_EVENTS
-        ? process.env.SLACK_ALERT_EVENTS.split(",").map((e) => e.trim())
-        : undefined,
-      paymentThreshold: process.env.SLACK_PAYMENT_THRESHOLD
-        ? parseFloat(process.env.SLACK_PAYMENT_THRESHOLD)
-        : undefined,
-      maxAlertsPerMinute: process.env.SLACK_MAX_ALERTS_PER_MINUTE
-        ? parseInt(process.env.SLACK_MAX_ALERTS_PER_MINUTE)
-        : undefined,
-    };
-    this.slackService = new SlackService(
-      process.env.SLACK_WEBHOOK_URL,
-      slackConfig
-    );
-
-    // Initialize Discord service with configuration
-    const discordConfig = {
-      defaultChannel: process.env.DISCORD_DEFAULT_CHANNEL,
-      alertEvents: process.env.DISCORD_ALERT_EVENTS
-        ? process.env.DISCORD_ALERT_EVENTS.split(",").map((e) => e.trim())
-        : undefined,
-      paymentThreshold: process.env.DISCORD_PAYMENT_THRESHOLD
-        ? parseFloat(process.env.DISCORD_PAYMENT_THRESHOLD)
-        : undefined,
-      maxAlertsPerMinute: process.env.DISCORD_MAX_ALERTS_PER_MINUTE
-        ? parseInt(process.env.DISCORD_MAX_ALERTS_PER_MINUTE)
-        : undefined,
-      username: process.env.DISCORD_USERNAME,
-      avatarUrl: process.env.DISCORD_AVATAR_URL,
-    };
-    this.discordService = new DiscordService(
-      process.env.DISCORD_WEBHOOK_URL,
-      discordConfig
-    );
+    const services = getServices();
+    this.mixpanelService = services.mixpanelService;
+    this.attioService = services.attioService;
+    this.slackService = services.slackService;
+    this.discordService = services.discordService;
 
     this.eventTracking = new EventTrackingService();
 
