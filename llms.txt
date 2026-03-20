@@ -1,0 +1,167 @@
+# Cairo
+
+Cairo is an open-source event tracking and customer data platform (CDP). It collects events from any app or AI agent, then routes them to analytics tools, databases, Slack, and 15+ other destinations.
+
+## Install
+
+```bash
+npm install @cairo/tracker
+```
+
+## Quick Start
+
+```typescript
+import { Cairo } from '@cairo/tracker';
+
+const cairo = Cairo.init({
+  writeKey: 'your-write-key',
+  host: 'https://your-cairo-instance.com',
+});
+
+// Track an event
+cairo.track({
+  event: 'signup',
+  userId: 'user_123',
+  properties: { plan: 'free', source: 'landing_page' },
+});
+
+// Identify a user
+cairo.identify({
+  userId: 'user_123',
+  traits: { name: 'Jane', email: 'jane@example.com', plan: 'free' },
+});
+
+// Track a page view
+cairo.page({ name: 'Dashboard', userId: 'user_123' });
+
+// Associate user with a group/org
+cairo.group({
+  groupId: 'org_456',
+  userId: 'user_123',
+  traits: { name: 'Acme Inc', plan: 'enterprise' },
+});
+
+// Link anonymous user to known user
+cairo.alias({ userId: 'user_123', previousId: 'anon_abc' });
+
+// Before process exits
+await cairo.shutdown();
+```
+
+## HTTP API (no SDK needed)
+
+All events go to `/v2/*`. Authenticate with `X-Write-Key` header.
+
+### POST /v2/track
+
+```json
+{
+  "event": "purchase",
+  "userId": "user_123",
+  "properties": { "amount": 29.99, "currency": "USD" },
+  "timestamp": "2026-03-20T10:00:00Z"
+}
+```
+
+### POST /v2/identify
+
+```json
+{
+  "userId": "user_123",
+  "traits": { "name": "Jane", "email": "jane@example.com" }
+}
+```
+
+### POST /v2/batch
+
+Send multiple events in one request:
+
+```json
+{
+  "batch": [
+    { "type": "track", "event": "page_viewed", "userId": "user_123", "properties": { "page": "/home" } },
+    { "type": "track", "event": "button_clicked", "userId": "user_123", "properties": { "button": "cta" } }
+  ]
+}
+```
+
+### POST /v2/page
+
+```json
+{ "name": "Pricing", "userId": "user_123" }
+```
+
+### POST /v2/group
+
+```json
+{ "groupId": "org_456", "userId": "user_123", "traits": { "name": "Acme" } }
+```
+
+### POST /v2/alias
+
+```json
+{ "userId": "user_123", "previousId": "anon_abc" }
+```
+
+## AI Agent Tracking
+
+For tracking AI agent behavior (LLM calls, tool usage, decisions), use `@cairo/agent-tracker`:
+
+```bash
+npm install @cairo/agent-tracker
+```
+
+```typescript
+import { AgentTracker } from '@cairo/agent-tracker';
+
+const tracker = AgentTracker.init({
+  writeKey: 'your-write-key',
+  host: 'https://your-cairo-instance.com',
+  agentId: 'my-agent',
+});
+
+tracker.generation({ model: 'gpt-4o', promptTokens: 500, completionTokens: 200, latencyMs: 1200 });
+tracker.toolCall({ tool: 'search', input: { q: 'hello' }, success: true, latencyMs: 300 });
+tracker.decision({ type: 'routing', options: ['a', 'b'], chosen: 'a', confidence: 0.9 });
+tracker.error({ type: 'timeout', message: 'API timed out', recoverable: true });
+
+await tracker.shutdown();
+```
+
+## Config Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| writeKey | (required) | Authentication key |
+| host | http://localhost:8080 | Cairo server URL |
+| flushAt | 20 | Events before auto-flush |
+| flushInterval | 5000 | Ms between flushes |
+| maxRetries | 3 | Retry attempts |
+| timeout | 10000 | Request timeout (ms) |
+| debug | false | Log to console |
+| enable | true | Set false to disable |
+
+## Self-hosting
+
+Cairo is a Node.js server backed by PostgreSQL:
+
+```bash
+git clone https://github.com/outcome-driven-studio/cairo.git
+cd cairo
+npm install
+# Set POSTGRES_URL in .env
+npm start
+```
+
+Server runs on port 8080 by default.
+
+## Key Features
+
+- Segment-compatible API (drop-in replacement)
+- Identity resolution (merge anonymous + known users)
+- Event transformations (rename, filter, enrich before delivery)
+- Tracking plans (schema validation for events)
+- 15+ destinations (Mixpanel, BigQuery, Slack, webhooks, etc.)
+- GDPR compliance (user deletion, suppression, audit log)
+- Event replay (backfill new destinations with historical data)
+- AI query (ask questions about your data in plain English)
