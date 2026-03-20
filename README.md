@@ -9,40 +9,99 @@
 
 # Cairo
 
-Open-source event pipeline for AI agents. Cairo collects events from LLM generations, tool calls, decisions, errors, and handoffs, then routes them to any destination: data warehouses, observability tools (Langfuse, LangSmith), Slack, Kafka, and more. Think Segment, but purpose-built for agent infrastructure.
+Open-source customer data platform. Track events from any app, resolve user identities, transform data on the fly, and route it all to 15+ destinations. Segment-compatible API, self-hosted, MIT licensed.
 
 ## Why Cairo
 
-- **Pipeline, not another dashboard.** Langfuse and LangSmith are observability UIs (destinations). Cairo is the collection and routing layer that sends data *to* them, and to everything else simultaneously. Same relationship as Segment to Mixpanel.
-- **Agent-native event model.** First-class support for generations, tool calls, decisions, errors, handoffs, and sessions. Not shoehorned into page views and button clicks.
-- **Framework agnostic.** Works with LangChain, OpenAI, Vercel AI SDK, or raw HTTP. Agents can self-report via MCP. No vendor lock-in.
-- **Full CDP pipeline included.** Identity resolution, transformations, tracking plans, GDPR compliance, and event replay ship out of the box. Not just a forwarder.
+- **Track anything.** Product events (signups, purchases), page views, AI agent behavior, backend events. One pipeline for all of it.
+- **Segment-compatible.** Drop-in replacement for Segment's tracking API. Existing Segment client libraries work out of the box.
+- **Full CDP pipeline.** Identity resolution, event transformations, tracking plans, GDPR compliance, and event replay ship out of the box.
+- **AI agent support.** First-class tracking for LLM generations, tool calls, decisions, and errors with dedicated agent SDK and MCP server.
+- **Self-hosted.** Your data stays on your infrastructure. Node.js + PostgreSQL.
 
 ## Quick Start
 
-### Install the SDK
+### Install
+
+```bash
+npm install @cairo/tracker
+```
+
+### Track Events
+
+```typescript
+import { Cairo } from '@cairo/tracker';
+
+const cairo = Cairo.init({
+  writeKey: 'your-write-key',
+  host: 'https://your-cairo-instance.com',
+});
+
+// Track product events
+cairo.track({
+  event: 'signup',
+  userId: 'user_123',
+  properties: { plan: 'free', source: 'landing_page' },
+});
+
+cairo.track({
+  event: 'story_generated',
+  userId: 'user_123',
+  properties: { theme: 'pirates', pages: 12, generationTimeMs: 3200 },
+});
+
+// Identify users
+cairo.identify({
+  userId: 'user_123',
+  traits: { name: 'Ava', email: 'ava@school.edu', grade: 5 },
+});
+
+// Track page views
+cairo.page({ name: 'Story Builder', userId: 'user_123' });
+
+// Associate user with a group
+cairo.group({
+  groupId: 'school_456',
+  userId: 'user_123',
+  traits: { name: 'Lincoln Elementary', plan: 'classroom' },
+});
+
+// Before process exits
+await cairo.shutdown();
+```
+
+### Use the HTTP API directly (no SDK)
+
+```bash
+curl -X POST https://your-cairo.com/v2/track \
+  -H "Content-Type: application/json" \
+  -H "X-Write-Key: your-write-key" \
+  -d '{
+    "event": "purchase",
+    "userId": "user_123",
+    "properties": { "amount": 29.99, "item": "premium_plan" }
+  }'
+```
+
+## AI Agent Tracking
+
+For tracking AI agent behavior, use the dedicated agent SDK:
 
 ```bash
 npm install @cairo/agent-tracker
 ```
 
-### Track Agent Events
-
 ```typescript
 import { AgentTracker } from '@cairo/agent-tracker';
 
 const tracker = AgentTracker.init({
-  writeKey: 'ak_...',
-  host: 'http://localhost:8080',
+  writeKey: 'your-write-key',
+  host: 'https://your-cairo-instance.com',
   agentId: 'support-agent',
-  flushAt: 50,
-  flushInterval: 5000,
 });
 
-// Start a session
 const session = tracker.session({ task: 'resolve-ticket-4521' });
 
-// Track an LLM generation
 tracker.generation({
   model: 'claude-sonnet-4-20250514',
   promptTokens: 1200,
@@ -51,60 +110,30 @@ tracker.generation({
   costUsd: 0.0047,
 });
 
-// Track a tool call
-tracker.toolCall({
-  tool: 'search_kb',
-  input: { query: 'refund policy' },
-  latencyMs: 450,
-  success: true,
-});
+tracker.toolCall({ tool: 'search_kb', input: { query: 'refund policy' }, success: true, latencyMs: 450 });
+tracker.decision({ type: 'routing', options: ['escalate', 'resolve'], chosen: 'resolve', confidence: 0.92 });
+tracker.error({ type: 'tool_timeout', message: 'KB search timed out', recoverable: true });
 
-// Track a decision
-tracker.decision({
-  type: 'routing',
-  options: ['escalate', 'resolve'],
-  chosen: 'resolve',
-  confidence: 0.92,
-});
-
-// Track an error
-tracker.error({
-  type: 'tool_timeout',
-  message: 'KB search timed out',
-  recoverable: true,
-});
-
-// End the session
 session.end({ exitReason: 'task_complete' });
-
-// Graceful shutdown
 await tracker.shutdown();
 ```
 
-### Use with MCP (for Claude, GPT, and other agents)
-
-Agents that support the Model Context Protocol can self-report events directly.
+### MCP Support (for Claude, GPT, and other agents)
 
 ```bash
-# Add to Claude Desktop or any MCP-compatible client
 claude mcp add cairo-agent -- npx @cairo/agent-mcp
 
-# Configure via environment
-export CAIRO_WRITE_KEY=ak_...
-export CAIRO_HOST=http://localhost:8080
+export CAIRO_WRITE_KEY=your-write-key
+export CAIRO_HOST=https://your-cairo-instance.com
 export CAIRO_AGENT_ID=my-agent
-npx @cairo/agent-mcp
 ```
 
-The MCP server exposes 6 tools: `track_generation`, `track_tool_call`, `track_decision`, `track_error`, `start_session`, `end_session`.
-
-### Use with LangChain / OpenAI / Vercel AI
+### Framework Middleware
 
 ```typescript
 // LangChain
 import { CairoCallbackHandler } from '@cairo/agent-tracker/middleware/langchain';
 const handler = new CairoCallbackHandler(tracker);
-const chain = new LLMChain({ llm, prompt, callbacks: [handler] });
 
 // OpenAI
 import { wrapOpenAI } from '@cairo/agent-tracker/middleware/openai';
@@ -112,21 +141,19 @@ const client = wrapOpenAI(new OpenAI(), tracker);
 
 // Vercel AI SDK
 import { trackVercelAI } from '@cairo/agent-tracker/middleware/vercel-ai';
-const result = await generateText({ model, prompt });
 trackVercelAI(tracker, result);
 ```
 
 ## Architecture
 
 ```
-                         +------------------+
-                         |   AI Agents      |
-                         | (LangChain,      |
-                         |  OpenAI, Claude, |
-                         |  custom)         |
-                         +--------+---------+
-                                  |
-                    SDK / MCP / HTTP API
+                      +-----------------------+
+                      |   Your App / Agents   |
+                      |                       |
+                      |  @cairo/tracker       |
+                      |  @cairo/agent-tracker |
+                      |  HTTP API             |
+                      +-----------+-----------+
                                   |
                          +--------v---------+
                          |   Cairo Server   |
@@ -141,103 +168,17 @@ trackVercelAI(tracker, result);
                  +----------------+----------------+
                  |                |                 |
           +------v------+  +-----v------+  +-------v-------+
-          | Warehouses  |  | Observ.    |  | Operational   |
-          | BigQuery    |  | Langfuse   |  | Slack         |
-          | Snowflake   |  | LangSmith  |  | Kafka         |
-          | S3          |  | PostHog    |  | Discord       |
-          | Elastic     |  | Mixpanel   |  | Webhooks      |
+          | Warehouses  |  | Analytics  |  | Operational   |
+          | BigQuery    |  | Mixpanel   |  | Slack         |
+          | Snowflake   |  | Amplitude  |  | Discord       |
+          | S3          |  | PostHog    |  | Webhooks      |
+          | Elastic     |  | Langfuse   |  | Kafka         |
           +-------------+  +------------+  +---------------+
-```
-
-## Event Taxonomy
-
-Cairo uses an `agent.*` event namespace for agent-specific tracking.
-
-| Event | Description | Key Properties |
-|-------|-------------|----------------|
-| `agent.session.start` | Agent session began | `session_id`, `agent_type`, `model`, `task` |
-| `agent.session.end` | Agent session completed | `session_id`, `duration_ms`, `total_tokens`, `total_cost_usd`, `exit_reason` |
-| `agent.generation` | LLM call completed | `model`, `prompt_tokens`, `completion_tokens`, `latency_ms`, `cost_usd` |
-| `agent.tool_call` | Tool/function invoked | `tool_name`, `input`, `output`, `success`, `latency_ms` |
-| `agent.decision` | Agent made a routing/logic decision | `decision_type`, `options`, `chosen`, `confidence` |
-| `agent.error` | Error occurred during execution | `error_type`, `error_message`, `recoverable` |
-| `agent.retrieval` | RAG or search performed | `source`, `query`, `num_results`, `latency_ms` |
-| `agent.handoff` | Agent handed off to another agent | `to_agent_id`, `reason`, `context_size` |
-| `agent.feedback` | Feedback on agent output | `score`, `source`, `criteria` |
-
-All events automatically include `agent_id`, `instance_id`, `session_id`, and `timestamp` in their context.
-
-## Agent Identity Model
-
-Cairo tracks agents across sessions and instances with a hierarchical identity model.
-
-| Identity | Scope | Description |
-|----------|-------|-------------|
-| `agentId` | Persistent | Developer-assigned identifier for an agent type (e.g. `support-agent-v3`) |
-| `instanceId` | Per-run | Auto-generated UUID for each AgentTracker instance |
-| `sessionId` | Per-task | Auto-generated UUID per `tracker.session()` call |
-| `namespace` | Tenant | Multi-tenant namespace for data segregation |
-
-The existing identity resolution service merges these into a canonical identity graph, the same way it handles user identities.
-
-## Server Setup
-
-### Prerequisites
-
-- Node.js >= 18
-- PostgreSQL >= 14
-
-### Clone and Install
-
-```bash
-git clone https://github.com/outcome-driven-studio/cairo.git
-cd cairo
-npm install
-```
-
-### Configure Environment
-
-```bash
-cp .env.example .env
-```
-
-The essential variables:
-
-```env
-DATABASE_URL=postgresql://user:password@localhost:5432/cairo
-PORT=8080
-NODE_ENV=development
-```
-
-See `.env.example` for the full list of configuration options including destination API keys, AI enrichment, and sync settings.
-
-### Run Migrations
-
-```bash
-npm run setup
-```
-
-### Start the Server
-
-```bash
-# Development (auto-reload)
-npm run dev
-
-# Production
-npm start
-```
-
-The API is available at `http://localhost:8080`. Verify with:
-
-```bash
-curl http://localhost:8080/health
 ```
 
 ## API Reference
 
 ### Event Ingestion (Segment-compatible)
-
-Cairo exposes a Segment-compatible API, so existing Segment client libraries work as drop-in replacements.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -246,6 +187,8 @@ Cairo exposes a Segment-compatible API, so existing Segment client libraries wor
 | `/v2/identify` | POST | Identify a user or agent |
 | `/v2/group` | POST | Associate user with a group |
 | `/v2/page` | POST | Track a page view |
+| `/v2/screen` | POST | Track a screen view (mobile) |
+| `/v2/alias` | POST | Link two user identities |
 
 ### Agent Tracking
 
@@ -254,12 +197,10 @@ Cairo exposes a Segment-compatible API, so existing Segment client libraries wor
 | `/v2/agent/session/start` | POST | Start a new agent session |
 | `/v2/agent/session/end` | POST | End an agent session |
 | `/v2/agent/sessions/:agentId` | GET | List sessions for an agent |
-| `/v2/agent/metrics/:agentId` | GET | Get aggregated agent metrics (cost, tokens, latency) |
+| `/v2/agent/metrics/:agentId` | GET | Get aggregated agent metrics |
 | `/v2/agent/compare` | GET | Compare metrics across agents |
 
 ### CDP Pipeline
-
-The full CDP pipeline is available for advanced use cases:
 
 | Capability | Endpoints |
 |------------|-----------|
@@ -274,8 +215,6 @@ See [docs/API_DOCUMENTATION.md](./docs/API_DOCUMENTATION.md) for the full API re
 
 ## Destinations
 
-Cairo ships with 21 destination connectors across four categories.
-
 | Category | Destinations |
 |----------|-------------|
 | **Analytics** | Mixpanel, Amplitude, PostHog, GA4 |
@@ -283,42 +222,47 @@ Cairo ships with 21 destination connectors across four categories.
 | **Data Warehouses** | BigQuery, Snowflake, S3, Elasticsearch, Kafka |
 | **Messaging & Ops** | Slack, Discord, Braze, CustomerIO, Intercom, SendGrid, Resend, Webhook |
 
-Destinations are plugin-based. Each connector lives in `src/destinations/` and implements a standard interface. Adding a new destination is a single file.
-
 ## SDKs and Packages
 
 | Package | Description |
 |---------|-------------|
-| `@cairo/agent-tracker` | Agent event tracking SDK. TypeScript, <20KB, zero heavy deps. Node 18+, Deno, Bun, Workers. |
-| `@cairo/agent-mcp` | MCP server for agent self-reporting. 6 tools for generations, tool calls, decisions, errors, sessions. |
-| `@cairo/node-sdk` | General-purpose Node.js SDK with Segment-compatible API. |
-| `@cairo/react` | React SDK with hooks and context providers. |
-| `@cairo/browser` | Browser SDK with auto page tracking and session management. |
+| [`@cairo/tracker`](./packages/tracker) | Universal event tracking SDK for product events. |
+| [`@cairo/agent-tracker`](./packages/agent-tracker) | Agent behavior tracking SDK with session management. |
+| [`@cairo/agent-mcp`](./packages/agent-mcp) | MCP server for agent self-reporting. |
 
-All packages live in the `packages/` directory. Build locally with `npm run build` from each package directory.
+## Server Setup
 
-## Deployment
+### Prerequisites
 
-### Docker
+- Node.js >= 18
+- PostgreSQL >= 14
+
+### Install and Run
 
 ```bash
+git clone https://github.com/outcome-driven-studio/cairo.git
+cd cairo
+npm install
+cp .env.example .env
+# Edit .env with your POSTGRES_URL
+npm start
+```
+
+Server runs on port 8080. Verify with `curl http://localhost:8080/health`.
+
+### Deployment
+
+```bash
+# Docker
 docker build -t cairo .
 docker run -p 8080:8080 --env-file .env cairo
-```
 
-### Railway
-
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template)
-
-### Manual
-
-```bash
+# PM2
 npm install -g pm2
 pm2 start server.js --name cairo
-pm2 save && pm2 startup
 ```
 
-See [docs/DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md) for detailed deployment instructions including GCP and production configuration.
+See [docs/DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md) for Railway, GCP, and production configuration.
 
 ## Project Structure
 
@@ -328,30 +272,19 @@ See [docs/DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md) for detailed deployme
 | `src/routes/` | API route handlers |
 | `src/services/` | Business logic and pipeline services |
 | `src/destinations/` | Destination connector plugins |
-| `src/config/` | Server and pipeline configuration |
 | `src/migrations/` | Database migration scripts |
-| `src/utils/` | Shared utilities (db, logger, env) |
+| `packages/tracker/` | Universal event tracking SDK |
 | `packages/agent-tracker/` | Agent tracking SDK |
 | `packages/agent-mcp/` | MCP server package |
-| `packages/node-sdk/` | Node.js SDK |
-| `packages/react-sdk/` | React SDK |
-| `packages/browser-sdk/` | Browser SDK |
-| `ui/` | React dashboard (Vite) |
 | `docs/` | Technical documentation |
-| `examples/` | Example integrations |
 
 ## Contributing
-
-Contributions are welcome. To get started:
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/my-feature`
 3. Make your changes and add tests
 4. Run `npm test` and `npm run lint`
-5. Commit and push to your fork
-6. Open a pull request
-
-Please follow existing code patterns and include tests for new features.
+5. Open a pull request
 
 ## License
 

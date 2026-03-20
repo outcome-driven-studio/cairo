@@ -24,7 +24,7 @@ let WebSocketService = null;
 try {
   WebSocketService = require("./src/services/websocketService");
 } catch (error) {
-  logger.warn("⚠️ WebSocket service not available (missing 'ws' dependency):", error.message);
+  logger.warn("WebSocket service not available (missing 'ws' dependency):", error.message);
 }
 const NewSyncRoutes = require("./src/routes/newSyncRoutes");
 const ScoringRoutes = require("./src/routes/scoringRoutes");
@@ -335,17 +335,17 @@ if (require("fs").existsSync(publicPath)) {
       }
     }
   }));
-  logger.info(`📁 Serving UI from ${publicPath}`);
+  logger.info(`Serving UI from ${publicPath}`);
 
   // Log available static files
   const fs = require("fs");
   const assetsPath = path.join(publicPath, "assets");
   if (fs.existsSync(assetsPath)) {
     const files = fs.readdirSync(assetsPath);
-    logger.info(`📄 Available assets: ${files.join(', ')}`);
+    logger.info(`Available assets: ${files.join(', ')}`);
   }
 } else {
-  logger.warn("⚠️ No UI build found. Run 'node build-ui.js' to build the UI.");
+  logger.warn("No UI build found. Run 'node build-ui.js' to build the UI.");
 }
 
 // Add body parser middleware
@@ -616,7 +616,7 @@ async function initializeDatabaseTables() {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    logger.info("✅ user_source table created/verified");
+    logger.info("user_source table created/verified");
 
     // Create event_source table
     await db.query(`
@@ -630,9 +630,9 @@ async function initializeDatabaseTables() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    logger.info("✅ event_source table created/verified");
+    logger.info("event_source table created/verified");
   } catch (error) {
-    logger.error("❌ Failed to initialize database tables:", error);
+    logger.error("Failed to initialize database tables:", error);
     throw error;
   }
 }
@@ -779,8 +779,8 @@ app.use((err, req, res, next) => {
 
 // Start the Express server
 const server = app.listen(PORT, "0.0.0.0", async () => {
-  console.log(`✅ Server listening on http://0.0.0.0:${PORT}`);
-  logger.info(`✅ Server listening on http://0.0.0.0:${PORT}`);
+  console.log(`Server listening on http://0.0.0.0:${PORT}`);
+  logger.info(`Server listening on http://0.0.0.0:${PORT}`);
 
   try {
     // Load GCP secrets if running on Cloud Run (before database connection)
@@ -800,11 +800,11 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
           Please ensure POSTGRES_URL or DATABASE_URL environment variable is set correctly.
           Expected format: postgresql://user:pass@host.neon.tech/db?sslmode=require`);
       }
-      logger.info("✅ Database connection healthy");
+      logger.info("Database connection healthy");
 
       // Initialize database tables
       await initializeDatabaseTables();
-      logger.info("✅ Database tables initialized");
+      logger.info("Database tables initialized");
 
       // Prepare Postgres sync_state table
       await syncState.init();
@@ -813,9 +813,9 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
       global.dedupStore = dedupStore;
       await dedupStore.init();
     } else {
-      logger.warn("⚠️ Database URL not set - running without database features");
-      logger.warn("⚠️ Please set POSTGRES_URL or DATABASE_URL in your environment");
-      logger.warn("⚠️ Some features will be disabled (event storage, user tracking, etc.)");
+      logger.warn("Database URL not set - running without database features");
+      logger.warn("Please set POSTGRES_URL or DATABASE_URL in your environment");
+      logger.warn("Some features will be disabled (event storage, user tracking, etc.)");
     }
 
     // Start monitoring health checks
@@ -827,22 +827,22 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
         webSocketService = new WebSocketService(server);
         // Pass WebSocket service to product event routes for real-time event streaming
         productEventRoutes.webSocketService = webSocketService;
-        logger.info("✅ WebSocket service initialized for real-time event streaming");
+        logger.info("WebSocket service initialized for real-time event streaming");
       } catch (error) {
-        logger.error("⚠️ Failed to initialize WebSocket service (continuing without real-time features):", error);
+        logger.error("Failed to initialize WebSocket service (continuing without real-time features):", error);
         // Continue without WebSocket - this is not critical for basic functionality
       }
     } else {
-      logger.warn("⚠️ WebSocket service unavailable - install 'ws' package for real-time features");
+      logger.warn("WebSocket service unavailable - install 'ws' package for real-time features");
     }
 
     // Sync configuration
     // Check for conflicting sync configurations
     if (process.env.USE_PERIODIC_SYNC === "true" && process.env.ENABLE_CRON_JOBS === "true") {
-      logger.warn("⚠️  WARNING: Both USE_PERIODIC_SYNC and ENABLE_CRON_JOBS are enabled!");
-      logger.warn("⚠️  This will cause duplicate sync operations and may overload your system.");
-      logger.warn("⚠️  Recommended: Set ENABLE_CRON_JOBS=false and use USE_PERIODIC_SYNC=true only.");
-      logger.warn("⚠️  Proceeding with Periodic Sync (legacy cron will be ignored)...");
+      logger.warn(" WARNING: Both USE_PERIODIC_SYNC and ENABLE_CRON_JOBS are enabled!");
+      logger.warn(" This will cause duplicate sync operations and may overload your system.");
+      logger.warn(" Recommended: Set ENABLE_CRON_JOBS=false and use USE_PERIODIC_SYNC=true only.");
+      logger.warn(" Proceeding with Periodic Sync (legacy cron will be ignored)...");
     }
 
     // Option 1: Use new periodic sync (recommended - every 4 hours)
@@ -874,9 +874,9 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     }
     // Option 2: Use legacy cron jobs (DEPRECATED - every 10-15 minutes)
     else if (process.env.ENABLE_CRON_JOBS === "true") {
-      logger.warn("⚠️  DEPRECATION WARNING: Legacy cron jobs (ENABLE_CRON_JOBS) are deprecated!");
-      logger.warn("⚠️  Please migrate to USE_PERIODIC_SYNC=true for better performance and control.");
-      logger.warn("⚠️  Legacy cron support will be removed in a future version.");
+      logger.warn(" DEPRECATION WARNING: Legacy cron jobs (ENABLE_CRON_JOBS) are deprecated!");
+      logger.warn(" Please migrate to USE_PERIODIC_SYNC=true for better performance and control.");
+      logger.warn(" Legacy cron support will be removed in a future version.");
       cronManager.start();
       logger.info("Legacy cron jobs started (10-15 minute intervals)");
     }
@@ -887,7 +887,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
       );
     }
 
-    console.log(`🎉 Server is ready! Available endpoints:`);
+    console.log(`Server is ready! Available endpoints:`);
     console.log(`  - GET  /health - Health check`);
     console.log(`  - GET  /health/detailed - Detailed health check`);
     console.log(`  - GET  /debug/test-integrations - Test all integrations`);
@@ -897,7 +897,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     // Show periodic sync endpoints if enabled
     if (process.env.USE_PERIODIC_SYNC === "true") {
       console.log(
-        `  \n⏰ Periodic Sync APIs (auto-sync every ${
+        `  \nPeriodic Sync APIs (auto-sync every ${
           process.env.SYNC_INTERVAL_HOURS || 4
         } hours):`
       );
@@ -907,7 +907,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     }
 
     console.log(
-      `  \n📌 Background Attio Sync APIs (runs even after request closes):`
+      `  \nBackground Attio Sync APIs (runs even after request closes):`
     );
     console.log(
       `  - POST /api/sync/users-background - Sync users to Attio in background`
@@ -923,7 +923,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
       `  - GET  /api/jobs/status/:jobName - Check specific job status`
     );
     console.log(`  - POST /api/jobs/stop/:jobName - Stop a running job`);
-    console.log(`  \n📌 Other endpoints:`);
+    console.log(`  \nOther endpoints:`);
     console.log(`  - GET  /initial-sync - Run initial sync`);
     console.log(`  - GET  /delta-sync - Run delta sync`);
     console.log(`  - GET  /sync-status - Check sync status`);
@@ -932,10 +932,10 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     console.log(`  - GET  /delta-sync?source=smartlead - Smartlead delta only`);
     console.log(`  - GET  /delta-sync?source=lemlist - Lemlist delta only`);
   } catch (error) {
-    logger.error("❌ FATAL: Failed to initialize application:", error);
+    logger.error("FATAL: Failed to initialize application:", error);
     await monitoring.captureError(error, { type: "startup" });
     console.error(`
-❌ APPLICATION STARTUP FAILED!
+APPLICATION STARTUP FAILED!
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Database connection is REQUIRED.
 Please check your environment variables:
@@ -988,4 +988,3 @@ async function gracefulShutdown() {
 }
 
 module.exports = app;
-// Force Railway redeploy - Sat Aug  9 00:03:38 IST 2025
