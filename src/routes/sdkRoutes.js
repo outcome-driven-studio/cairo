@@ -15,6 +15,14 @@ const TrackingPlanService = require("../services/trackingPlanService");
 const GDPRService = require("../services/gdprService");
 const EventReplayService = require("../services/eventReplayService");
 
+// Agent Tracking
+let AgentMetricsService;
+try {
+  AgentMetricsService = require("../services/agentMetricsService");
+} catch (e) {
+  // Agent metrics service not available
+}
+
 /**
  * SDK Routes - Handle events from Cairo SDKs
  * Compatible with Segment-like API structure
@@ -67,6 +75,9 @@ class SDKRoutes {
     this.trackingPlanService = new TrackingPlanService();
     this.gdprService = new GDPRService();
     this.eventReplayService = new EventReplayService();
+
+    // Agent Metrics (optional)
+    this.agentMetricsService = AgentMetricsService ? new AgentMetricsService() : null;
 
     logger.info("SDK Routes initialized");
   }
@@ -483,6 +494,36 @@ class SDKRoutes {
         properties,
         timestamp,
       });
+    }
+
+    // Agent session tracking - create/update agent_sessions table rows
+    if (this.agentMetricsService && event.startsWith("agent.session.")) {
+      try {
+        if (event === "agent.session.start") {
+          await this.agentMetricsService.upsertSession({
+            session_id: properties.session_id,
+            agent_id: context?.agent_id || userIdentifier,
+            instance_id: context?.instance_id,
+            agent_type: properties.agent_type,
+            model: properties.model,
+            task: properties.task,
+            config: properties.config,
+            namespace: message.namespace || context?.namespace || "default",
+          });
+        } else if (event === "agent.session.end") {
+          await this.agentMetricsService.endSession(properties.session_id, {
+            duration_ms: properties.duration_ms,
+            total_tokens: properties.total_tokens,
+            total_cost_usd: properties.total_cost_usd,
+            generation_count: properties.generation_count,
+            tool_call_count: properties.tool_call_count,
+            error_count: properties.error_count,
+            exit_reason: properties.exit_reason,
+          });
+        }
+      } catch (e) {
+        logger.warn("[SDK] Agent session tracking failed:", e.message);
+      }
     }
   }
 

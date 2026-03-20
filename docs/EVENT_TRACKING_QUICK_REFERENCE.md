@@ -1,195 +1,159 @@
-# Cairo Event Tracking - Quick Reference
+# Quick Start
 
-## 🚀 5-Minute Setup
+Track AI agent behavior in 5 minutes. Events flow through Cairo's pipeline and get routed to any configured destination (warehouses, analytics, Slack, Kafka, etc).
 
-### 1. Basic Event Tracking
+## Install
 
-```javascript
-// Track any event
-fetch("https://your-cairo.com/api/events/track", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    user_email: "user@example.com",
-    event: "button_clicked",
-    properties: { button: "signup" },
-  }),
+```bash
+npm install @cairo/agent-tracker
+```
+
+## Initialize
+
+```typescript
+import { AgentTracker } from '@cairo/agent-tracker';
+
+const tracker = AgentTracker.init({
+  writeKey: 'your-write-key',
+  host: 'https://your-cairo-instance.com',
+  agentId: 'my-agent',
 });
 ```
 
-### 2. Common Events
+## Track Events
 
-```javascript
-// Page view
-track("page_viewed", {
-  page: "/pricing",
-  referrer: document.referrer,
+```typescript
+// LLM generation
+tracker.generation({
+  model: 'claude-sonnet-4-20250514',
+  promptTokens: 1200,
+  completionTokens: 350,
+  latencyMs: 1830,
+  costUsd: 0.0042,
+  stopReason: 'end_turn',
 });
 
-// Feature usage
-track("feature_used", {
-  feature_name: "export_csv",
-  item_count: 150,
+// Tool call
+tracker.toolCall({
+  tool: 'web_search',
+  input: { query: 'latest earnings report' },
+  output: { results: 5 },
+  latencyMs: 420,
+  success: true,
 });
 
-// Sign up
-track("signup_completed", {
-  plan: "premium",
-  source: "organic",
+// Decision
+tracker.decision({
+  type: 'routing',
+  options: ['search', 'calculate', 'respond'],
+  chosen: 'search',
+  confidence: 0.92,
+  reasoning: 'User query requires external data',
+});
+
+// Error
+tracker.error({
+  type: 'tool_timeout',
+  message: 'web_search exceeded 5000ms timeout',
+  recoverable: true,
 });
 ```
 
-### 3. Identify User
+## Sessions
 
-```javascript
-fetch("https://your-cairo.com/api/events/identify", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    user_email: "user@example.com",
-    properties: {
-      name: "John Doe",
-      company: "Acme Corp",
-      plan: "premium",
-    },
-  }),
+Sessions group events and auto-accumulate tokens, cost, tool calls, and errors.
+
+```typescript
+const session = tracker.session({
+  task: 'Answer customer question about billing',
+  agentType: 'customer-support',
+  model: 'claude-sonnet-4-20250514',
 });
+
+// ... track events as usual, they accumulate into the session ...
+
+session.end({ exitReason: 'task_complete' });
 ```
 
-## 📊 API Endpoints
+On `session.end()`, Cairo emits a summary event with `total_tokens`, `total_cost_usd`, `generation_count`, `tool_call_count`, `error_count`, and `duration_ms`.
 
-| Endpoint               | Method | Purpose               |
-| ---------------------- | ------ | --------------------- |
-| `/api/events/track`    | POST   | Track single event    |
-| `/api/events/batch`    | POST   | Track multiple events |
-| `/api/events/identify` | POST   | Set user properties   |
-| `/api/events/stats`    | GET    | View statistics       |
-| `/api/events/health`   | GET    | Check service health  |
+## MCP (for Claude, GPT, and other MCP-capable agents)
 
-## 📝 Event Payload Format
+Add the Cairo MCP server so agents can self-report events over stdio.
 
 ```json
 {
-  "user_email": "required@email.com",
-  "event": "required_event_name",
-  "properties": {
-    "any": "optional",
-    "data": "you want"
-  },
-  "timestamp": "2024-01-01T00:00:00Z" // optional
+  "mcpServers": {
+    "cairo": {
+      "command": "npx",
+      "args": ["-y", "@cairo/agent-mcp"],
+      "env": {
+        "CAIRO_WRITE_KEY": "your-write-key",
+        "CAIRO_HOST": "https://your-cairo-instance.com",
+        "CAIRO_AGENT_ID": "my-mcp-agent"
+      }
+    }
+  }
 }
 ```
 
-## 🎯 Best Practices
+The MCP server exposes tools: `track_generation`, `track_tool_call`, `track_decision`, `track_error`, `start_session`, `end_session`.
 
-### Event Naming
+## Framework Middleware
 
-- Use snake_case: `button_clicked`, not `Button Clicked`
-- Be specific: `checkout_completed` not just `completed`
-- Action-oriented: `feature_used` not `feature`
-
-### Essential Properties
-
-```javascript
-{
-  page: window.location.pathname,      // Always include
-  referrer: document.referrer,         // For attribution
-  session_id: getSessionId(),          // For funnels
-  timestamp: new Date().toISOString()  // For accuracy
-}
-```
-
-### Don't Send
-
-- ❌ Passwords or tokens
-- ❌ Credit card numbers
-- ❌ Social security numbers
-- ❌ Any PII you don't need
-
-## 🔧 Next.js Quick Setup
+### LangChain
 
 ```typescript
-// lib/tracking.ts
-export async function track(event: string, properties?: any) {
-  const user = getCurrentUser();
-  if (!user?.email) return;
+import { CairoCallbackHandler } from '@cairo/agent-tracker/middleware/langchain';
 
-  await fetch(`${process.env.NEXT_PUBLIC_CAIRO_URL}/api/events/track`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      user_email: user.email,
-      event,
-      properties,
-    }),
-  });
-}
-
-// In your components
-import { track } from "@/lib/tracking";
-
-function MyButton() {
-  return (
-    <button onClick={() => track("button_clicked", { button: "cta" })}>
-      Click Me
-    </button>
-  );
-}
+const handler = new CairoCallbackHandler(tracker);
+const chain = new LLMChain({ llm, prompt, callbacks: [handler] });
 ```
 
-## 🐛 Troubleshooting
+### OpenAI
 
-| Issue                  | Check                                        |
-| ---------------------- | -------------------------------------------- |
-| Events not showing     | Verify `user_email` is valid                 |
-| Mixpanel not receiving | Check `MIXPANEL_PROJECT_TOKEN` env var       |
-| 400 errors             | Ensure `user_email` and `event` are provided |
-| CORS errors            | Cairo needs CORS configuration               |
+```typescript
+import { wrapOpenAI } from '@cairo/agent-tracker/middleware/openai';
+import OpenAI from 'openai';
 
-## 📈 What Happens to Your Events?
-
-```
-Your App → Cairo API → PostgreSQL (permanent storage)
-                    ↓
-                    → Mixpanel (analytics)
-                    → Attio (CRM enrichment)
-                    → Slack (alerts for important events)
+const openai = wrapOpenAI(new OpenAI(), tracker);
+// All chat.completions.create calls are now tracked automatically
 ```
 
-### 🔔 Slack Alerts
+### Vercel AI SDK
 
-Get notified instantly for ANY events you choose:
+```typescript
+import { createTrackedGenerateText } from '@cairo/agent-tracker/middleware/vercel-ai';
+import { generateText } from 'ai';
 
-```javascript
-// Simple configuration - just list events
-SLACK_ALERT_EVENTS=signup_completed,payment_succeeded,custom_event
-
-// Advanced configuration - full control per event
-SLACK_ALERT_EVENTS='{
-  "user_upgraded": {
-    "channel": "#revenue",
-    "threshold": 50,
-    "color": "#36a64f"
-  },
-  "error_occurred": {
-    "channel": "#alerts",
-    "color": "#dc3545",
-    "template": "⚠️ Error: {error_message} for {user_email}"
-  },
-  "custom_milestone": {
-    "properties": ["milestone", "value"],
-    "channel": "#achievements"
-  }
-}'
-
-// Track any event - alerts based on your config
-track("user_upgraded", { plan: "enterprise", amount: 299 });
-track("error_occurred", { error_message: "Payment failed" });
-track("custom_milestone", { milestone: "1000_api_calls", value: 1000 });
+const trackedGenerate = createTrackedGenerateText(tracker, generateText);
+const result = await trackedGenerate({ model, prompt });
 ```
 
-## 🔗 Useful Links
+## Server Setup (self-hosting)
 
-- [Full Documentation](./EVENT_TRACKING_GUIDE.md)
-- [API Reference](./API_DOCUMENTATION.md)
-- [Integration Examples](./EVENT_TRACKING_GUIDE.md#integration-examples)
+```bash
+git clone https://github.com/outcome-driven-studio/cairo.git
+cd cairo
+npm install
+npm run setup    # creates database tables
+npm start        # starts on port 8080
+```
+
+Set `DATABASE_URL` to your PostgreSQL connection string. See the [Deployment Guide](./DEPLOYMENT_GUIDE.md) for production configuration.
+
+## Graceful Shutdown
+
+Always flush pending events before your process exits:
+
+```typescript
+process.on('SIGTERM', async () => {
+  await tracker.shutdown();
+  process.exit(0);
+});
+```
+
+## What's Next
+
+- [SDK Integration Guide](./EVENT_TRACKING_GUIDE.md) -- full configuration reference, all event types, advanced features
+- [API Reference](./API_DOCUMENTATION.md) -- HTTP endpoints, agent session/metrics APIs, CDP pipeline

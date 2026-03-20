@@ -4,7 +4,7 @@ This guide shows practical examples of configuring Slack alerts for different us
 
 ## Basic Setup
 
-### 1. Simple Event List
+### Simple Event List
 
 Track only the events you care about:
 
@@ -13,7 +13,7 @@ Track only the events you care about:
 SLACK_ALERT_EVENTS=user_signed_up,payment_received,subscription_cancelled,feature_launched
 ```
 
-### 2. Different Channels per Event Type
+### Different Channels per Event Type
 
 Route different events to appropriate Slack channels:
 
@@ -238,7 +238,7 @@ process.env.SLACK_ALERT_EVENTS = JSON.stringify({
 
 ## Best Practices
 
-### 1. Use Meaningful Event Names
+### Use Meaningful Event Names
 
 ```javascript
 // Good - specific and actionable
@@ -250,7 +250,7 @@ track("user_action", { type: "upgrade" });
 track("event_occurred", { what: "rate_limit" });
 ```
 
-### 2. Include Relevant Context
+### Include Relevant Context
 
 ```javascript
 // Include context that helps understand the alert
@@ -262,7 +262,7 @@ track("payment_failed", {
 });
 ```
 
-### 3. Use Thresholds Wisely
+### Use Thresholds Wisely
 
 ```javascript
 {
@@ -276,7 +276,7 @@ track("payment_failed", {
 }
 ```
 
-### 4. Avoid Alert Fatigue
+### Avoid Alert Fatigue
 
 - Don't alert on every single event
 - Set appropriate thresholds

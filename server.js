@@ -564,6 +564,20 @@ const EventReplayRoutes = require("./src/routes/eventReplayRoutes");
 const eventReplayRoutes = new EventReplayRoutes();
 app.use("/api/v2/replay", eventReplayRoutes.setupRoutes());
 
+// SDK Routes (Segment-compatible event ingestion)
+const SDKRoutes = require("./src/routes/sdkRoutes");
+const sdkRoutes = new SDKRoutes();
+app.use("/api/v2", sdkRoutes.setupRoutes());
+
+// Agent Tracking Routes (agent session management + metrics)
+try {
+  const AgentTrackingRoutes = require("./src/routes/agentTrackingRoutes");
+  const agentTrackingRoutes = new AgentTrackingRoutes();
+  app.use("/api/v2/agent", agentTrackingRoutes.setupRoutes());
+} catch (e) {
+  logger.warn("Agent tracking routes not available:", e.message);
+}
+
 // Agent Tools API (OpenAI-compatible)
 const AgentToolsRoutes = require("./src/routes/agentToolsRoutes");
 const agentToolsRoutes = new AgentToolsRoutes();

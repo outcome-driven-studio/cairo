@@ -1,779 +1,391 @@
-# Cairo Event Tracking Guide
+# SDK Integration Guide
 
-> Complete guide for integrating product analytics with Cairo's event tracking system
+## Overview
 
-## Table of Contents
+`@cairo/agent-tracker` is a TypeScript SDK for tracking AI agent behavior. It collects structured events (LLM generations, tool calls, decisions, errors, handoffs) and sends them to a Cairo server, which processes them through an event pipeline and routes them to configured destinations.
 
-1. [Quick Start](#quick-start)
-2. [Core Concepts](#core-concepts)
-3. [API Reference](#api-reference)
-4. [Integration Examples](#integration-examples)
-5. [Slack Alerts](#slack-alerts)
-6. [Event Types & Best Practices](#event-types--best-practices)
-7. [Troubleshooting](#troubleshooting)
-8. [Migration from Segment](#migration-from-segment)
+The SDK uses native `fetch`, queue-based batching, and automatic session accumulation. It has zero runtime dependencies beyond `uuid`.
 
-## Quick Start
-
-Cairo provides a simple HTTP API for tracking user events from your product. Events are stored in PostgreSQL and automatically synced to Mixpanel and Attio CRM.
-
-### Basic Example
+## Installation
 
 ```bash
-curl -X POST https://your-cairo-instance.com/api/events/track \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_email": "user@example.com",
-    "event": "button_clicked",
-    "properties": {
-      "button_name": "signup",
-      "page": "/pricing",
-      "variant": "blue"
-    }
-  }'
+npm install @cairo/agent-tracker
 ```
 
-### JavaScript Example
+## Configuration
 
-```javascript
-async function trackEvent(event, properties) {
-  const response = await fetch(
-    "https://your-cairo-instance.com/api/events/track",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_email: getCurrentUserEmail(),
-        event: event,
-        properties: properties,
-        timestamp: new Date().toISOString(),
-      }),
-    }
-  );
+```typescript
+import { AgentTracker } from '@cairo/agent-tracker';
 
-  return response.json();
-}
-
-// Usage
-trackEvent("page_viewed", {
-  page: "/dashboard",
-  referrer: document.referrer,
+const tracker = AgentTracker.init({
+  writeKey: 'your-write-key',
+  host: 'https://your-cairo-instance.com',
+  agentId: 'my-agent',
 });
 ```
+
+Full configuration reference:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `writeKey` | `string` | (required) | Authentication key for the Cairo server |
+| `host` | `string` | `http://localhost:8080` | Cairo server URL |
+| `agentId` | `string` | (required) | Persistent identifier for this agent |
+| `flushAt` | `number` | `50` | Flush the queue when it reaches this size |
+| `flushInterval` | `number` | `5000` | Flush the queue on this interval (ms) |
+| `maxRetries` | `number` | `3` | Max retry attempts for failed requests |
+| `timeout` | `number` | `10000` | HTTP request timeout (ms) |
+| `sampleRate` | `number` | `1.0` | Fraction of events to send (0.0-1.0). Session events and errors always send. |
+| `redactInputs` | `boolean` | `false` | Hash tool inputs/outputs and redact retrieval queries |
+| `maxPropertySize` | `number` | `4096` | Truncate property values exceeding this length (bytes) |
+| `debug` | `boolean` | `false` | Log internal operations to console |
+| `enable` | `boolean` | `true` | Master switch. Set to `false` to disable all tracking. |
 
 ## Core Concepts
 
 ### Events
 
-Events represent actions users take in your product. Each event has:
+All events are sent as `track` calls with structured event names. The SDK provides typed methods for each event type, and internally serializes them as Segment-compatible `track` messages sent to `POST /v2/batch`.
 
-- **user_email** (required): Unique identifier for the user
-- **event** (required): Name of the event (e.g., "signup_completed")
-- **properties** (optional): Additional context about the event
-- **timestamp** (optional): When the event occurred (defaults to now)
+Event names follow the `agent.*` namespace:
 
-### Event Flow
+- `agent.generation`
+- `agent.tool_call`
+- `agent.decision`
+- `agent.error`
+- `agent.retrieval`
+- `agent.handoff`
+- `agent.feedback`
+- `agent.session.start`
+- `agent.session.end`
 
-```
-Your App → Cairo API → PostgreSQL
-                    ↓
-                    → Mixpanel (Analytics)
-                    → Attio (CRM)
-                    → Slack (Alerts for important events)
-```
+### Sessions
 
-### Data Storage
+A session groups related events for a single agent task. When you call `tracker.session()`, the SDK:
 
-- Events are stored in the `event_source` table
-- Users are automatically created in `playmaker_user_source`
-- Events are deduplicated using unique event keys
-- All data is retained for historical analysis
+1. Generates a `sessionId` and attaches it to all subsequent events.
+2. Accumulates totals (tokens, cost, tool calls, errors) from `generation()`, `toolCall()`, and `error()` calls.
+3. On `session.end()`, emits an `agent.session.end` event with the accumulated summary.
 
-## API Reference
+### Identity
 
-### Track Single Event
+Cairo uses a three-level identity model:
 
-**Endpoint:** `POST /api/events/track`
+- **agentId** -- persistent identifier for the agent (set in config, sent as `userId`)
+- **instanceId** -- auto-generated UUID per `AgentTracker.init()` call (per process/run)
+- **sessionId** -- auto-generated UUID per `tracker.session()` call (per task)
 
-**Request Body:**
+These are attached to every event in the `context` object.
 
-```json
-{
-  "user_email": "user@example.com",
-  "event": "feature_used",
-  "properties": {
-    "feature_name": "export_data",
-    "format": "csv",
-    "rows_exported": 1500
-  },
-  "timestamp": "2024-11-14T10:30:00Z"
-}
-```
+## Event Reference
 
-**Response:**
+### generation()
 
-```json
-{
-  "success": true,
-  "message": "Event tracked successfully",
-  "results": {
-    "db": true,
-    "mixpanel": "queued",
-    "attio": "queued"
-  }
-}
-```
-
-### Track Batch Events
-
-**Endpoint:** `POST /api/events/batch`
-
-**Request Body:**
-
-```json
-{
-  "events": [
-    {
-      "user_email": "user@example.com",
-      "event": "page_viewed",
-      "properties": { "page": "/home" },
-      "timestamp": "2024-11-14T10:30:00Z"
-    },
-    {
-      "user_email": "user@example.com",
-      "event": "button_clicked",
-      "properties": { "button": "get_started" },
-      "timestamp": "2024-11-14T10:30:05Z"
-    }
-  ]
-}
-```
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "results": {
-    "received": 2,
-    "processed": 2,
-    "errors": []
-  }
-}
-```
-
-### Identify User
-
-**Endpoint:** `POST /api/events/identify`
-
-**Request Body:**
-
-```json
-{
-  "user_email": "user@example.com",
-  "properties": {
-    "name": "John Doe",
-    "company": "Acme Corp",
-    "plan": "premium",
-    "role": "admin",
-    "created_at": "2024-01-01T00:00:00Z"
-  }
-}
-```
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "message": "User identified successfully"
-}
-```
-
-### Get Event Statistics
-
-**Endpoint:** `GET /api/events/stats`
-
-**Query Parameters:**
-
-- `days` (optional): Number of days to include (default: 30)
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "stats": {
-    "eventsReceived": 15234,
-    "eventsStored": 15230,
-    "mixpanelSent": 15100,
-    "attioSent": 15050,
-    "uniqueUsers": 523,
-    "topEvents": [
-      { "event": "page_viewed", "count": 8234 },
-      { "event": "feature_used", "count": 3421 }
-    ]
-  }
-}
-```
-
-### Health Check
-
-**Endpoint:** `GET /api/events/health`
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "services": {
-    "mixpanel": true,
-    "attio": true,
-    "database": true
-  }
-}
-```
-
-## Integration Examples
-
-### Next.js Integration
-
-#### 1. Create Event Tracking Client
+Track an LLM generation (completion, chat, embedding).
 
 ```typescript
-// lib/cairo-events.ts
-interface EventProperties {
-  [key: string]: any;
-}
-
-class CairoEvents {
-  private apiUrl: string;
-  private userEmail: string | null = null;
-
-  constructor(apiUrl: string) {
-    this.apiUrl = apiUrl;
-  }
-
-  setUser(email: string) {
-    this.userEmail = email;
-  }
-
-  async track(event: string, properties?: EventProperties) {
-    if (!this.userEmail) {
-      console.warn("No user email set for tracking");
-      return;
-    }
-
-    try {
-      const response = await fetch(`${this.apiUrl}/api/events/track`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_email: this.userEmail,
-          event,
-          properties,
-          timestamp: new Date().toISOString(),
-        }),
-      });
-
-      return await response.json();
-    } catch (error) {
-      console.error("Failed to track event:", error);
-    }
-  }
-
-  async identify(properties: EventProperties) {
-    if (!this.userEmail) return;
-
-    try {
-      await fetch(`${this.apiUrl}/api/events/identify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_email: this.userEmail,
-          properties,
-        }),
-      });
-    } catch (error) {
-      console.error("Failed to identify user:", error);
-    }
-  }
-}
-
-export const cairo = new CairoEvents(process.env.NEXT_PUBLIC_CAIRO_URL!);
-```
-
-#### 2. React Hook for Event Tracking
-
-```typescript
-// hooks/useTracking.ts
-import { useCallback } from "react";
-import { cairo } from "@/lib/cairo-events";
-
-export function useTracking() {
-  const track = useCallback((event: string, properties?: any) => {
-    cairo.track(event, properties);
-  }, []);
-
-  return { track };
-}
-
-// Usage in component
-function MyComponent() {
-  const { track } = useTracking();
-
-  const handleClick = () => {
-    track("button_clicked", {
-      button_name: "subscribe",
-      location: "header",
-    });
-  };
-
-  return <button onClick={handleClick}>Subscribe</button>;
-}
-```
-
-#### 3. Automatic Page View Tracking
-
-```typescript
-// app/layout.tsx (Next.js 13+)
-"use client";
-
-import { usePathname } from "next/navigation";
-import { useEffect } from "react";
-import { cairo } from "@/lib/cairo-events";
-
-export default function RootLayout({ children }) {
-  const pathname = usePathname();
-
-  useEffect(() => {
-    cairo.track("page_viewed", {
-      page: pathname,
-      referrer: document.referrer,
-      title: document.title,
-    });
-  }, [pathname]);
-
-  return <>{children}</>;
-}
-```
-
-#### 4. Server-Side Tracking
-
-```typescript
-// app/api/signup/route.ts
-import { NextResponse } from "next/server";
-
-export async function POST(request: Request) {
-  const { email, name, company } = await request.json();
-
-  // Your signup logic here...
-
-  // Track signup event server-side
-  await fetch(`${process.env.CAIRO_URL}/api/events/track`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      user_email: email,
-      event: "signup_completed",
-      properties: {
-        name,
-        company,
-        source: "organic",
-        timestamp: new Date().toISOString(),
-      },
-    }),
-  });
-
-  return NextResponse.json({ success: true });
-}
-```
-
-## Slack Alerts
-
-Cairo can automatically send Slack notifications for important events. This is perfect for monitoring critical user actions like signups, payments, and high-value feature usage.
-
-### Configuration
-
-Set these environment variables to enable Slack alerts:
-
-```bash
-# Required
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
-
-# Optional - Simple Configuration (comma-separated events)
-SLACK_DEFAULT_CHANNEL=#alerts
-SLACK_ALERT_EVENTS=signup_completed,payment_succeeded,trial_started,your_custom_event
-SLACK_PAYMENT_THRESHOLD=100
-SLACK_MAX_ALERTS_PER_MINUTE=10
-```
-
-#### Advanced Configuration (JSON Format)
-
-You can also use JSON format in `SLACK_ALERT_EVENTS` for fine-grained control:
-
-```bash
-# Advanced JSON configuration
-SLACK_ALERT_EVENTS='{
-  "signup_completed": {
-    "enabled": true,
-    "channel": "#new-users",
-    "color": "#36a64f"
-  },
-  "payment_succeeded": {
-    "threshold": 100,
-    "thresholdProperty": "amount",
-    "channel": "#sales",
-    "color": "#2eb886"
-  },
-  "trial_started": {
-    "channel": "#trials",
-    "properties": ["plan", "duration_days"],
-    "template": "New {plan} trial started by {user_email} for {duration_days} days!"
-  },
-  "feature_used": {
-    "threshold": 1000,
-    "thresholdProperty": "usage_count",
-    "title": "High Usage Alert",
-    "color": "#ff9900"
-  },
-  "custom_milestone": {
-    "enabled": true,
-    "properties": ["milestone_name", "value"],
-    "template": "🎉 {user_email} reached {milestone_name}: {value}!"
-  }
-}'
-```
-
-#### Configuration Options Per Event
-
-| Option              | Description                         | Example                            |
-| ------------------- | ----------------------------------- | ---------------------------------- |
-| `enabled`           | Enable/disable specific event       | `true` or `false`                  |
-| `channel`           | Override default Slack channel      | `"#sales-wins"`                    |
-| `threshold`         | Minimum value to trigger alert      | `100`                              |
-| `thresholdProperty` | Property to check against threshold | `"amount"` or `"count"`            |
-| `properties`        | Required properties for alert       | `["plan", "company"]`              |
-| `color`             | Custom color for message            | `"#36a64f"` (hex)                  |
-| `title`             | Custom message title                | `"Big Deal Alert!"`                |
-| `template`          | Custom message template             | `"User {user_email} did {action}"` |
-| `footer`            | Custom footer text                  | `"Sales Team"`                     |
-
-### Default Alert Events
-
-If you don't configure `SLACK_ALERT_EVENTS`, Cairo defaults to alerting on:
-
-- `signup_completed` - New user registrations
-- `subscription_created` - New subscriptions
-- `payment_succeeded` - Successful payments (respects threshold)
-- `trial_started` - Trial activations
-
-**You can completely customize this list** using the configurations above to track ANY events your application sends.
-
-### Custom Alert Configuration
-
-#### 1. Per-Event Channel Routing
-
-```javascript
-// Send to specific Slack channel
-track("payment_succeeded", {
-  amount: 999,
-  plan: "enterprise",
-  _slackChannel: "#big-deals", // Override default channel
+tracker.generation({
+  model: 'claude-sonnet-4-20250514',   // required
+  promptTokens: 1200,
+  completionTokens: 350,
+  totalTokens: 1550,            // auto-calculated if omitted
+  latencyMs: 1830,
+  costUsd: 0.0042,
+  stopReason: 'end_turn',
+  temperature: 0.7,
+  maxTokens: 4096,
 });
 ```
 
-#### 2. Threshold-Based Alerts
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `model` | `string` | yes | Model identifier |
+| `promptTokens` | `number` | no | Input token count |
+| `completionTokens` | `number` | no | Output token count |
+| `totalTokens` | `number` | no | Total tokens (auto-calculated from prompt + completion if omitted) |
+| `latencyMs` | `number` | no | Response latency in ms |
+| `costUsd` | `number` | no | Cost in USD |
+| `stopReason` | `string` | no | Why generation stopped (e.g., `end_turn`, `max_tokens`) |
+| `temperature` | `number` | no | Sampling temperature |
+| `maxTokens` | `number` | no | Max tokens setting |
 
-```javascript
-// Automatically alerts if payment > SLACK_PAYMENT_THRESHOLD
-track("payment_succeeded", {
-  amount: 500, // Triggers alert if threshold is $100
-  currency: "USD",
+### toolCall()
+
+Track a tool invocation.
+
+```typescript
+tracker.toolCall({
+  tool: 'web_search',           // required
+  input: { query: 'revenue' },
+  output: { results: 5 },
+  latencyMs: 420,
+  success: true,                // required
+  error: undefined,
+});
+```
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `tool` | `string` | yes | Tool name |
+| `input` | `object` | no | Tool input (redacted if `redactInputs` is true) |
+| `output` | `object` | no | Tool output (redacted if `redactInputs` is true) |
+| `latencyMs` | `number` | no | Execution time in ms |
+| `success` | `boolean` | yes | Whether the call succeeded |
+| `error` | `string` | no | Error message if failed |
+
+### decision()
+
+Track a routing or branching decision.
+
+```typescript
+tracker.decision({
+  type: 'routing',              // required
+  options: ['search', 'calc', 'respond'],  // required
+  chosen: 'search',            // required
+  confidence: 0.92,
+  reasoning: 'Query requires external data',
+});
+```
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `type` | `string` | yes | Decision category (e.g., `routing`, `classification`) |
+| `options` | `string[]` | yes | Available choices |
+| `chosen` | `string` | yes | The selected option |
+| `confidence` | `number` | no | Confidence score (0-1) |
+| `reasoning` | `string` | no | Explanation for the choice |
+
+### error()
+
+Track an error. Errors always bypass sampling.
+
+```typescript
+tracker.error({
+  type: 'tool_timeout',         // required
+  message: 'web_search timed out',  // required
+  recoverable: true,
+  stack: '...',
+});
+```
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `type` | `string` | yes | Error category |
+| `message` | `string` | yes | Error message |
+| `recoverable` | `boolean` | no | Whether the agent can recover |
+| `stack` | `string` | no | Stack trace |
+
+### retrieval()
+
+Track a retrieval/RAG operation.
+
+```typescript
+tracker.retrieval({
+  source: 'pinecone',          // required
+  query: 'billing policy',    // required (redacted if redactInputs is true)
+  numResults: 5,
+  latencyMs: 120,
+});
+```
+
+### handoff()
+
+Track a handoff to another agent.
+
+```typescript
+tracker.handoff({
+  toAgentId: 'escalation-agent',  // required
+  reason: 'Complex billing dispute',  // required
+  contextSize: 4200,
+});
+```
+
+### feedback()
+
+Track feedback on agent performance.
+
+```typescript
+tracker.feedback({
+  score: 0.85,                 // required
+  source: 'human_review',     // required
+  criteria: 'accuracy',
+  comment: 'Correct answer but slow',
+});
+```
+
+### session() / session.end()
+
+Start and end a session. See the Sessions section above.
+
+```typescript
+const session = tracker.session({
+  task: 'Resolve billing inquiry',
+  agentType: 'customer-support',
+  model: 'claude-sonnet-4-20250514',
+  config: { maxTurns: 10 },
 });
 
-// Alert on high usage
-track("feature_used", {
-  feature_name: "bulk_export",
-  usage_count: 5000, // Alerts if > configured threshold
+// ... do work, track events ...
+
+session.end({ exitReason: 'task_complete' });
+```
+
+The `session.end()` call emits an `agent.session.end` event with:
+
+| Property | Description |
+|----------|-------------|
+| `session_id` | UUID of the session |
+| `duration_ms` | Wall-clock duration |
+| `total_tokens` | Sum of all generation tokens |
+| `total_cost_usd` | Sum of all generation costs |
+| `generation_count` | Number of generation events |
+| `tool_call_count` | Number of tool call events |
+| `error_count` | Number of error events |
+| `exit_reason` | Why the session ended |
+
+## Framework Integrations
+
+### LangChain
+
+`CairoCallbackHandler` implements the LangChain callback interface. It automatically tracks generations, tool calls, and errors from any chain or agent.
+
+```typescript
+import { CairoCallbackHandler } from '@cairo/agent-tracker/middleware/langchain';
+
+const handler = new CairoCallbackHandler(tracker);
+
+// Use with any LangChain chain or agent
+const chain = new LLMChain({
+  llm: new ChatOpenAI({ modelName: 'gpt-4o' }),
+  prompt,
+  callbacks: [handler],
+});
+
+const result = await chain.call({ input: 'What is our refund policy?' });
+```
+
+Tracked automatically: `handleLLMStart/End` (generations with token counts and latency), `handleToolStart/End/Error` (tool calls), `handleLLMError`, `handleChainError`.
+
+### OpenAI
+
+`wrapOpenAI` monkey-patches `chat.completions.create` to track every call.
+
+```typescript
+import OpenAI from 'openai';
+import { wrapOpenAI } from '@cairo/agent-tracker/middleware/openai';
+
+const openai = wrapOpenAI(new OpenAI(), tracker);
+
+// This call is now tracked automatically
+const response = await openai.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello' }],
 });
 ```
 
-#### 3. Include Extra Alert Context
+Tracks: model, token counts (`prompt_tokens`, `completion_tokens`, `total_tokens`), latency, `finish_reason`. Errors are tracked as both `agent.error` and `agent.generation` events.
 
-```javascript
-// Properties starting with "alert_" are highlighted in Slack
-track("subscription_created", {
-  plan: "enterprise",
-  amount: 999,
-  alert_account_value: "$50,000 ARR", // Highlighted in Slack
-  alert_sales_rep: "@john", // Can mention users
+### Vercel AI SDK
+
+Two options: manual tracking with `trackVercelAI`, or auto-tracking with `createTrackedGenerateText`.
+
+```typescript
+import { generateText } from 'ai';
+import { trackVercelAI, createTrackedGenerateText } from '@cairo/agent-tracker/middleware/vercel-ai';
+
+// Option 1: Manual
+const result = await generateText({ model, prompt });
+trackVercelAI(tracker, result, { latencyMs: 1200 });
+
+// Option 2: Auto-wrapped
+const trackedGenerate = createTrackedGenerateText(tracker, generateText);
+const result = await trackedGenerate({ model, prompt });
+```
+
+Both options track: model, token usage, finish reason, and any tool calls in the response.
+
+## Advanced
+
+### Sampling
+
+Set `sampleRate` to a value between 0 and 1 to send only a fraction of events. Session lifecycle events (`agent.session.start`, `agent.session.end`) and error events always send regardless of sample rate.
+
+```typescript
+const tracker = AgentTracker.init({
+  writeKey: 'key',
+  agentId: 'my-agent',
+  sampleRate: 0.1,  // send 10% of events
 });
 ```
 
-### Slack Message Format
+### Input Redaction
 
-Events are formatted with:
+When `redactInputs` is true, tool call inputs and outputs are replaced with a deterministic hash (`[redacted:a3f2b1]`), and retrieval queries are replaced with `[redacted]`.
 
-- **Color coding**: Green for success, yellow for warnings, red for errors
-- **User information**: Email of the user who triggered the event
-- **Key properties**: Relevant event properties
-- **Timestamp**: When the event occurred
-- **Custom fields**: Any `alert_*` properties
+### Property Truncation
 
-Example Slack message:
+Properties exceeding `maxPropertySize` bytes are truncated with a `...[truncated]` suffix.
 
-```
-🚀 Cairo Events
-├── Event: Signup Completed
-├── User: john@company.com
-├── Plan: Premium
-├── Source: Organic
-└── Time: 2024-01-15 10:30:45
-```
+### Batching and Flushing
 
-### Disabling Slack Alerts
+Events are queued in memory and flushed when:
+- The queue reaches `flushAt` items (default: 50), or
+- The `flushInterval` timer fires (default: every 5 seconds)
 
-To temporarily disable Slack alerts without removing the webhook:
+Flushing sends a single `POST /v2/batch` request with all queued events.
 
-1. Remove `SLACK_WEBHOOK_URL` from environment
-2. Or set `SLACK_ALERT_EVENTS` to empty string
-3. Or use event properties: `{ _skipSlack: true }`
+### Graceful Shutdown
 
-## Event Types & Best Practices
+Call `tracker.shutdown()` before process exit. This ends any active session, flushes the queue, and stops the flush timer.
 
-### Common Event Naming Conventions
-
-#### Page/Screen Events
-
-- `page_viewed` - User viewed a page
-- `screen_viewed` - Mobile screen view
-- `tab_switched` - User switched tabs
-
-#### Authentication Events
-
-- `signup_started` - User began signup process
-- `signup_completed` - User completed signup
-- `login_succeeded` - Successful login
-- `login_failed` - Failed login attempt
-- `logout_completed` - User logged out
-- `password_reset_requested` - Password reset initiated
-
-#### Feature Usage Events
-
-- `feature_used` - Generic feature usage
-- `button_clicked` - User clicked a button
-- `form_submitted` - Form submission
-- `search_performed` - User performed search
-- `filter_applied` - User applied filters
-- `export_completed` - Data export completed
-
-#### Engagement Events
-
-- `session_started` - User session began
-- `session_ended` - User session ended
-- `notification_received` - User received notification
-- `notification_clicked` - User clicked notification
-- `email_opened` - Marketing email opened
-- `email_clicked` - Link clicked in email
-
-#### Transaction Events
-
-- `trial_started` - Free trial began
-- `trial_ended` - Free trial ended
-- `subscription_created` - New subscription
-- `subscription_cancelled` - Cancelled subscription
-- `payment_succeeded` - Successful payment
-- `payment_failed` - Failed payment
-
-### Event Properties Best Practices
-
-1. **Be Consistent**: Use the same property names across events
-
-   ```json
-   {
-     "user_email": "user@example.com",
-     "event": "feature_used",
-     "properties": {
-       "feature_name": "export_data", // Always use feature_name, not feature/name/feature_id
-       "page": "/dashboard", // Always include page context
-       "session_id": "abc123" // Track sessions for funnel analysis
-     }
-   }
-   ```
-
-2. **Include Context**: Always include relevant context
-
-   ```json
-   {
-     "properties": {
-       "page": "/pricing",
-       "referrer": "https://google.com",
-       "device_type": "desktop",
-       "browser": "Chrome",
-       "viewport_width": 1920
-     }
-   }
-   ```
-
-3. **Use Proper Types**: Send numbers as numbers, not strings
-
-   ```json
-   {
-     "properties": {
-       "item_count": 5, // ✓ Number
-       "price": 29.99, // ✓ Number
-       "user_id": "12345" // ✓ String for IDs
-     }
-   }
-   ```
-
-4. **Avoid PII**: Don't send sensitive information
-   ```json
-   {
-     "properties": {
-       "user_role": "admin", // ✓ Role is fine
-       "password": "xxx", // ✗ Never send passwords
-       "ssn": "xxx-xx-xxxx" // ✗ Never send SSN
-     }
-   }
-   ```
-
-## Troubleshooting
-
-### Common Issues
-
-#### 1. Events Not Appearing in Mixpanel
-
-**Check:**
-
-- Mixpanel project token is configured: `MIXPANEL_PROJECT_TOKEN`
-- Check Cairo logs for Mixpanel errors
-- Verify event names don't contain special characters
-- Check `/api/events/stats` for sent counts
-
-#### 2. User Not Found Errors
-
-**Solution:**
-
-- Cairo automatically creates users on first event
-- Ensure `user_email` is a valid email format
-- Check `playmaker_user_source` table for user record
-
-#### 3. Duplicate Events
-
-**Cairo prevents duplicates using:**
-
-- Unique event keys based on event type, user, and timestamp
-- `ON CONFLICT DO NOTHING` in database inserts
-- Check event_key generation if seeing duplicates
-
-#### 4. High Latency
-
-**Optimize by:**
-
-- Using batch endpoint for multiple events
-- Implementing client-side queueing
-- Checking database connection pool settings
-
-### Debug Mode
-
-Enable debug logging by setting:
-
-```bash
-LOG_LEVEL=debug
+```typescript
+process.on('SIGTERM', async () => {
+  await tracker.shutdown();
+  process.exit(0);
+});
 ```
 
-This will show detailed information about:
+## Server-Side Endpoints
 
-- Event processing steps
-- External service calls
-- Database operations
-- Error details
+The SDK sends events to these Cairo server endpoints:
 
-## Migration from Segment
+### Event Ingestion
 
-### API Compatibility
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v2/batch` | POST | Primary batch endpoint (used by the SDK) |
+| `/v2/track` | POST | Single event |
+| `/v2/identify` | POST | User/agent identification |
+| `/v2/page` | POST | Page view |
+| `/v2/screen` | POST | Screen view |
+| `/v2/group` | POST | Group membership |
+| `/v2/alias` | POST | Identity alias |
 
-Cairo's API is designed to be similar to Segment's for easy migration:
+### Agent-Specific
 
-| Segment                | Cairo                        | Notes                          |
-| ---------------------- | ---------------------------- | ------------------------------ |
-| `analytics.track()`    | `cairo.track()`              | Same parameters                |
-| `analytics.identify()` | `cairo.identify()`           | Same parameters                |
-| `analytics.page()`     | `cairo.track('page_viewed')` | Use track with page event      |
-| `userId`               | `user_email`                 | Cairo uses email as identifier |
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v2/agent/session/start` | POST | Start agent session |
+| `/v2/agent/session/end` | POST | End agent session with summary |
+| `/v2/agent/sessions/:agentId` | GET | List sessions for an agent |
+| `/v2/agent/metrics/:agentId` | GET | Aggregated metrics for an agent |
+| `/v2/agent/compare` | GET | Compare metrics across agents |
 
-### Migration Steps
+## Migrating from Segment
 
-1. **Update Initialization**
+Cairo's event API is Segment-compatible. To migrate:
 
-   ```javascript
-   // Before (Segment)
-   analytics.load("YOUR_WRITE_KEY");
+1. Replace your Segment write key with a Cairo write key.
+2. Point the host URL to your Cairo instance.
+3. Event payloads (`track`, `identify`, `page`, etc.) use the same schema.
 
-   // After (Cairo)
-   import { cairo } from "./lib/cairo-events";
-   cairo.setUser(userEmail);
-   ```
+```typescript
+// Before (Segment analytics-node)
+const analytics = new Analytics({ writeKey: 'seg_xxx' });
+analytics.track({ userId: 'user_1', event: 'Order Completed', properties: { total: 99 } });
 
-2. **Update Track Calls**
+// After (Cairo - same payload format)
+// Just change the write key and host. The API accepts the same request body.
+```
 
-   ```javascript
-   // Before (Segment)
-   analytics.track("Product Viewed", {
-     product_id: "123",
-     price: 29.99,
-   });
-
-   // After (Cairo)
-   cairo.track("product_viewed", {
-     product_id: "123",
-     price: 29.99,
-   });
-   ```
-
-3. **Update Identify Calls**
-
-   ```javascript
-   // Before (Segment)
-   analytics.identify(userId, {
-     email: "user@example.com",
-     name: "John Doe",
-   });
-
-   // After (Cairo)
-   cairo.setUser("user@example.com");
-   cairo.identify({
-     name: "John Doe",
-   });
-   ```
-
-### Feature Comparison
-
-| Feature               | Segment | Cairo                   |
-| --------------------- | ------- | ----------------------- |
-| Real-time tracking    | ✓       | ✓                       |
-| Batch API             | ✓       | ✓                       |
-| User identification   | ✓       | ✓                       |
-| Anonymous tracking    | ✓       | ✗ (requires email)      |
-| Multiple destinations | ✓       | Mixpanel + Attio        |
-| Client libraries      | Many    | DIY (examples provided) |
-| Replay/Debugging      | ✓       | Via logs                |
-
-## Additional Resources
-
-- [API Documentation](./API_DOCUMENTATION.md) - Full API reference
-- [Database Schema](./DB_MIGRATIONS.md) - Event storage details
-- [Cairo Architecture](../README.md) - System overview
-
-## Support
-
-For issues or questions:
-
-1. Check the [troubleshooting](#troubleshooting) section
-2. Review Cairo logs at `LOG_LEVEL=debug`
-3. Check service health at `/api/events/health`
-4. Open an issue in the Cairo repository
+Cairo supports 20 destination connectors out of the box, so you can replace Segment's destination catalog with Cairo's for common targets like Mixpanel, BigQuery, Snowflake, Slack, HubSpot, and others.
