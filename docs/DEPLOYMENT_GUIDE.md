@@ -1,10 +1,10 @@
-# 🚀 Full Sync System - Deployment Guide
+# Deployment Guide
 
-## 🎯 Overview
+## Overview
 
-This guide provides step-by-step instructions for deploying the Full Sync System to production environments, including Railway, AWS, Docker, and other platforms.
+Step-by-step instructions for deploying Cairo to production environments, including Railway, AWS, Docker, and other platforms.
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Prerequisites](#prerequisites)
 - [Environment Configuration](#environment-configuration)
@@ -18,7 +18,7 @@ This guide provides step-by-step instructions for deploying the Full Sync System
 
 ---
 
-## ✅ Prerequisites
+## Prerequisites
 
 ### System Requirements
 
@@ -49,9 +49,9 @@ This guide provides step-by-step instructions for deploying the Full Sync System
 
 ---
 
-## 🔧 Environment Configuration
+## Environment Configuration
 
-### 1. Environment Variables Setup
+### Environment Variables Setup
 
 Copy the `.env.example` file and configure all required variables:
 
@@ -59,7 +59,7 @@ Copy the `.env.example` file and configure all required variables:
 cp .env.example .env
 ```
 
-### 2. Required Environment Variables
+### Required Environment Variables
 
 **Database Configuration:**
 
@@ -130,7 +130,7 @@ CRON_CLEANUP_ENABLED=true
 CRON_CLEANUP_SCHEDULE="0 2 * * *"
 ```
 
-### 3. Environment-Specific Configurations
+### Environment-Specific Configurations
 
 **Development (.env.development):**
 
@@ -161,9 +161,9 @@ PERIODIC_SYNC_INTERVAL_MINUTES=60
 
 ---
 
-## 🗄️ Database Setup
+## Database Setup
 
-### 1. Database Creation
+### Database Creation
 
 **NeonDB (Recommended):**
 
@@ -192,7 +192,7 @@ aws rds create-db-instance \
   --vpc-security-group-ids sg-xxxxxxxxx
 ```
 
-### 2. Database Initialization
+### Database Initialization
 
 **Run Initial Migrations:**
 
@@ -207,7 +207,7 @@ curl -X POST https://your-app.com/api/migrations/run \
   -d '{"migrations": ["all"]}'
 ```
 
-### 3. Database Optimizations
+### Database Optimizations
 
 **Apply Performance Optimizations:**
 
@@ -242,9 +242,9 @@ ON user_source (email, platform);
 
 ---
 
-## 🚄 Railway Deployment
+## Railway Deployment
 
-### 1. Railway Setup
+### Railway Setup
 
 **Install Railway CLI:**
 
@@ -260,7 +260,7 @@ railway init cairo-sync-system
 cd cairo-sync-system
 ```
 
-### 2. Database Configuration
+### Database Configuration
 
 **Add NeonDB Database:**
 
@@ -271,7 +271,7 @@ railway add --database postgresql
 railway variables set DATABASE_URL="postgresql://user:pass@host:5432/db"
 ```
 
-### 3. Environment Variables
+### Environment Variables
 
 **Set Production Variables:**
 
@@ -294,7 +294,7 @@ railway variables set CRON_SYNC_ENABLED=true
 railway variables set CRON_SYNC_SCHEDULE="0 */6 * * *"
 ```
 
-### 4. Deployment Configuration
+### Deployment Configuration
 
 **railway.json:**
 
@@ -322,7 +322,7 @@ railway variables set CRON_SYNC_SCHEDULE="0 */6 * * *"
 }
 ```
 
-### 5. Deploy to Railway
+### Deploy to Railway
 
 ```bash
 # Deploy application
@@ -335,7 +335,7 @@ railway status
 railway logs
 ```
 
-### 6. Post-Deployment Setup
+### Post-Deployment Setup
 
 **Initialize Database:**
 
@@ -351,9 +351,9 @@ curl -X POST https://your-railway-app.railway.app/api/database/optimize \
 
 ---
 
-## 🐳 Docker Deployment
+## Docker Deployment
 
-### 1. Dockerfile
+### Dockerfile
 
 **Create Dockerfile:**
 
@@ -392,7 +392,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 CMD ["npm", "start"]
 ```
 
-### 2. Docker Compose
+### Docker Compose
 
 **docker-compose.yml:**
 
@@ -440,7 +440,7 @@ volumes:
   redis_data:
 ```
 
-### 3. Docker Deployment Commands
+### Docker Deployment Commands
 
 ```bash
 # Build and start services
@@ -462,9 +462,9 @@ docker-compose up -d
 
 ---
 
-## ☁️ AWS Deployment
+## AWS Deployment
 
-### 1. ECS Deployment
+### ECS Deployment
 
 **Task Definition (task-definition.json):**
 
@@ -541,7 +541,7 @@ aws ecs create-service \
   --network-configuration "awsvpcConfiguration={subnets=[subnet-xxx,subnet-yyy],securityGroups=[sg-xxx],assignPublicIp=ENABLED}"
 ```
 
-### 2. Lambda Deployment (for background jobs)
+### Lambda Deployment (for background jobs)
 
 **serverless.yml:**
 
@@ -577,7 +577,7 @@ plugins:
 
 ---
 
-## ✅ Production Checklist
+## Production Checklist
 
 ### Pre-Deployment Checklist
 
@@ -616,9 +616,9 @@ plugins:
 
 ---
 
-## 📊 Monitoring Setup
+## Monitoring Setup
 
-### 1. Application Monitoring
+### Application Monitoring
 
 **Health Check Endpoint:**
 
@@ -656,7 +656,7 @@ app.get("/health", async (req, res) => {
 });
 ```
 
-### 2. Performance Monitoring
+### Performance Monitoring
 
 **Custom Metrics Collection:**
 
@@ -681,7 +681,7 @@ app.get("/metrics", (req, res) => {
 });
 ```
 
-### 3. Database Monitoring
+### Database Monitoring
 
 **Performance Query:**
 
@@ -699,7 +699,7 @@ WHERE created_at > NOW() - INTERVAL '24 hours'
 GROUP BY platform;
 ```
 
-### 4. Alert Configuration
+### Alert Configuration
 
 **CloudWatch Alarms (AWS):**
 
@@ -731,7 +731,7 @@ aws cloudwatch put-metric-alarm \
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Common Deployment Issues
 
@@ -805,7 +805,7 @@ SELECT pg_reload_conf();
 
 ---
 
-## 📈 Scaling Considerations
+## Scaling Considerations
 
 ### Horizontal Scaling
 
@@ -851,30 +851,30 @@ const poolConfig = {
 
 ---
 
-## 🎯 Production Best Practices
+## Production Best Practices
 
-### 1. Security
+### Security
 
 - Use environment variables for all secrets
 - Enable HTTPS/TLS for all communications
 - Implement proper CORS policies
 - Regular security audits and updates
 
-### 2. Performance
+### Performance
 
 - Enable compression for API responses
 - Implement caching strategies
 - Monitor and optimize database queries
 - Use CDN for static assets
 
-### 3. Reliability
+### Reliability
 
 - Implement circuit breakers for external APIs
 - Set up proper error handling and retries
 - Configure health checks and monitoring
 - Maintain comprehensive logs
 
-### 4. Maintenance
+### Maintenance
 
 - Automate deployments with CI/CD
 - Regular backup and recovery testing

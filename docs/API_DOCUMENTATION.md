@@ -1,630 +1,445 @@
-# 📚 Full Sync System - API Documentation
+# API Reference
 
-## 🎯 Overview
+## Authentication
 
-The Full Sync System provides comprehensive APIs for managing large-scale data synchronization between Smartlead, Lemlist, and your database. This documentation covers all endpoints, parameters, and usage examples.
+All endpoints require a write key. Pass it as either:
 
-## 📋 Table of Contents
+- `X-Write-Key: your-write-key` header, or
+- `Authorization: Bearer your-write-key` header
 
-- [Authentication](#authentication)
-- [Full Sync APIs](#full-sync-apis)
-- [Event Key APIs](#event-key-apis)
-- [Database Optimization APIs](#database-optimization-apis)
-- [Migration APIs](#migration-apis)
-- [Background Job APIs](#background-job-apis)
-- [Error Codes](#error-codes)
-- [Rate Limits](#rate-limits)
-- [Best Practices](#best-practices)
+Requests without a valid write key receive a `401` response.
 
 ---
 
-## 🔐 Authentication
+## Event Ingestion
 
-All API endpoints require proper authentication. Include your API key in the request headers:
+### POST /v2/batch
 
-```http
-Authorization: Bearer YOUR_API_KEY
-Content-Type: application/json
-```
+Primary ingestion endpoint. The SDK uses this for all event delivery.
 
----
-
-## 🔄 Full Sync APIs
-
-### Execute Full Sync
-
-Initiates a comprehensive synchronization process with configurable parameters.
-
-**Endpoint:** `POST /api/full-sync/execute`
-
-**Request Body:**
+**Request body:**
 
 ```json
 {
-  "platforms": "smartlead,lemlist",
-  "syncMode": "full_historical",
-  "namespaces": "production,staging",
-  "startDate": "2024-01-01",
-  "endDate": "2024-12-31",
-  "batchSize": 100,
-  "enableProgressTracking": true,
-  "enableMixpanelTracking": true,
-  "enableAttioSync": true,
-  "webhookUrl": "https://your-app.com/webhooks/sync-complete"
+  "batch": [
+    {
+      "type": "track",
+      "event": "agent.generation",
+      "messageId": "550e8400-e29b-41d4-a716-446655440000",
+      "timestamp": "2026-03-20T10:30:00.000Z",
+      "userId": "my-agent",
+      "properties": {
+        "model": "claude-sonnet-4-20250514",
+        "prompt_tokens": 1200,
+        "completion_tokens": 350,
+        "total_tokens": 1550,
+        "latency_ms": 1830,
+        "cost_usd": 0.0042
+      },
+      "context": {
+        "agent_id": "my-agent",
+        "instance_id": "uuid",
+        "session_id": "uuid",
+        "library": { "name": "@cairo/agent-tracker", "version": "1.0.0" }
+      }
+    }
+  ],
+  "sentAt": "2026-03-20T10:30:01.000Z"
 }
 ```
 
-**Parameters:**
+**Response (200):**
 
-| Parameter                | Type         | Required    | Description                                                                       |
-| ------------------------ | ------------ | ----------- | --------------------------------------------------------------------------------- |
-| `platforms`              | string/array | Yes         | Comma-separated platforms: `smartlead`, `lemlist`                                 |
-| `syncMode`               | string       | Yes         | Sync mode: `full_historical`, `delta_since_last`, `date_range`, `namespace_reset` |
-| `namespaces`             | string/array | No          | Target namespaces for sync                                                        |
-| `startDate`              | string       | Conditional | ISO date (required for `date_range` mode)                                         |
-| `endDate`                | string       | Conditional | ISO date (required for `date_range` mode)                                         |
-| `batchSize`              | number       | No          | Batch processing size (default: 50)                                               |
-| `enableProgressTracking` | boolean      | No          | Enable real-time progress updates                                                 |
-| `enableMixpanelTracking` | boolean      | No          | Enable event tracking in Mixpanel                                                 |
-| `enableAttioSync`        | boolean      | No          | Enable person sync to Attio                                                       |
-| `webhookUrl`             | string       | No          | Webhook for completion notification                                               |
+```json
+{ "success": true }
+```
 
-**Response:**
+**curl example:**
+
+```bash
+curl -X POST https://your-cairo.com/v2/batch \
+  -H "Content-Type: application/json" \
+  -H "X-Write-Key: your-write-key" \
+  -d '{
+    "batch": [{
+      "type": "track",
+      "event": "agent.generation",
+      "messageId": "abc-123",
+      "timestamp": "2026-03-20T10:00:00Z",
+      "userId": "my-agent",
+      "properties": { "model": "gpt-4o", "total_tokens": 500 }
+    }],
+    "sentAt": "2026-03-20T10:00:01Z"
+  }'
+```
+
+### POST /v2/track
+
+Single event ingestion.
+
+**Request body:**
 
 ```json
 {
-  "success": true,
-  "jobId": "job_1234567890",
-  "config": {
-    "platforms": ["smartlead", "lemlist"],
-    "syncMode": "full_historical",
-    "namespaces": ["production"]
+  "type": "track",
+  "event": "agent.tool_call",
+  "userId": "my-agent",
+  "properties": {
+    "tool_name": "web_search",
+    "success": true,
+    "latency_ms": 420
   },
-  "estimatedDuration": "15 minutes",
-  "progressUrl": "/api/full-sync/status/job_1234567890"
+  "timestamp": "2026-03-20T10:30:00Z"
 }
 ```
 
-### Check Sync Status
+**Response (200):**
 
-Monitor the progress of a running sync operation.
+```json
+{ "success": true }
+```
 
-**Endpoint:** `GET /api/full-sync/status/{jobId}`
+### POST /v2/identify
 
-**Response:**
+Set traits on a user or agent identity.
+
+**Request body:**
 
 ```json
 {
-  "jobId": "job_1234567890",
-  "status": "in_progress",
-  "progress": {
-    "percentage": 65,
-    "processed_items": 6500,
-    "total_items": 10000,
-    "current_stage": "processing_smartlead_events",
-    "eta_minutes": 8
-  },
-  "summary": {
-    "events_created": 4200,
-    "users_processed": 2300,
-    "errors": 0,
-    "duration_ms": 450000
+  "type": "identify",
+  "userId": "my-agent",
+  "traits": {
+    "agent_type": "customer-support",
+    "version": "2.1.0",
+    "team": "billing"
   }
 }
 ```
 
-**Status Values:**
+### POST /v2/page
 
-- `queued` - Job is waiting to be processed
-- `in_progress` - Sync is actively running
-- `completed` - Sync finished successfully
-- `failed` - Sync encountered an error
-- `cancelled` - Sync was manually cancelled
+Track a page view. Follows the Segment page spec.
 
-### Cancel Sync Operation
-
-Cancel a running sync operation.
-
-**Endpoint:** `DELETE /api/full-sync/cancel/{jobId}`
-
-**Response:**
+**Request body:**
 
 ```json
 {
-  "success": true,
-  "jobId": "job_1234567890",
-  "status": "cancelled",
-  "message": "Sync operation cancelled successfully"
+  "type": "page",
+  "userId": "user-123",
+  "name": "Dashboard",
+  "category": "App",
+  "properties": { "url": "/app/dashboard", "referrer": "/login" }
+}
+```
+
+### POST /v2/screen
+
+Track a screen view (mobile). Same schema as page.
+
+### POST /v2/group
+
+Associate a user/agent with a group.
+
+**Request body:**
+
+```json
+{
+  "type": "group",
+  "userId": "my-agent",
+  "groupId": "team-billing",
+  "traits": { "name": "Billing Team", "plan": "enterprise" }
+}
+```
+
+### POST /v2/alias
+
+Link two identities.
+
+**Request body:**
+
+```json
+{
+  "type": "alias",
+  "previousId": "anon-456",
+  "userId": "user-123"
 }
 ```
 
 ---
 
-## 🔑 Event Key APIs
+## Agent Tracking
 
-### Generate Event Key
+### POST /v2/agent/session/start
 
-Generate a unique, collision-resistant event key.
+Start a new agent session.
 
-**Endpoint:** `POST /api/event-keys/generate`
-
-**Request Body:**
+**Request body:**
 
 ```json
 {
-  "platform": "lemlist",
-  "campaignId": "campaign_123",
-  "eventType": "email_sent",
-  "email": "user@example.com",
-  "activityId": "activity_456",
-  "timestamp": "2024-01-15T10:30:00Z",
+  "session_id": "uuid",
+  "agent_id": "my-agent",
+  "instance_id": "uuid",
+  "agent_type": "customer-support",
+  "model": "claude-sonnet-4-20250514",
+  "task": "Resolve billing inquiry",
   "namespace": "production"
 }
 ```
 
-**Parameters:**
+**Response (200):**
 
-| Parameter    | Type   | Required | Description                                     |
-| ------------ | ------ | -------- | ----------------------------------------------- |
-| `platform`   | string | Yes      | Platform: `smartlead` or `lemlist`              |
-| `campaignId` | string | Yes      | Campaign identifier                             |
-| `eventType`  | string | Yes      | Event type (e.g., `email_sent`, `email_opened`) |
-| `email`      | string | Yes      | User email address                              |
-| `activityId` | string | No       | Activity/event identifier                       |
-| `timestamp`  | string | No       | Event timestamp (ISO format)                    |
-| `namespace`  | string | No       | Namespace for the event                         |
+```json
+{ "success": true, "session": { "session_id": "uuid", "status": "active" } }
+```
 
-**Response:**
+**curl example:**
+
+```bash
+curl -X POST https://your-cairo.com/v2/agent/session/start \
+  -H "Content-Type: application/json" \
+  -H "X-Write-Key: your-write-key" \
+  -d '{
+    "session_id": "s-001",
+    "agent_id": "my-agent",
+    "agent_type": "support",
+    "task": "Handle refund request"
+  }'
+```
+
+### POST /v2/agent/session/end
+
+End an agent session with accumulated metrics.
+
+**Request body:**
+
+```json
+{
+  "session_id": "uuid",
+  "duration_ms": 45000,
+  "total_tokens": 8500,
+  "total_cost_usd": 0.025,
+  "generation_count": 4,
+  "tool_call_count": 2,
+  "error_count": 0,
+  "exit_reason": "task_complete"
+}
+```
+
+**Response (200):**
+
+```json
+{ "success": true, "session": { "session_id": "uuid", "status": "ended" } }
+```
+
+### GET /v2/agent/sessions/:agentId
+
+List sessions for an agent.
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `namespace` | `string` | `default` | Namespace filter |
+| `limit` | `number` | `50` | Max results |
+| `offset` | `number` | `0` | Pagination offset |
+| `status` | `string` | (all) | Filter by status (`active`, `ended`) |
+
+**curl example:**
+
+```bash
+curl "https://your-cairo.com/v2/agent/sessions/my-agent?limit=10&namespace=production" \
+  -H "X-Write-Key: your-write-key"
+```
+
+**Response (200):**
 
 ```json
 {
   "success": true,
-  "event_key": "lemlist_campaign123_emailsent_activity456_a1b2c3d4",
-  "collision_detected": false,
-  "generation_stats": {
-    "total_generated": 1,
-    "cache_size": 847,
-    "collision_rate": "2.1%"
-  }
-}
-```
-
-### Event Key Statistics
-
-Get performance statistics for event key generation.
-
-**Endpoint:** `GET /api/event-keys/stats`
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "stats": {
-    "total_generated": 156789,
-    "collisions_detected": 234,
-    "fallback_used": 12,
-    "invalid_inputs": 3,
-    "cache_size": 8472,
-    "collision_rate": "0.15%",
-    "generation_rate": "45,231 keys/sec"
-  }
-}
-```
-
-### Clear Event Key Cache
-
-Clear the collision detection cache (use with caution in production).
-
-**Endpoint:** `POST /api/event-keys/clear-cache`
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "message": "Event key cache cleared",
-  "previous_cache_size": 8472
-}
-```
-
----
-
-## 🗄️ Database Optimization APIs
-
-### Initialize Optimizations
-
-Apply database performance optimizations for sync operations.
-
-**Endpoint:** `POST /api/database/optimize`
-
-**Request Body:**
-
-```json
-{
-  "optimizations": [
-    "sync_indexes",
-    "bulk_operations",
-    "connection_pool",
-    "query_optimization"
-  ],
-  "force_recreate": false
-}
-```
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "optimizations_applied": [
-    "sync_indexes_created",
-    "bulk_operations_initialized",
-    "connection_pool_configured",
-    "query_optimization_enabled"
-  ],
-  "performance_improvement": "28%",
-  "indexes_created": 7,
-  "bulk_statements_prepared": 2
-}
-```
-
-### Database Performance Stats
-
-Get current database performance metrics.
-
-**Endpoint:** `GET /api/database/performance`
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "performance": {
-    "connection_pool": {
-      "active": 5,
-      "idle": 15,
-      "max": 20
-    },
-    "query_performance": {
-      "avg_insert_time": "1.2ms",
-      "avg_select_time": "0.8ms",
-      "slow_queries": 0
-    },
-    "bulk_operations": {
-      "events_per_batch": 100,
-      "avg_batch_time": "15ms",
-      "success_rate": "99.8%"
-    }
-  }
-}
-```
-
----
-
-## 🔄 Migration APIs
-
-### Migration Status
-
-Check the status of database migrations.
-
-**Endpoint:** `GET /api/migrations/status`
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "available_migrations": [
-    "001_initial_schema",
-    "002_sync_optimizations",
-    "003_event_key_indexes",
-    "004_performance_tuning"
-  ],
-  "applied_migrations": [
-    "001_initial_schema",
-    "002_sync_optimizations",
-    "003_event_key_indexes"
-  ],
-  "pending_migrations": ["004_performance_tuning"]
-}
-```
-
-### Run Migrations
-
-Execute pending database migrations.
-
-**Endpoint:** `POST /api/migrations/run`
-
-**Request Body:**
-
-```json
-{
-  "migrations": ["004_performance_tuning"],
-  "dry_run": false
-}
-```
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "applied": ["004_performance_tuning"],
-  "failed": [],
-  "execution_time": "2.3s",
-  "details": [
+  "sessions": [
     {
-      "migration": "004_performance_tuning",
-      "status": "success",
-      "execution_time": "2.3s"
+      "session_id": "uuid",
+      "agent_id": "my-agent",
+      "agent_type": "customer-support",
+      "status": "ended",
+      "duration_ms": 45000,
+      "total_tokens": 8500,
+      "total_cost_usd": 0.025,
+      "generation_count": 4,
+      "tool_call_count": 2,
+      "error_count": 0,
+      "exit_reason": "task_complete",
+      "started_at": "2026-03-20T10:00:00Z",
+      "ended_at": "2026-03-20T10:00:45Z"
     }
   ]
 }
 ```
 
-### Rollback Migration
+### GET /v2/agent/metrics/:agentId
 
-Rollback the last applied migration.
+Aggregated metrics for an agent over a time range.
 
-**Endpoint:** `POST /api/migrations/rollback`
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `namespace` | `string` | `default` | Namespace |
+| `timeRange` | `string` | `24h` | Time window (e.g., `1h`, `24h`, `7d`, `30d`) |
+
+**curl example:**
+
+```bash
+curl "https://your-cairo.com/v2/agent/metrics/my-agent?timeRange=7d" \
+  -H "X-Write-Key: your-write-key"
+```
+
+### GET /v2/agent/compare
+
+Compare metrics across agents.
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `namespace` | `string` | `default` | Namespace |
+| `timeRange` | `string` | `24h` | Time window |
+| `groupBy` | `string` | `agent_id` | Group by field (`agent_id`, `agent_type`, `model`) |
+
+**curl example:**
+
+```bash
+curl "https://your-cairo.com/v2/agent/compare?timeRange=7d&groupBy=model" \
+  -H "X-Write-Key: your-write-key"
+```
+
+---
+
+## CDP Pipeline
+
+### Identity Resolution
+
+Manage the identity graph.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v2/identities/:id` | Look up identity by canonical ID |
+| POST | `/v2/identities/resolve` | Resolve an identity (userId, anonymousId, or email) to its canonical ID |
+| GET | `/v2/identities/:id/graph` | Get the full identity graph for a canonical ID |
+
+### Transformations
+
+CRUD for JavaScript transformations that run on events before destination delivery.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v2/transformations` | List all transformations |
+| POST | `/v2/transformations` | Create a transformation |
+| GET | `/v2/transformations/:id` | Get a transformation |
+| PUT | `/v2/transformations/:id` | Update a transformation |
+| DELETE | `/v2/transformations/:id` | Delete a transformation |
+
+**Create transformation example:**
+
+```bash
+curl -X POST https://your-cairo.com/v2/transformations \
+  -H "Content-Type: application/json" \
+  -H "X-Write-Key: your-write-key" \
+  -d '{
+    "name": "Strip PII from tool calls",
+    "code": "function transform(event) { if (event.properties.input) delete event.properties.input.email; return event; }",
+    "enabled": true,
+    "execution_order": 1
+  }'
+```
+
+### Tracking Plans
+
+CRUD for event validation schemas.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v2/tracking-plans` | List tracking plans |
+| POST | `/v2/tracking-plans` | Create a tracking plan |
+| GET | `/v2/tracking-plans/:id` | Get a tracking plan |
+| PUT | `/v2/tracking-plans/:id` | Update a tracking plan |
+| DELETE | `/v2/tracking-plans/:id` | Delete a tracking plan |
+| GET | `/v2/tracking-plans/:id/violations` | List violations for a plan |
+
+Enforcement modes: `allow` (log violations, forward event), `drop` (reject event), `warn` (forward event, flag violation).
+
+### GDPR
+
+User suppression and deletion endpoints.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v2/gdpr/suppress` | Suppress a user (all future events dropped) |
+| POST | `/v2/gdpr/unsuppress` | Remove suppression |
+| POST | `/v2/gdpr/delete` | Delete all data for a user |
+| GET | `/v2/gdpr/status/:userId` | Check suppression status |
+
+**Suppress a user:**
+
+```bash
+curl -X POST https://your-cairo.com/v2/gdpr/suppress \
+  -H "Content-Type: application/json" \
+  -H "X-Write-Key: your-write-key" \
+  -d '{ "userId": "user-123", "reason": "GDPR deletion request" }'
+```
+
+### Event Replay
+
+Replay raw events from storage.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v2/replay` | Replay events for a time range and namespace |
+| GET | `/v2/replay/status/:jobId` | Check replay job status |
+
+### Destinations
+
+CRUD for destination configurations.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v2/destinations` | List configured destinations |
+| POST | `/v2/destinations` | Create a destination |
+| GET | `/v2/destinations/:id` | Get a destination |
+| PUT | `/v2/destinations/:id` | Update a destination |
+| DELETE | `/v2/destinations/:id` | Delete a destination |
+| POST | `/v2/destinations/:id/test` | Test destination connectivity |
+
+Available destination types: `slack`, `mixpanel`, `discord`, `resend`, `webhook`, `bigquery`, `hubspot`, `salesforce`, `ga4`, `amplitude`, `posthog`, `braze`, `customerio`, `sendgrid`, `kafka`, `elasticsearch`, `snowflake`, `s3`, `intercom`, `pipedrive`.
+
+---
+
+## Health
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Full health check (database, destinations) |
+| `GET /health/simple` | Returns `200 OK` if server is running |
+| `GET /health/detailed` | Detailed status of all subsystems |
+
+**curl example:**
+
+```bash
+curl https://your-cairo.com/health/detailed
+```
 
 **Response:**
 
 ```json
 {
-  "success": true,
-  "rolled_back": "004_performance_tuning",
-  "execution_time": "1.8s"
-}
-```
-
----
-
-## ⚙️ Background Job APIs
-
-### Job Status
-
-Check the status of background jobs.
-
-**Endpoint:** `GET /api/jobs/status`
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "jobs": {
-    "periodic_sync": {
-      "enabled": true,
-      "last_run": "2024-01-15T10:00:00Z",
-      "next_run": "2024-01-15T11:00:00Z",
-      "status": "healthy"
-    },
-    "mixpanel_sync": {
-      "enabled": true,
-      "last_run": "2024-01-15T10:30:00Z",
-      "next_run": "2024-01-15T10:35:00Z",
-      "status": "healthy"
-    }
+  "status": "healthy",
+  "uptime": 86400,
+  "database": { "connected": true, "latency_ms": 2 },
+  "destinations": {
+    "slack": { "enabled": true, "healthy": true },
+    "bigquery": { "enabled": true, "healthy": true }
   }
 }
 ```
-
-### Manual Job Trigger
-
-Manually trigger a background job.
-
-**Endpoint:** `POST /api/jobs/trigger/{jobName}`
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "job_name": "periodic_sync",
-  "triggered_at": "2024-01-15T10:45:00Z",
-  "job_id": "manual_job_123"
-}
-```
-
----
-
-## ❌ Error Codes
-
-| Code       | Status | Description                  | Action                     |
-| ---------- | ------ | ---------------------------- | -------------------------- |
-| `SYNC_001` | 400    | Invalid sync configuration   | Check parameters           |
-| `SYNC_002` | 404    | Sync job not found           | Verify job ID              |
-| `SYNC_003` | 409    | Sync already in progress     | Wait or cancel existing    |
-| `SYNC_004` | 429    | Rate limit exceeded          | Reduce request frequency   |
-| `KEY_001`  | 400    | Invalid event key parameters | Check required fields      |
-| `KEY_002`  | 500    | Key generation failed        | Retry or contact support   |
-| `DB_001`   | 500    | Database connection failed   | Check database status      |
-| `DB_002`   | 409    | Migration conflict           | Resolve conflicts manually |
-| `API_001`  | 401    | Authentication required      | Include valid API key      |
-| `API_002`  | 403    | Insufficient permissions     | Check API key permissions  |
-
----
-
-## 🚦 Rate Limits
-
-| Endpoint           | Limit         | Window   | Burst |
-| ------------------ | ------------- | -------- | ----- |
-| Full Sync Execute  | 10 requests   | 1 hour   | 3     |
-| Event Key Generate | 1000 requests | 1 minute | 100   |
-| Database Optimize  | 5 requests    | 1 hour   | 2     |
-| Migration Run      | 3 requests    | 1 hour   | 1     |
-| Status/Stats       | 100 requests  | 1 minute | 20    |
-
-**Rate Limit Headers:**
-
-```http
-X-RateLimit-Limit: 1000
-X-RateLimit-Remaining: 856
-X-RateLimit-Reset: 1642694400
-```
-
----
-
-## 📋 Best Practices
-
-### 🔄 Full Sync Operations
-
-1. **Start Small**: Begin with small namespaces to test configuration
-2. **Monitor Progress**: Always enable progress tracking for long operations
-3. **Use Webhooks**: Configure webhook URLs for completion notifications
-4. **Schedule Wisely**: Run large syncs during off-peak hours
-5. **Batch Sizing**: Use appropriate batch sizes (50-200) based on data volume
-
-### 🔑 Event Key Generation
-
-1. **Cache Management**: Monitor cache size and clear when necessary
-2. **Collision Monitoring**: Set alerts for collision rates > 5%
-3. **Consistent Format**: Use consistent data formats across platforms
-4. **Error Handling**: Implement retry logic for generation failures
-5. **Performance Monitoring**: Track generation rates and optimize as needed
-
-### 🗄️ Database Operations
-
-1. **Index Maintenance**: Apply optimizations before large sync operations
-2. **Connection Pooling**: Monitor pool usage and adjust as needed
-3. **Migration Safety**: Test migrations in staging before production
-4. **Performance Monitoring**: Track query performance and optimize slow queries
-5. **Backup Strategy**: Ensure backups before major migrations
-
-### ⚙️ Background Jobs
-
-1. **Health Monitoring**: Regularly check job status and health
-2. **Error Alerting**: Set up alerts for job failures
-3. **Resource Management**: Monitor CPU and memory usage
-4. **Graceful Shutdowns**: Implement proper shutdown procedures
-5. **Logging**: Maintain detailed logs for troubleshooting
-
-### 🔒 Security
-
-1. **API Key Rotation**: Regularly rotate API keys
-2. **Access Control**: Use least-privilege principle
-3. **Audit Logging**: Log all API access and changes
-4. **Data Encryption**: Ensure data is encrypted in transit and at rest
-5. **Rate Limiting**: Implement and monitor rate limits
-
-### 📊 Monitoring
-
-1. **Performance Metrics**: Track API response times and error rates
-2. **Sync Metrics**: Monitor sync success rates and data volumes
-3. **Database Metrics**: Track connection pool, query performance
-4. **Alert Setup**: Configure alerts for critical issues
-5. **Dashboard Creation**: Build monitoring dashboards for operations team
-
----
-
-## 🎯 Example Use Cases
-
-### Complete Full Sync Workflow
-
-```javascript
-// 1. Execute full sync
-const syncResponse = await fetch("/api/full-sync/execute", {
-  method: "POST",
-  headers: {
-    Authorization: "Bearer YOUR_API_KEY",
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    platforms: "smartlead,lemlist",
-    syncMode: "full_historical",
-    namespaces: "production",
-    batchSize: 100,
-    enableProgressTracking: true,
-    webhookUrl: "https://your-app.com/sync-complete",
-  }),
-});
-
-const { jobId } = await syncResponse.json();
-
-// 2. Monitor progress
-const checkProgress = async () => {
-  const status = await fetch(`/api/full-sync/status/${jobId}`);
-  const progress = await status.json();
-
-  if (progress.status === "completed") {
-    console.log("Sync completed successfully!");
-    console.log(`Events created: ${progress.summary.events_created}`);
-  } else if (progress.status === "in_progress") {
-    console.log(`Progress: ${progress.progress.percentage}%`);
-    setTimeout(checkProgress, 5000); // Check again in 5 seconds
-  }
-};
-
-checkProgress();
-```
-
-### Event Key Generation with Collision Handling
-
-```javascript
-const generateEventKey = async (eventData) => {
-  try {
-    const response = await fetch("/api/event-keys/generate", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer YOUR_API_KEY",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(eventData),
-    });
-
-    const result = await response.json();
-
-    if (result.collision_detected) {
-      console.warn("Collision detected and resolved:", result.event_key);
-    }
-
-    return result.event_key;
-  } catch (error) {
-    console.error("Key generation failed:", error);
-    throw error;
-  }
-};
-```
-
-### Database Optimization Setup
-
-```javascript
-// Apply optimizations before large sync
-const optimizeDatabase = async () => {
-  const response = await fetch("/api/database/optimize", {
-    method: "POST",
-    headers: {
-      Authorization: "Bearer YOUR_API_KEY",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      optimizations: ["sync_indexes", "bulk_operations"],
-      force_recreate: false,
-    }),
-  });
-
-  const result = await response.json();
-  console.log(`Performance improved by ${result.performance_improvement}`);
-
-  return result.success;
-};
-```
-
----
-
-## 📞 Support
-
-For additional support or questions:
-
-- **Documentation**: [Full Documentation](../README.md)
-- **Issues**: Create an issue on GitHub
-- **Performance**: Check [Performance Guide](./PERFORMANCE_GUIDE.md)
-- **Troubleshooting**: See [Troubleshooting Guide](./TROUBLESHOOTING.md)
-
----
-
-**Last Updated**: January 2024  
-**API Version**: v1.0  
-**Documentation Version**: 1.0.0

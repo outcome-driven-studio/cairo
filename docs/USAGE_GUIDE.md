@@ -1,10 +1,10 @@
-# 📖 Full Sync System - Usage Guide
+# Data Sync Usage Guide
 
-## 🎯 Overview
+## Overview
 
-This guide provides practical examples and best practices for using the Full Sync System effectively. Learn how to perform different types of synchronization, optimize performance, and troubleshoot common scenarios.
+Practical examples and best practices for using Cairo's data sync system. Covers historical sync, date-range sync, performance optimization, and troubleshooting.
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Quick Start](#quick-start)
 - [Sync Modes Explained](#sync-modes-explained)
@@ -16,9 +16,9 @@ This guide provides practical examples and best practices for using the Full Syn
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
-### 1. Basic Full Sync
+### Basic Full Sync
 
 The simplest way to sync all historical data from both platforms:
 
@@ -44,7 +44,7 @@ curl -X POST https://your-app.com/api/full-sync/execute \
 }
 ```
 
-### 2. Monitor Progress
+### Monitor Progress
 
 ```bash
 # Check sync progress
@@ -61,7 +61,7 @@ curl https://your-app.com/api/full-sync/status/job_1234567890
 }
 ```
 
-### 3. Verify Results
+### Verify Results
 
 ```bash
 # Check event key statistics
@@ -73,9 +73,9 @@ curl https://your-app.com/api/database/performance
 
 ---
 
-## 🔄 Sync Modes Explained
+## Sync Modes Explained
 
-### 1. Full Historical Sync
+### Full Historical Sync
 
 **When to use:** First-time setup, data recovery, complete refresh
 
@@ -106,7 +106,7 @@ curl -X POST /api/full-sync/execute -d '{
 }'
 ```
 
-### 2. Delta Since Last Sync
+### Delta Since Last Sync
 
 **When to use:** Regular maintenance, catching up missed data
 
@@ -136,7 +136,7 @@ curl -X POST /api/full-sync/execute -d '{
 }'
 ```
 
-### 3. Date Range Sync
+### Date Range Sync
 
 **When to use:** Syncing specific time periods, historical analysis
 
@@ -169,7 +169,7 @@ curl -X POST /api/full-sync/execute -d '{
 }'
 ```
 
-### 4. Namespace Reset
+### Namespace Reset
 
 **When to use:** Clean slate for specific namespace, testing
 
@@ -200,7 +200,7 @@ curl -X POST /api/full-sync/execute -d '{
 
 ---
 
-## 💼 Common Use Cases
+## Common Use Cases
 
 ### Use Case 1: Initial System Setup
 
@@ -363,9 +363,9 @@ curl -X POST /api/full-sync/execute -d '{
 
 ---
 
-## ⚙️ Advanced Configurations
+## Advanced Configurations
 
-### 1. High-Volume Sync Optimization
+### High-Volume Sync Optimization
 
 **For large datasets (100k+ records):**
 
@@ -388,7 +388,7 @@ const highVolumeConfig = {
 };
 ```
 
-### 2. Memory-Optimized Configuration
+### Memory-Optimized Configuration
 
 **For systems with limited memory:**
 
@@ -408,7 +408,7 @@ const memoryOptimizedConfig = {
 };
 ```
 
-### 3. Development Environment Setup
+### Development Environment Setup
 
 **For fast development cycles:**
 
@@ -425,7 +425,7 @@ curl -X POST /api/full-sync/execute -d '{
 }'
 ```
 
-### 4. Custom Event Key Generation
+### Custom Event Key Generation
 
 **For special scenarios requiring custom event keys:**
 
@@ -444,9 +444,9 @@ curl -X POST /api/event-keys/generate -d '{
 
 ---
 
-## 🚀 Performance Optimization
+## Performance Optimization
 
-### 1. Batch Size Optimization
+### Batch Size Optimization
 
 **Find optimal batch size for your environment:**
 
@@ -472,7 +472,7 @@ done
 - **Large datasets (10k+ records)**: 100-200
 - **High-performance systems**: 200-500
 
-### 2. Database Optimization
+### Database Optimization
 
 **Pre-sync optimization:**
 
@@ -495,7 +495,7 @@ curl -X POST /api/database/optimize -d '{
 watch -n 30 "curl -s /api/database/performance | jq '.performance'"
 ```
 
-### 3. Memory Management
+### Memory Management
 
 **Monitor memory usage:**
 
@@ -507,7 +507,7 @@ curl /api/metrics | jq '.memory'
 curl -X POST /api/event-keys/clear-cache
 ```
 
-### 4. Rate Limit Optimization
+### Rate Limit Optimization
 
 **Adjust rate limits based on API quotas:**
 
@@ -529,9 +529,9 @@ const rateLimitConfig = {
 
 ---
 
-## 📊 Monitoring and Troubleshooting
+## Monitoring and Troubleshooting
 
-### 1. Real-Time Monitoring
+### Real-Time Monitoring
 
 **Monitor active sync operations:**
 
@@ -571,7 +571,7 @@ while true; do
 done
 ```
 
-### 2. Performance Analysis
+### Performance Analysis
 
 **Analyze sync performance:**
 
@@ -591,7 +591,7 @@ curl /api/event-keys/stats | jq '{
 }'
 ```
 
-### 3. Error Diagnosis
+### Error Diagnosis
 
 **Common error patterns and solutions:**
 
@@ -602,9 +602,9 @@ curl /api/event-keys/stats | jq '{
 curl /api/database/performance
 
 # If connection issues:
-# 1. Verify DATABASE_URL
-# 2. Check connection pool settings
-# 3. Ensure database is accessible
+# Verify DATABASE_URL
+# Check connection pool settings
+# Ensure database is accessible
 ```
 
 **API Rate Limit Errors:**
@@ -614,9 +614,9 @@ curl /api/database/performance
 curl /api/metrics | jq '.rate_limits'
 
 # Solutions:
-# 1. Reduce batch size
-# 2. Increase delays between requests
-# 3. Implement exponential backoff
+# Reduce batch size
+# Increase delays between requests
+# Implement exponential backoff
 ```
 
 **Memory Issues:**
@@ -631,7 +631,7 @@ curl -X POST /api/event-keys/clear-cache
 # Enable memory monitoring
 ```
 
-### 4. Debugging Specific Issues
+### Debugging Specific Issues
 
 **Collision Detection Issues:**
 
@@ -640,9 +640,9 @@ curl -X POST /api/event-keys/clear-cache
 curl /api/event-keys/stats
 
 # High collision rate (>5%) may indicate:
-# 1. Duplicate data in source systems
-# 2. Insufficient unique identifiers
-# 3. System clock issues
+# Duplicate data in source systems
+# Insufficient unique identifiers
+# System clock issues
 ```
 
 **Sync Performance Issues:**
@@ -658,9 +658,9 @@ curl /api/full-sync/history | jq '.jobs[] | {
 
 ---
 
-## 🎯 Best Practices
+## Best Practices
 
-### 1. Sync Scheduling
+### Sync Scheduling
 
 **Recommended schedule patterns:**
 
@@ -675,7 +675,7 @@ curl /api/full-sync/history | jq '.jobs[] | {
 # No automated sync, manual triggers
 ```
 
-### 2. Error Handling
+### Error Handling
 
 **Implement robust error handling:**
 
@@ -720,7 +720,7 @@ const syncWithRetry = async (config, maxRetries = 3) => {
 };
 ```
 
-### 3. Data Validation
+### Data Validation
 
 **Validate sync results:**
 
@@ -749,7 +749,7 @@ fi
 echo "✅ Sync validation passed: $PROCESSED records processed"
 ```
 
-### 4. Resource Management
+### Resource Management
 
 **Monitor and manage resources:**
 
@@ -780,7 +780,7 @@ else
 fi
 ```
 
-### 5. Maintenance Tasks
+### Maintenance Tasks
 
 **Regular maintenance schedule:**
 
@@ -791,19 +791,19 @@ fi
 
 echo "Starting weekly maintenance..."
 
-# 1. Clear old event key cache
+# Clear old event key cache
 curl -X POST /api/event-keys/clear-cache
 
-# 2. Clean up old sync logs
-# (Implementation depends on your logging system)
+# Clean up old sync logs
+# Implementation depends on your logging system)
 
-# 3. Optimize database
+# Optimize database
 curl -X POST /api/database/optimize -d '{
   "optimizations": ["query_optimization"],
   "force_recreate": false
 }'
 
-# 4. Generate performance report
+# Generate performance report
 curl /api/event-keys/stats > "stats-$(date +%Y%m%d).json"
 curl /api/database/performance > "db-perf-$(date +%Y%m%d).json"
 
@@ -812,7 +812,7 @@ echo "Weekly maintenance completed"
 
 ---
 
-## 📈 Usage Analytics
+## Usage Analytics
 
 ### Track Your Sync Patterns
 

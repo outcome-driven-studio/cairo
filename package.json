@@ -28,10 +28,12 @@
     "setup-env": "node setup-env.js",
     "build:ui": "node build-ui.js",
     "build": "npm run build:ui && npm run build:sdks",
-    "build:sdks": "npm run build:sdk:node && npm run build:sdk:react && npm run build:sdk:browser",
+    "build:sdks": "npm run build:sdk:node && npm run build:sdk:react && npm run build:sdk:browser && npm run build:sdk:agent-tracker && npm run build:sdk:agent-mcp",
     "build:sdk:node": "cd packages/node-sdk && npm install && npm run build",
     "build:sdk:react": "cd packages/react-sdk && npm install && npm run build",
     "build:sdk:browser": "cd packages/browser-sdk && npm install && npm run build",
+    "build:sdk:agent-tracker": "cd packages/agent-tracker && npm install && npm run build",
+    "build:sdk:agent-mcp": "cd packages/agent-mcp && npm install && npm run build",
     "postinstall": "node build-ui.js || echo 'UI build failed, continuing...'"
   },
   "devDependencies": {
