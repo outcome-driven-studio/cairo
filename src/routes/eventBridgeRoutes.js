@@ -59,7 +59,16 @@ class EventBridgeRoutes {
     for (const [key, value] of Object.entries(body)) {
       if (skip.has(key) || value === undefined || value === null) continue;
       const label = key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
-      lines.push(`**${label}:** ${value}`);
+      let display;
+      if (typeof value === "object") {
+        if (Array.isArray(value) && value.length === 0) continue;
+        if (!Array.isArray(value) && Object.keys(value).length === 0) continue;
+        const pretty = JSON.stringify(value, null, 2);
+        display = "```json\n" + pretty + "\n```";
+        lines.push(`**${label}:**\n${display}`);
+      } else {
+        lines.push(`**${label}:** ${value}`);
+      }
     }
     return lines.length ? lines.join("\n") : "No details";
   }
