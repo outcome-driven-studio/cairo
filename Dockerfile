@@ -40,12 +40,12 @@ RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nodeuser -u 1001
 USER nodeuser
 
-# Expose port (Railway will override this with PORT env var)
-EXPOSE 3000
+# Expose port (Cloud Run provides PORT=8080 at runtime)
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-3000}/health/simple || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/health/simple || exit 1
 
 # Start the application using the pre-flight check script
 CMD ["./start.sh"]
