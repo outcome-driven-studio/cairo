@@ -1,6 +1,27 @@
 {
-  "name": "cairo",
-  "version": "1.0.0",
+  "name": "cairo-cdp",
+  "version": "2.0.0",
+  "description": "Headless customer data platform with MCP protocol, error tracking, and AI agent observability",
+  "bin": {
+    "cairo-cdp": "./bin/cairo.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "server.js",
+    "llms.txt",
+    "package.json"
+  ],
+  "keywords": [
+    "cdp", "customer-data-platform", "mcp", "model-context-protocol",
+    "error-tracking", "sentry-alternative", "agent-observability",
+    "headless", "analytics", "event-tracking", "ai-agent"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/outcome-driven-studio/cairo.git"
+  },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
     "@google-cloud/secret-manager": "^5.0.0",
@@ -34,7 +55,7 @@
     "build:sdk:browser": "cd packages/browser-sdk && npm install && npm run build",
     "build:sdk:agent-tracker": "cd packages/agent-tracker && npm install && npm run build",
     "build:sdk:agent-mcp": "cd packages/agent-mcp && npm install && npm run build",
-    "postinstall": "node build-ui.js || echo 'UI build failed, continuing...'"
+    "migrate": "node src/migrations/run_migrations.js"
   },
   "devDependencies": {
     "@railway/cli": "^4.6.1",

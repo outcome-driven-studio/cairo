@@ -1,0 +1,34 @@
+# UI (not shipped in npm package)
+ui/
+public/
+build-ui.js
+start-ui.sh
+
+# Dev / CI
+.claude/
+.claude-flow/
+.mcp.json
+.env*
+.git/
+.github/
+node_modules/
+packages/
+
+# Docs (use llms.txt instead)
+docs/
+examples/
+scripts/
+*.md
+!README.md
+
+# Config files
+CLAUDE.md
+.eslintrc*
+.prettierrc*
+nodemon.json
+tsconfig.json
+
+# Tests
+tests/
+*.test.js
+*.spec.js

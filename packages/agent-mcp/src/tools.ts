@@ -93,4 +93,67 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    name: 'capture_error',
+    description: 'Capture an error event (Sentry-like). Supports stack traces, severity levels, and context.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'Error message' },
+        stackTrace: { type: 'string', description: 'Stack trace' },
+        type: { type: 'string', description: 'Error type (error, exception, rejection)' },
+        level: { type: 'string', description: 'Severity: fatal, error, warning, info' },
+        sourceFile: { type: 'string', description: 'Source file path' },
+        sourceLine: { type: 'number', description: 'Line number' },
+        context: { type: 'object', description: 'Additional context' },
+        tags: { type: 'object', description: 'Tags for filtering' },
+        release: { type: 'string', description: 'Release/version' },
+        environment: { type: 'string', description: 'Environment (production, staging)' },
+      },
+      required: ['message'],
+    },
+  },
+  {
+    name: 'query_events',
+    description: 'Query CDP events. Returns recent events matching filters.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        eventType: { type: 'string', description: 'Filter by event type' },
+        userEmail: { type: 'string', description: 'Filter by user email' },
+        limit: { type: 'number', description: 'Max results (default 20)' },
+        since: { type: 'string', description: 'ISO timestamp: only events after this time' },
+      },
+    },
+  },
+  {
+    name: 'lookup_user',
+    description: 'Look up a user by email. Returns profile and recent activity.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', description: 'Email to look up' },
+      },
+      required: ['email'],
+    },
+  },
+  {
+    name: 'list_error_groups',
+    description: 'List error groups (like Sentry issues). Filter by status.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: 'Filter: open, resolved, ignored' },
+        limit: { type: 'number', description: 'Max results (default 20)' },
+      },
+    },
+  },
+  {
+    name: 'system_health',
+    description: 'Get Cairo system health: database, uptime, event counts, error counts.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
 ];

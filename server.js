@@ -316,10 +316,10 @@ app.get("/debug/routes", (req, res) => {
   });
 });
 
-// Serve static files from the UI build with proper MIME types
+// Serve static files from the UI build (opt-in: set SERVE_UI=false to disable)
+const serveUI = process.env.SERVE_UI !== 'false';
 const publicPath = path.join(__dirname, "public");
-if (require("fs").existsSync(publicPath)) {
-  // Add logging for static file requests
+if (serveUI && require("fs").existsSync(publicPath)) {
   app.use('/assets', (req, res, next) => {
     logger.info(`[STATIC] Requesting asset: ${req.path}`);
     next();
@@ -327,7 +327,6 @@ if (require("fs").existsSync(publicPath)) {
 
   app.use(express.static(publicPath, {
     setHeaders: (res, path, stat) => {
-      logger.info(`[STATIC] Serving file: ${path}`);
       if (path.endsWith('.css')) {
         res.setHeader('Content-Type', 'text/css; charset=utf-8');
       } else if (path.endsWith('.js')) {
@@ -337,15 +336,16 @@ if (require("fs").existsSync(publicPath)) {
   }));
   logger.info(`Serving UI from ${publicPath}`);
 
-  // Log available static files
   const fs = require("fs");
   const assetsPath = path.join(publicPath, "assets");
   if (fs.existsSync(assetsPath)) {
     const files = fs.readdirSync(assetsPath);
     logger.info(`Available assets: ${files.join(', ')}`);
   }
+} else if (!serveUI) {
+  logger.info("UI disabled (SERVE_UI=false). Running in headless mode.");
 } else {
-  logger.warn("No UI build found. Run 'node build-ui.js' to build the UI.");
+  logger.warn("No UI build found. Run 'node build-ui.js' to build the UI, or set SERVE_UI=false for headless mode.");
 }
 
 // Add body parser middleware
@@ -578,6 +578,16 @@ try {
   logger.warn("Agent tracking routes not available:", e.message);
 }
 
+// Error Tracking Routes (Sentry-like error capture + grouping)
+const ErrorRoutes = require("./src/routes/errorRoutes");
+const errorRoutes = new ErrorRoutes();
+app.use("/api/v2/errors", errorRoutes.setupRoutes());
+
+// MCP Protocol Endpoint (headless agent interface)
+const McpRoutes = require("./src/routes/mcpRoutes");
+const mcpRoutes = new McpRoutes();
+app.use("/mcp", mcpRoutes.setupRoutes());
+
 // Agent Tools API (OpenAI-compatible)
 const AgentToolsRoutes = require("./src/routes/agentToolsRoutes");
 const agentToolsRoutes = new AgentToolsRoutes();
@@ -750,11 +760,19 @@ app.get("*", (req, res) => {
     return;
   }
 
-  const indexPath = path.join(__dirname, "public", "index.html");
-  if (require("fs").existsSync(indexPath)) {
-    res.sendFile(indexPath);
+  if (serveUI) {
+    const indexPath = path.join(__dirname, "public", "index.html");
+    if (require("fs").existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send("UI not built. Run 'node build-ui.js' or set SERVE_UI=false for headless mode.");
+    }
   } else {
-    res.status(404).send("UI not built. Please run 'node build-ui.js' to build the UI.");
+    res.status(404).json({
+      error: 'Not found',
+      path: req.path,
+      message: 'Cairo is running in headless mode. Use /mcp for MCP protocol or /api/* for REST.',
+    });
   }
 });
 
@@ -887,9 +905,12 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
       );
     }
 
-    console.log(`Server is ready! Available endpoints:`);
+    console.log(`Server is ready!${serveUI ? '' : ' (headless mode)'} Available endpoints:`);
     console.log(`  - GET  /health - Health check`);
     console.log(`  - GET  /health/detailed - Detailed health check`);
+    console.log(`  - POST /mcp - MCP protocol (JSON-RPC, for agents)`);
+    console.log(`  - GET  /mcp - MCP discovery (list tools)`);
+    console.log(`  - POST /api/v2/errors/capture - Error capture (Sentry-like)`);
     console.log(`  - GET  /debug/test-integrations - Test all integrations`);
     console.log(`  - GET  /debug/data-status - Check data flow and recent activity`);
     console.log(`  - GET  /debug/routes - List all registered routes`);

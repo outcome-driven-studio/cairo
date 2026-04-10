@@ -1,115 +1,161 @@
 # Cairo
 
-Cairo is an open-source event tracking and customer data platform (CDP). It collects events from any app or AI agent, then routes them to analytics tools, databases, Slack, and 15+ other destinations.
+Cairo is an open-source, headless customer data platform (CDP) with built-in error tracking and AI agent observability. It runs MCP-first: agents connect via the MCP protocol, humans can optionally use the REST API or UI.
 
-## Install
+## MCP Protocol (Recommended for Agents)
 
-```bash
-npm install @cairo/tracker
+Cairo exposes an MCP server at `POST /mcp`. Auth with `X-Write-Key` header.
+
+### Connect via MCP
+
+```json
+POST /mcp
+X-Write-Key: your-write-key
+Content-Type: application/json
+
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
 ```
 
-## Quick Start
+### List Available Tools
 
-```typescript
-import { Cairo } from '@cairo/tracker';
-
-const cairo = Cairo.init({
-  writeKey: 'your-write-key',
-  host: 'https://your-cairo-instance.com',
-});
-
-// Track an event
-cairo.track({
-  event: 'signup',
-  userId: 'user_123',
-  properties: { plan: 'free', source: 'landing_page' },
-});
-
-// Identify a user
-cairo.identify({
-  userId: 'user_123',
-  traits: { name: 'Jane', email: 'jane@example.com', plan: 'free' },
-});
-
-// Track a page view
-cairo.page({ name: 'Dashboard', userId: 'user_123' });
-
-// Associate user with a group/org
-cairo.group({
-  groupId: 'org_456',
-  userId: 'user_123',
-  traits: { name: 'Acme Inc', plan: 'enterprise' },
-});
-
-// Link anonymous user to known user
-cairo.alias({ userId: 'user_123', previousId: 'anon_abc' });
-
-// Before process exits
-await cairo.shutdown();
+```json
+{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
 ```
 
-## HTTP API (no SDK needed)
+### Call a Tool
 
-All events go to `/v2/*`. Authenticate with `X-Write-Key` header.
+```json
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{
+  "name":"track_event",
+  "arguments":{"event":"signup","user_email":"jane@example.com","properties":{"plan":"free"}}
+}}
+```
 
-### POST /v2/track
+### Available MCP Tools
+
+**Write:**
+- `track_event` - Track any CDP event (page view, click, purchase, custom)
+- `identify_user` - Identify a user with traits
+- `capture_error` - Capture an error with stack trace and context (Sentry-like)
+
+**Read:**
+- `query_events` - Query events with filters (type, user, time range)
+- `lookup_user` - Look up user profile and recent activity
+- `resolve_identity` - Resolve identity graph across IDs and emails
+- `list_error_groups` - List error groups by status (open, resolved, ignored)
+- `get_error_group` - Get error group details with recent occurrences
+- `resolve_error` - Update error group status
+- `error_trends` - Get error count trends over time
+- `list_destinations` - List configured destinations and their status
+- `query_agent_sessions` - Query AI agent tracking sessions
+- `system_health` - Get system health, uptime, and counts
+
+## Stdio MCP Server (for Claude Code, etc.)
+
+Add Cairo as an MCP server in your agent config:
 
 ```json
 {
-  "event": "purchase",
-  "userId": "user_123",
-  "properties": { "amount": 29.99, "currency": "USD" },
-  "timestamp": "2026-03-20T10:00:00Z"
+  "mcpServers": {
+    "cairo": {
+      "command": "npx",
+      "args": ["-y", "@cairo/agent-mcp"],
+      "env": {
+        "CAIRO_HOST": "https://your-cairo-instance.com",
+        "CAIRO_WRITE_KEY": "your-write-key",
+        "CAIRO_AGENT_ID": "my-agent"
+      }
+    }
+  }
 }
+```
+
+## Error Tracking (Sentry Alternative)
+
+Cairo captures, fingerprints, and groups errors just like Sentry, but headless and MCP-native.
+
+### Via MCP
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
+  "name":"capture_error",
+  "arguments":{
+    "message":"TypeError: Cannot read property 'name' of undefined",
+    "stack_trace":"TypeError: Cannot read property...\n    at UserProfile.render (/app/src/components/UserProfile.js:42:15)",
+    "level":"error",
+    "environment":"production",
+    "tags":{"component":"user-profile"}
+  }
+}}
+```
+
+### Via REST
+
+```
+POST /api/v2/errors/capture
+X-Write-Key: your-write-key
+
+{
+  "message": "TypeError: Cannot read property 'name' of undefined",
+  "stack_trace": "...",
+  "level": "error",
+  "environment": "production"
+}
+```
+
+### Via SDK
+
+```typescript
+import { CairoClient } from '@cairo/node-sdk';
+
+const cairo = new CairoClient({ writeKey: 'your-key', dataPlaneUrl: 'https://your-cairo.com' });
+
+// Capture an exception
+cairo.captureException(new Error('Something broke'), { component: 'payments' });
+
+// Capture a message
+cairo.captureMessage('Disk usage above 90%', 'warning', { disk: '/dev/sda1' });
+```
+
+### Query Errors (MCP)
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
+  "name":"list_error_groups",
+  "arguments":{"status":"open","limit":10}
+}}
+```
+
+## HTTP API (REST)
+
+All events go to `/v2/*` or `/api/v2/*`. Auth with `X-Write-Key` header.
+
+### POST /v2/track
+```json
+{"event":"purchase","userId":"user_123","properties":{"amount":29.99}}
 ```
 
 ### POST /v2/identify
-
 ```json
-{
-  "userId": "user_123",
-  "traits": { "name": "Jane", "email": "jane@example.com" }
-}
+{"userId":"user_123","traits":{"name":"Jane","email":"jane@example.com"}}
 ```
 
 ### POST /v2/batch
-
-Send multiple events in one request:
-
 ```json
-{
-  "batch": [
-    { "type": "track", "event": "page_viewed", "userId": "user_123", "properties": { "page": "/home" } },
-    { "type": "track", "event": "button_clicked", "userId": "user_123", "properties": { "button": "cta" } }
-  ]
-}
+{"batch":[
+  {"type":"track","event":"page_viewed","userId":"user_123","properties":{"page":"/home"}},
+  {"type":"track","event":"button_clicked","userId":"user_123","properties":{"button":"cta"}}
+]}
 ```
 
 ### POST /v2/page
-
 ```json
-{ "name": "Pricing", "userId": "user_123" }
-```
-
-### POST /v2/group
-
-```json
-{ "groupId": "org_456", "userId": "user_123", "traits": { "name": "Acme" } }
-```
-
-### POST /v2/alias
-
-```json
-{ "userId": "user_123", "previousId": "anon_abc" }
+{"name":"Pricing","userId":"user_123"}
 ```
 
 ## AI Agent Tracking
 
-For tracking AI agent behavior (LLM calls, tool usage, decisions), use `@cairo/agent-tracker`:
-
-```bash
-npm install @cairo/agent-tracker
-```
+Track AI agent sessions, LLM calls, tool usage, and costs:
 
 ```typescript
 import { AgentTracker } from '@cairo/agent-tracker';
@@ -120,13 +166,23 @@ const tracker = AgentTracker.init({
   agentId: 'my-agent',
 });
 
-tracker.generation({ model: 'gpt-4o', promptTokens: 500, completionTokens: 200, latencyMs: 1200 });
+tracker.generation({ model: 'claude-sonnet-4-20250514', promptTokens: 500, completionTokens: 200, latencyMs: 1200 });
 tracker.toolCall({ tool: 'search', input: { q: 'hello' }, success: true, latencyMs: 300 });
 tracker.decision({ type: 'routing', options: ['a', 'b'], chosen: 'a', confidence: 0.9 });
 tracker.error({ type: 'timeout', message: 'API timed out', recoverable: true });
 
 await tracker.shutdown();
 ```
+
+## Headless Mode
+
+Run Cairo without any UI:
+
+```bash
+SERVE_UI=false npm start
+```
+
+All configuration and operation happens through MCP tools or REST API.
 
 ## Config Options
 
@@ -143,25 +199,22 @@ await tracker.shutdown();
 
 ## Self-hosting
 
-Cairo is a Node.js server backed by PostgreSQL:
-
 ```bash
 git clone https://github.com/outcome-driven-studio/cairo.git
 cd cairo
 npm install
 # Set POSTGRES_URL in .env
-npm start
+SERVE_UI=false npm start
 ```
-
-Server runs on port 8080 by default.
 
 ## Key Features
 
+- MCP-native: agents connect via MCP protocol, no UI required
+- Error tracking: capture, fingerprint, group, and resolve errors (Sentry alternative)
 - Segment-compatible API (drop-in replacement)
 - Identity resolution (merge anonymous + known users)
-- Event transformations (rename, filter, enrich before delivery)
-- Tracking plans (schema validation for events)
-- 15+ destinations (Mixpanel, BigQuery, Slack, webhooks, etc.)
+- AI agent observability (sessions, costs, tool usage)
+- Event transformations and tracking plans
+- 15+ destinations (Mixpanel, BigQuery, Slack, Discord, webhooks)
 - GDPR compliance (user deletion, suppression, audit log)
-- Event replay (backfill new destinations with historical data)
-- AI query (ask questions about your data in plain English)
+- Event replay (backfill destinations with historical data)
