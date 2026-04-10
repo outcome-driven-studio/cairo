@@ -232,6 +232,72 @@ export class CairoClient {
   }
 
   /**
+   * Capture an exception (error tracking, like Sentry)
+   */
+  captureException(error: Error | string, context?: Record<string, any>, callback?: Callback): void {
+    if (!this.config.enable) {
+      callback?.();
+      return;
+    }
+
+    const err = typeof error === 'string' ? new Error(error) : error;
+    const properties: Record<string, any> = {
+      message: err.message,
+      stack_trace: err.stack,
+      type: err.name || 'Error',
+      level: 'error',
+      ...context,
+    };
+
+    this.enqueue('track', {
+      event: 'cairo.error.captured',
+      properties,
+      timestamp: new Date().toISOString(),
+    }, callback);
+
+    // Also send to error-specific endpoint
+    this._sendError(properties).catch(() => {});
+  }
+
+  /**
+   * Capture a message at a specific severity level (error tracking)
+   */
+  captureMessage(message: string, level: 'fatal' | 'error' | 'warning' | 'info' = 'info', context?: Record<string, any>, callback?: Callback): void {
+    if (!this.config.enable) {
+      callback?.();
+      return;
+    }
+
+    const properties: Record<string, any> = {
+      message,
+      level,
+      type: 'message',
+      ...context,
+    };
+
+    this.enqueue('track', {
+      event: 'cairo.error.captured',
+      properties,
+      timestamp: new Date().toISOString(),
+    }, callback);
+
+    if (level === 'fatal' || level === 'error') {
+      this._sendError(properties).catch(() => {});
+    }
+  }
+
+  /**
+   * Send error to the dedicated error capture endpoint.
+   */
+  private async _sendError(errorData: Record<string, any>): Promise<void> {
+    try {
+      await this.httpClient.post('/api/v2/errors/capture', errorData);
+    } catch {
+      // Errors in error reporting are silently ignored
+    }
+  }
+
+  /**
    * Flush the queue immediately
    */
   async flush(callback?: Callback): Promise<void> {

@@ -127,6 +127,36 @@ class EventPoster {
   }
 }
 
+/**
+ * Proxy read tools to the Cairo server's in-process MCP endpoint.
+ * This lets the stdio MCP server delegate reads to the same tool
+ * implementations running inside Cairo.
+ */
+async function proxyToMcpEndpoint(toolName: string, args: unknown): Promise<unknown> {
+  try {
+    const response = await fetch(`${config.host}/mcp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Write-Key': config.writeKey!,
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: toolName, arguments: args },
+      }),
+    });
+
+    const json = await response.json() as { result?: { content?: Array<{ text?: string }> }; error?: { message: string } };
+    if (json.error) return { error: json.error.message };
+    const text = json.result?.content?.[0]?.text;
+    return text ? JSON.parse(text) : json.result;
+  } catch (err: any) {
+    return { error: `Failed to reach Cairo server: ${err.message}` };
+  }
+}
+
 // --- MCP Server ---
 
 const config: McpServerConfig = {
@@ -218,6 +248,51 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const input = args as unknown as SessionEndInput;
       poster.endSession(input);
       return { content: [{ type: 'text', text: 'Session ended' }] };
+    }
+
+    case 'capture_error': {
+      const input = args as Record<string, unknown>;
+      poster.track('agent.error.captured', {
+        message: input.message,
+        stack_trace: input.stackTrace,
+        type: input.type || 'error',
+        level: input.level || 'error',
+        source_file: input.sourceFile,
+        source_line: input.sourceLine,
+        context: input.context,
+        tags: input.tags,
+        release: input.release,
+        environment: input.environment,
+      });
+      // Also POST to error capture endpoint
+      try {
+        await fetch(`${config.host}/api/v2/errors/capture`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Write-Key': config.writeKey! },
+          body: JSON.stringify({
+            message: input.message,
+            stack_trace: input.stackTrace,
+            type: input.type || 'error',
+            level: input.level || 'error',
+            source_file: input.sourceFile,
+            source_line: input.sourceLine,
+            context: input.context,
+            tags: input.tags,
+            release: input.release,
+            environment: input.environment,
+          }),
+        });
+      } catch { /* non-blocking */ }
+      return { content: [{ type: 'text', text: `Error captured: ${input.message}` }] };
+    }
+
+    // Read tools: proxy to Cairo REST API
+    case 'query_events':
+    case 'lookup_user':
+    case 'list_error_groups':
+    case 'system_health': {
+      const result = await proxyToMcpEndpoint(name, args);
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     }
 
     default:

@@ -291,6 +291,101 @@ export class CairoBrowserAnalytics implements CairoAnalytics {
     this.enqueue('alias', message, cb);
   }
 
+  /**
+   * Capture an exception (Sentry-like error tracking)
+   */
+  captureException(error: Error | string, context?: Record<string, any>, callback?: Callback): void {
+    if (!this.shouldTrack()) {
+      callback?.();
+      return;
+    }
+
+    const err = typeof error === 'string' ? new Error(error) : error;
+
+    this.track('cairo.error.captured', {
+      message: err.message,
+      stack_trace: err.stack,
+      type: err.name || 'Error',
+      level: 'error',
+      source_file: this._extractFileName(err.stack),
+      source_line: this._extractLineNumber(err.stack),
+      url: window.location.href,
+      user_agent: navigator.userAgent,
+      ...context,
+    }, callback);
+
+    // Fire to dedicated error endpoint
+    this._sendError({
+      message: err.message,
+      stack_trace: err.stack,
+      type: err.name || 'Error',
+      level: 'error',
+      source_file: this._extractFileName(err.stack),
+      source_line: this._extractLineNumber(err.stack),
+      url: window.location.href,
+      browser_name: navigator.userAgent,
+      user_email: this.userId || undefined,
+      ...context,
+    });
+  }
+
+  /**
+   * Capture a message at a specific severity level
+   */
+  captureMessage(message: string, level: 'fatal' | 'error' | 'warning' | 'info' = 'info', context?: Record<string, any>, callback?: Callback): void {
+    if (!this.shouldTrack()) {
+      callback?.();
+      return;
+    }
+
+    this.track('cairo.error.captured', {
+      message,
+      level,
+      type: 'message',
+      url: window.location.href,
+      ...context,
+    }, callback);
+
+    if (level === 'fatal' || level === 'error') {
+      this._sendError({ message, level, type: 'message', url: window.location.href, ...context });
+    }
+  }
+
+  private _extractFileName(stack?: string): string | undefined {
+    if (!stack) return undefined;
+    const match = stack.match(/at\s+.*\(?(https?:\/\/[^:]+|\/[^:]+):(\d+)/);
+    return match?.[1];
+  }
+
+  private _extractLineNumber(stack?: string): number | undefined {
+    if (!stack) return undefined;
+    const match = stack.match(/:(\d+):\d+/);
+    return match ? parseInt(match[1], 10) : undefined;
+  }
+
+  private _sendError(errorData: Record<string, any>): void {
+    try {
+      const url = `${this.config.dataPlaneUrl}/api/v2/errors/capture`;
+      const body = JSON.stringify(errorData);
+
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+      } else {
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Write-Key': this.config.writeKey,
+          },
+          body,
+          keepalive: true,
+        }).catch(() => {});
+      }
+    } catch {
+      // Silent failure
+    }
+  }
+
   ready(callback: () => void): void {
     if (this.isReady) {
       callback();
@@ -541,21 +636,22 @@ export class CairoBrowserAnalytics implements CairoAnalytics {
 
   private setupErrorTracking(): void {
     window.addEventListener('error', (event) => {
-      this.track('JavaScript Error', {
-        error_message: event.message,
-        error_filename: event.filename,
-        error_line: event.lineno,
-        error_column: event.colno,
-        error_url: window.location.href,
-        user_agent: navigator.userAgent,
-      });
+      this.captureException(
+        event.error || new Error(event.message),
+        {
+          source_file: event.filename,
+          source_line: event.lineno,
+          source_column: event.colno,
+          type: 'uncaught_exception',
+        }
+      );
     });
 
     window.addEventListener('unhandledrejection', (event) => {
-      this.track('Unhandled Promise Rejection', {
-        error_reason: event.reason?.toString(),
-        error_url: window.location.href,
-        user_agent: navigator.userAgent,
+      const reason = event.reason;
+      const error = reason instanceof Error ? reason : new Error(String(reason));
+      this.captureException(error, {
+        type: 'unhandled_rejection',
       });
     });
   }
