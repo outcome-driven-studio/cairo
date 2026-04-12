@@ -1,7 +1,7 @@
 {
   "name": "cairo-cdp",
   "version": "2.0.0",
-  "description": "Headless customer data platform with MCP protocol, error tracking, and AI agent observability",
+  "description": "Headless MCP-first customer data platform with error tracking, identity resolution, and AI agent observability",
   "bin": {
     "cairo-cdp": "./bin/cairo.js"
   },
@@ -9,6 +9,8 @@
     "bin/",
     "src/",
     "server.js",
+    "start-safe.js",
+    "start.sh",
     "llms.txt",
     "package.json"
   ],

@@ -1,7 +1,9 @@
 node_modules
 .git
+.github
 .env
 .env.local
+.env.*
 *.log
 combined.log
 error.log
@@ -10,6 +12,21 @@ dist
 coverage
 .vscode
 .idea
+.claude
+.claude-flow
+.mcp.json
+CLAUDE.md
+
+# Documentation (llms.txt is included for agent discovery)
+docs/
 *.md
 !README.md
-MERGE_CONFLICT_RESOLUTION.md
+
+# Deprecated packages (not needed at runtime)
+packages/browser-sdk
+packages/react-sdk
+
+# Tests
+tests/
+*.test.js
+*.spec.js

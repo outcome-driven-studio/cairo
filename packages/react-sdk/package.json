@@ -1,7 +1,8 @@
 {
   "name": "@cairo/react",
   "version": "1.0.0",
-  "description": "Cairo CDP React SDK for client-side event tracking",
+  "deprecated": "Use @cairo/tracker instead. Cairo is now headless MCP-first and this React SDK is no longer maintained.",
+  "description": "[DEPRECATED] Cairo CDP React SDK - use @cairo/tracker instead",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
