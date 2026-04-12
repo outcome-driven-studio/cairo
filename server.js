@@ -39,7 +39,6 @@ const fullSyncJobRoutes = require("./src/routes/fullSyncJobRoutes");
 
 // Create Express app
 const app = express();
-const path = require("path");
 
 // Initialize Sentry with Express app (must be before any middleware)
 sentry.initSentry(app);
@@ -316,37 +315,19 @@ app.get("/debug/routes", (req, res) => {
   });
 });
 
-// Serve static files from the UI build (opt-in: set SERVE_UI=false to disable)
-const serveUI = process.env.SERVE_UI !== 'false';
-const publicPath = path.join(__dirname, "public");
-if (serveUI && require("fs").existsSync(publicPath)) {
-  app.use('/assets', (req, res, next) => {
-    logger.info(`[STATIC] Requesting asset: ${req.path}`);
-    next();
-  });
+// Cairo runs in headless mode - all interaction via MCP or REST API
+logger.info("Cairo running in headless mode (MCP-first).");
 
-  app.use(express.static(publicPath, {
-    setHeaders: (res, path, stat) => {
-      if (path.endsWith('.css')) {
-        res.setHeader('Content-Type', 'text/css; charset=utf-8');
-      } else if (path.endsWith('.js')) {
-        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-      }
-    }
-  }));
-  logger.info(`Serving UI from ${publicPath}`);
-
+// Serve llms.txt for agent discovery
+app.get("/llms.txt", (req, res) => {
   const fs = require("fs");
-  const assetsPath = path.join(publicPath, "assets");
-  if (fs.existsSync(assetsPath)) {
-    const files = fs.readdirSync(assetsPath);
-    logger.info(`Available assets: ${files.join(', ')}`);
+  const llmsPath = require("path").join(__dirname, "llms.txt");
+  if (fs.existsSync(llmsPath)) {
+    res.type("text/plain").send(fs.readFileSync(llmsPath, "utf-8"));
+  } else {
+    res.status(404).type("text/plain").send("llms.txt not found");
   }
-} else if (!serveUI) {
-  logger.info("UI disabled (SERVE_UI=false). Running in headless mode.");
-} else {
-  logger.warn("No UI build found. Run 'node build-ui.js' to build the UI, or set SERVE_UI=false for headless mode.");
-}
+});
 
 // Add body parser middleware
 app.use(express.json());
@@ -731,49 +712,21 @@ app.get("/test-sentry", async (req, res) => {
   }
 });
 
-// Catch-all route for client-side routing (must be after API routes)
-app.get("*", (req, res) => {
-  // Don't catch API routes
-  if (req.path.startsWith('/api') || req.path.startsWith('/sync') || req.path.startsWith('/ws')) {
-    logger.warn(`[404] API route not found: ${req.method} ${req.path}`);
+// Catch-all 404 handler (must be after API routes)
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
 
-    // Send to Sentry for monitoring
-    sentry.captureMessage(
-      `API route not found: ${req.method} ${req.path}`,
-      'warning',
-      {
-        method: req.method,
-        path: req.path,
-        query: req.query,
-        headers: {
-          'user-agent': req.headers['user-agent'],
-          'referer': req.headers['referer']
-        }
-      }
-    );
-
-    res.status(404).json({
-      error: 'Not found',
-      path: req.path,
-      message: `The endpoint ${req.path} does not exist. Check /debug/routes for available endpoints.`
-    });
-    return;
-  }
-
-  if (serveUI) {
-    const indexPath = path.join(__dirname, "public", "index.html");
-    if (require("fs").existsSync(indexPath)) {
-      res.sendFile(indexPath);
-    } else {
-      res.status(404).send("UI not built. Run 'node build-ui.js' or set SERVE_UI=false for headless mode.");
-    }
-  } else {
-    res.status(404).json({
-      error: 'Not found',
-      path: req.path,
-      message: 'Cairo is running in headless mode. Use /mcp for MCP protocol or /api/* for REST.',
-    });
-  }
+  logger.warn(`[404] Route not found: ${req.method} ${req.path}`);
+  res.status(404).json({
+    error: 'Not found',
+    path: req.path,
+    message: 'Cairo is a headless MCP-first CDP. Use POST /mcp for MCP protocol or /api/* for REST.',
+    docs: {
+      mcp_discovery: 'GET /mcp',
+      health: 'GET /health',
+      llms_txt: 'GET /llms.txt',
+    },
+  });
 });
 
 // Add Sentry error handler (must be after all other middleware and routes)
@@ -905,53 +858,19 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
       );
     }
 
-    console.log(`Server is ready!${serveUI ? '' : ' (headless mode)'} Available endpoints:`);
-    console.log(`  - GET  /health - Health check`);
-    console.log(`  - GET  /health/detailed - Detailed health check`);
-    console.log(`  - POST /mcp - MCP protocol (JSON-RPC, for agents)`);
-    console.log(`  - GET  /mcp - MCP discovery (list tools)`);
-    console.log(`  - POST /api/v2/errors/capture - Error capture (Sentry-like)`);
-    console.log(`  - GET  /debug/test-integrations - Test all integrations`);
-    console.log(`  - GET  /debug/data-status - Check data flow and recent activity`);
-    console.log(`  - GET  /debug/routes - List all registered routes`);
-
-    // Show periodic sync endpoints if enabled
-    if (process.env.USE_PERIODIC_SYNC === "true") {
-      console.log(
-        `  \nPeriodic Sync APIs (auto-sync every ${
-          process.env.SYNC_INTERVAL_HOURS || 4
-        } hours):`
-      );
-      console.log(`  - GET  /api/periodic-sync/status - Check sync status`);
-      console.log(`  - POST /api/periodic-sync/sync-now - Force sync now`);
-      console.log(`  - GET  /api/periodic-sync/history - View sync history`);
-    }
-
-    console.log(
-      `  \nBackground Attio Sync APIs (runs even after request closes):`
-    );
-    console.log(
-      `  - POST /api/sync/users-background - Sync users to Attio in background`
-    );
-    console.log(
-      `  - POST /api/sync/events-background - Sync events to Attio in background`
-    );
-    console.log(
-      `  - POST /api/sync/full-background - Full sync (users + events) in background`
-    );
-    console.log(`  - GET  /api/jobs - List all background jobs`);
-    console.log(
-      `  - GET  /api/jobs/status/:jobName - Check specific job status`
-    );
-    console.log(`  - POST /api/jobs/stop/:jobName - Stop a running job`);
-    console.log(`  \nOther endpoints:`);
-    console.log(`  - GET  /initial-sync - Run initial sync`);
-    console.log(`  - GET  /delta-sync - Run delta sync`);
-    console.log(`  - GET  /sync-status - Check sync status`);
-    console.log(`  - GET  /initial-sync?source=smartlead - Smartlead only`);
-    console.log(`  - GET  /initial-sync?source=lemlist - Lemlist only`);
-    console.log(`  - GET  /delta-sync?source=smartlead - Smartlead delta only`);
-    console.log(`  - GET  /delta-sync?source=lemlist - Lemlist delta only`);
+    console.log(`Server is ready! (headless MCP-first mode)`);
+    console.log(`\n  Primary interface:`);
+    console.log(`  - POST /mcp          - MCP protocol (JSON-RPC, for agents)`);
+    console.log(`  - GET  /mcp          - MCP discovery (list tools)`);
+    console.log(`  - GET  /llms.txt     - Agent-readable documentation`);
+    console.log(`\n  Health:`);
+    console.log(`  - GET  /health       - Health check`);
+    console.log(`  - GET  /health/simple - Simple health check (no DB)`);
+    console.log(`\n  REST API (compatibility):`);
+    console.log(`  - POST /api/v2/batch          - Batch event ingestion`);
+    console.log(`  - POST /api/v2/track          - Track event`);
+    console.log(`  - POST /api/v2/identify       - Identify user`);
+    console.log(`  - POST /api/v2/errors/capture - Capture error`);
   } catch (error) {
     logger.error("FATAL: Failed to initialize application:", error);
     await monitoring.captureError(error, { type: "startup" });
