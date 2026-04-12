@@ -1,7 +1,7 @@
 {
   "name": "cairo-cdp",
   "version": "2.0.0",
-  "description": "Headless customer data platform with MCP protocol, error tracking, and AI agent observability",
+  "description": "Headless MCP-first customer data platform with error tracking, identity resolution, and AI agent observability",
   "bin": {
     "cairo-cdp": "./bin/cairo.js"
   },
@@ -9,6 +9,8 @@
     "bin/",
     "src/",
     "server.js",
+    "start-safe.js",
+    "start.sh",
     "llms.txt",
     "package.json"
   ],
@@ -47,14 +49,12 @@
     "test": "echo \"No tests specified\" && exit 0",
     "setup": "node src/migrations/run_migrations.js",
     "setup-env": "node setup-env.js",
-    "build:ui": "node build-ui.js",
-    "build": "npm run build:ui && npm run build:sdks",
-    "build:sdks": "npm run build:sdk:node && npm run build:sdk:react && npm run build:sdk:browser && npm run build:sdk:agent-tracker && npm run build:sdk:agent-mcp",
+    "build": "npm run build:sdks",
+    "build:sdks": "npm run build:sdk:node && npm run build:sdk:agent-tracker && npm run build:sdk:agent-mcp && npm run build:sdk:tracker",
     "build:sdk:node": "cd packages/node-sdk && npm install && npm run build",
-    "build:sdk:react": "cd packages/react-sdk && npm install && npm run build",
-    "build:sdk:browser": "cd packages/browser-sdk && npm install && npm run build",
     "build:sdk:agent-tracker": "cd packages/agent-tracker && npm install && npm run build",
     "build:sdk:agent-mcp": "cd packages/agent-mcp && npm install && npm run build",
+    "build:sdk:tracker": "cd packages/tracker && npm install && npm run build",
     "migrate": "node src/migrations/run_migrations.js"
   },
   "devDependencies": {

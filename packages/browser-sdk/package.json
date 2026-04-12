@@ -1,7 +1,8 @@
 {
   "name": "@cairo/browser",
   "version": "1.0.0",
-  "description": "Cairo CDP Browser SDK for universal web tracking",
+  "deprecated": "Use @cairo/tracker instead. Cairo is now headless MCP-first and this browser SDK is no longer maintained.",
+  "description": "[DEPRECATED] Cairo CDP Browser SDK - use @cairo/tracker instead",
   "main": "dist/cairo.min.js",
   "module": "dist/cairo.esm.js",
   "types": "dist/index.d.ts",
