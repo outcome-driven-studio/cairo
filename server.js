@@ -318,6 +318,8 @@ app.get("/debug/routes", (req, res) => {
 // Cairo runs in headless mode - all interaction via MCP or REST API
 logger.info("Cairo running in headless mode (MCP-first).");
 
+// ── Agent discovery endpoints (before body parser, lightweight) ──
+
 // Serve llms.txt for agent discovery
 app.get("/llms.txt", (req, res) => {
   const fs = require("fs");
@@ -327,6 +329,45 @@ app.get("/llms.txt", (req, res) => {
   } else {
     res.status(404).type("text/plain").send("llms.txt not found");
   }
+});
+
+// .well-known/mcp.json for automated MCP server discovery
+app.get("/.well-known/mcp.json", (req, res) => {
+  const host = req.headers.host || `localhost:${process.env.PORT || 8080}`;
+  const protocol = req.headers['x-forwarded-proto'] || 'http';
+  const baseUrl = `${protocol}://${host}`;
+
+  res.json({
+    name: "cairo-cdp",
+    version: "2.0.0",
+    description: "Headless MCP-first customer data platform with error tracking, identity resolution, and AI agent observability.",
+    protocol: "mcp",
+    protocolVersion: "2024-11-05",
+    transport: {
+      type: "streamable-http",
+      url: `${baseUrl}/mcp`,
+      authentication: {
+        type: "header",
+        header: "X-Write-Key",
+        description: "Pass your write key as X-Write-Key header or Bearer token.",
+      },
+    },
+    discovery: {
+      tools_list: `${baseUrl}/mcp (GET)`,
+      llms_txt: `${baseUrl}/llms.txt`,
+      health: `${baseUrl}/health`,
+    },
+    capabilities: {
+      events: "Track, query, and batch events",
+      identity: "Resolve and merge user identities",
+      errors: "Capture, group, and resolve errors (Sentry alternative)",
+      destinations: "Route events to 15+ destinations",
+      transformations: "Transform events with JavaScript functions",
+      tracking_plans: "Validate events against schemas",
+      gdpr: "User deletion and suppression",
+      agents: "AI agent session tracking and observability",
+    },
+  });
 });
 
 // Add body parser middleware
@@ -422,11 +463,17 @@ app.use((req, res, next) => {
   }
 });
 
+// ── PRIMARY INTERFACE: MCP Protocol ──
+// MCP is the canonical interface. Agents connect here.
+const McpRoutes = require("./src/routes/mcpRoutes");
+const mcpRoutes = new McpRoutes();
+app.use("/mcp", mcpRoutes.setupRoutes());
+
 // Initialize services
 const lemlistService = new LemlistService();
 const smartleadService = new SmartleadService();
 
-// Initialize and mount routes
+// ── REST API (compatibility layer) ──
 const syncRoutes = new SyncRoutes(lemlistService, smartleadService);
 app.use("/sync", syncRoutes.setupRoutes());
 
@@ -564,12 +611,7 @@ const ErrorRoutes = require("./src/routes/errorRoutes");
 const errorRoutes = new ErrorRoutes();
 app.use("/api/v2/errors", errorRoutes.setupRoutes());
 
-// MCP Protocol Endpoint (headless agent interface)
-const McpRoutes = require("./src/routes/mcpRoutes");
-const mcpRoutes = new McpRoutes();
-app.use("/mcp", mcpRoutes.setupRoutes());
-
-// Agent Tools API (OpenAI-compatible)
+// Agent Tools API (OpenAI-compatible, legacy)
 const AgentToolsRoutes = require("./src/routes/agentToolsRoutes");
 const agentToolsRoutes = new AgentToolsRoutes();
 app.use("/api/agent", agentToolsRoutes.setupRoutes());
