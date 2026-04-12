@@ -1,10 +1,10 @@
 # Cairo
 
-Cairo is an open-source, headless customer data platform (CDP) with built-in error tracking and AI agent observability. It runs MCP-first: agents connect via the MCP protocol, humans can optionally use the REST API or UI.
+Cairo is an open-source, headless MCP-first customer data platform (CDP). Agents are the primary user. All interaction happens through the MCP protocol or REST API. There is no UI.
 
-## MCP Protocol (Recommended for Agents)
+## MCP Protocol (Primary Interface)
 
-Cairo exposes an MCP server at `POST /mcp`. Auth with `X-Write-Key` header.
+Cairo exposes an MCP server at `POST /mcp`. Authenticate with `X-Write-Key` header.
 
 ### Connect via MCP
 
@@ -31,28 +31,61 @@ Content-Type: application/json
 }}
 ```
 
-### Available MCP Tools
+## Available MCP Tools
 
-**Write:**
+### Events
 - `track_event` - Track any CDP event (page view, click, purchase, custom)
-- `identify_user` - Identify a user with traits
-- `capture_error` - Capture an error with stack trace and context (Sentry-like)
-
-**Read:**
+- `batch_track` - Track multiple events in a single call
 - `query_events` - Query events with filters (type, user, time range)
+
+### Users
+- `identify_user` - Identify a user with traits
 - `lookup_user` - Look up user profile and recent activity
+
+### Identity Resolution
 - `resolve_identity` - Resolve identity graph across IDs and emails
+- `alias_identity` - Link two user identities together
+
+### Error Tracking (Sentry alternative)
+- `capture_error` - Capture an error with stack trace and context
 - `list_error_groups` - List error groups by status (open, resolved, ignored)
 - `get_error_group` - Get error group details with recent occurrences
 - `resolve_error` - Update error group status
 - `error_trends` - Get error count trends over time
+
+### Destinations
 - `list_destinations` - List configured destinations and their status
+- `list_destination_types` - List all available destination types
+- `create_destination` - Create a new destination configuration
+- `update_destination` - Update a destination configuration
+- `delete_destination` - Delete a destination configuration
+
+### Transformations
+- `list_transformations` - List event transformation rules
+- `create_transformation` - Create a transformation rule (JavaScript)
+- `update_transformation` - Update a transformation rule
+- `delete_transformation` - Delete a transformation rule
+
+### Tracking Plans
+- `list_tracking_plans` - List tracking plans (event schema validation)
+- `create_tracking_plan` - Create a tracking plan
+- `update_tracking_plan` - Update a tracking plan
+- `delete_tracking_plan` - Delete a tracking plan
+
+### GDPR Compliance
+- `gdpr_delete_user` - Delete a user and all their data (right to erasure)
+- `gdpr_suppress_user` - Suppress a user (stop storing events)
+- `gdpr_unsuppress_user` - Remove suppression
+- `gdpr_check_suppression` - Check if a user is suppressed
+
+### Agent Observability
 - `query_agent_sessions` - Query AI agent tracking sessions
+
+### System
 - `system_health` - Get system health, uptime, and counts
+- `describe_tool` - Get detailed info about any tool
 
-## Stdio MCP Server (for Claude Code, etc.)
-
-Add Cairo as an MCP server in your agent config:
+## Stdio MCP Server (for Claude Code, Cursor, etc.)
 
 ```json
 {
@@ -71,8 +104,6 @@ Add Cairo as an MCP server in your agent config:
 ```
 
 ## Error Tracking (Sentry Alternative)
-
-Cairo captures, fingerprints, and groups errors just like Sentry, but headless and MCP-native.
 
 ### Via MCP
 
@@ -109,53 +140,27 @@ X-Write-Key: your-write-key
 import { CairoClient } from '@cairo/node-sdk';
 
 const cairo = new CairoClient({ writeKey: 'your-key', dataPlaneUrl: 'https://your-cairo.com' });
-
-// Capture an exception
 cairo.captureException(new Error('Something broke'), { component: 'payments' });
-
-// Capture a message
 cairo.captureMessage('Disk usage above 90%', 'warning', { disk: '/dev/sda1' });
 ```
 
-### Query Errors (MCP)
+## REST API (Compatibility Layer)
 
-```json
-{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
-  "name":"list_error_groups",
-  "arguments":{"status":"open","limit":10}
-}}
-```
+REST endpoints are available for backward compatibility. All functionality is also available via MCP tools.
 
-## HTTP API (REST)
+### Event Ingestion (Segment-compatible)
 
-All events go to `/v2/*` or `/api/v2/*`. Auth with `X-Write-Key` header.
-
-### POST /v2/track
-```json
-{"event":"purchase","userId":"user_123","properties":{"amount":29.99}}
-```
-
-### POST /v2/identify
-```json
-{"userId":"user_123","traits":{"name":"Jane","email":"jane@example.com"}}
-```
-
-### POST /v2/batch
-```json
-{"batch":[
-  {"type":"track","event":"page_viewed","userId":"user_123","properties":{"page":"/home"}},
-  {"type":"track","event":"button_clicked","userId":"user_123","properties":{"button":"cta"}}
-]}
-```
-
-### POST /v2/page
-```json
-{"name":"Pricing","userId":"user_123"}
-```
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v2/track` | POST | Track a single event |
+| `/v2/batch` | POST | Track multiple events |
+| `/v2/identify` | POST | Identify a user |
+| `/v2/group` | POST | Associate user with a group |
+| `/v2/page` | POST | Track a page view |
+| `/v2/screen` | POST | Track a screen view |
+| `/v2/alias` | POST | Link two user identities |
 
 ## AI Agent Tracking
-
-Track AI agent sessions, LLM calls, tool usage, and costs:
 
 ```typescript
 import { AgentTracker } from '@cairo/agent-tracker';
@@ -174,15 +179,15 @@ tracker.error({ type: 'timeout', message: 'API timed out', recoverable: true });
 await tracker.shutdown();
 ```
 
-## Headless Mode
-
-Run Cairo without any UI:
+## Self-hosting
 
 ```bash
-SERVE_UI=false npm start
+git clone https://github.com/outcome-driven-studio/cairo.git
+cd cairo
+npm install
+# Set POSTGRES_URL in .env
+npm start
 ```
-
-All configuration and operation happens through MCP tools or REST API.
 
 ## Config Options
 
@@ -194,23 +199,11 @@ All configuration and operation happens through MCP tools or REST API.
 | flushInterval | 5000 | Ms between flushes |
 | maxRetries | 3 | Retry attempts |
 | timeout | 10000 | Request timeout (ms) |
-| debug | false | Log to console |
-| enable | true | Set false to disable |
-
-## Self-hosting
-
-```bash
-git clone https://github.com/outcome-driven-studio/cairo.git
-cd cairo
-npm install
-# Set POSTGRES_URL in .env
-SERVE_UI=false npm start
-```
 
 ## Key Features
 
-- MCP-native: agents connect via MCP protocol, no UI required
-- Error tracking: capture, fingerprint, group, and resolve errors (Sentry alternative)
+- MCP-first: agents connect via MCP protocol, no UI
+- Error tracking: capture, fingerprint, group, resolve (Sentry alternative)
 - Segment-compatible API (drop-in replacement)
 - Identity resolution (merge anonymous + known users)
 - AI agent observability (sessions, costs, tool usage)

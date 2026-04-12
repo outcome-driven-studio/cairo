@@ -72,21 +72,42 @@ class McpRoutes {
    * GET /mcp - Discovery endpoint. Returns server info and available tools.
    */
   async handleGet(req, res) {
+    const allTools = Object.values(this.mcpService.tools);
+    const categorize = (name) => {
+      if (name.startsWith('gdpr_')) return 'gdpr';
+      if (name.includes('error') || name === 'capture_error') return 'errors';
+      if (name.includes('destination')) return 'destinations';
+      if (name.includes('transformation')) return 'transformations';
+      if (name.includes('tracking_plan')) return 'tracking_plans';
+      if (name.includes('agent')) return 'agents';
+      if (name.includes('identity') || name === 'alias_identity') return 'identity';
+      if (['track_event', 'batch_track', 'query_events'].includes(name)) return 'events';
+      if (['identify_user', 'lookup_user'].includes(name)) return 'users';
+      return 'system';
+    };
+
+    const toolsByCategory = {};
+    for (const t of allTools) {
+      const cat = categorize(t.name);
+      if (!toolsByCategory[cat]) toolsByCategory[cat] = [];
+      toolsByCategory[cat].push({ name: t.name, description: t.description });
+    }
+
     const info = {
       name: 'cairo-cdp',
       version: '2.0.0',
       protocol: 'mcp',
       protocolVersion: '2024-11-05',
       transport: 'streamable-http',
-      description: 'Cairo CDP - Headless customer data platform with error tracking, identity resolution, and AI agent observability.',
+      description: 'Cairo CDP - Headless MCP-first customer data platform. Agents connect via MCP protocol, humans use REST.',
       endpoints: {
         mcp: 'POST /mcp (JSON-RPC)',
-        rest: '/api/v2/* (REST)',
+        discovery: 'GET /mcp',
+        llms_txt: 'GET /llms.txt',
+        rest: '/api/v2/* (compatibility)',
       },
-      tools: Object.values(this.mcpService.tools).map(t => ({
-        name: t.name,
-        description: t.description,
-      })),
+      tool_count: allTools.length,
+      tools_by_category: toolsByCategory,
     };
     res.json(info);
   }
