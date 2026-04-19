@@ -15,9 +15,17 @@
     "package.json"
   ],
   "keywords": [
-    "cdp", "customer-data-platform", "mcp", "model-context-protocol",
-    "error-tracking", "sentry-alternative", "agent-observability",
-    "headless", "analytics", "event-tracking", "ai-agent"
+    "cdp",
+    "customer-data-platform",
+    "mcp",
+    "model-context-protocol",
+    "error-tracking",
+    "sentry-alternative",
+    "agent-observability",
+    "headless",
+    "analytics",
+    "event-tracking",
+    "ai-agent"
   ],
   "license": "MIT",
   "repository": {
@@ -25,9 +33,9 @@
     "url": "https://github.com/outcome-driven-studio/cairo.git"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.21.0",
     "@google-cloud/secret-manager": "^5.0.0",
     "@google-cloud/tasks": "^4.0.0",
+    "@google/generative-ai": "^0.21.0",
     "@sentry/node": "^7.120.4",
     "@sentry/profiling-node": "^7.120.3",
     "axios": "^1.9.0",
@@ -36,6 +44,7 @@
     "csv-parser": "^3.2.0",
     "dotenv": "^16.5.0",
     "express": "^4.18.2",
+    "express-validator": "^7.3.2",
     "node-cron": "^3.0.3",
     "pg": "^8.16.0",
     "uuid": "^9.0.1",
