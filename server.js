@@ -320,6 +320,74 @@ logger.info("Cairo running in headless mode (MCP-first).");
 
 // ── Agent discovery endpoints (before body parser, lightweight) ──
 
+// Root: tiny dev-esque landing page (humans land here, agents use /mcp)
+app.get("/", (req, res) => {
+  const pkg = require("./package.json");
+  res.type("html").send(`<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cairo</title>
+<style>
+  :root { color-scheme: light dark; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #0b0b0b;
+    color: #e6e6e6;
+    font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    html, body { background: #fafafa; color: #1a1a1a; }
+    a { color: #0a58ca; }
+    .muted { color: #666; }
+    .prompt { color: #7a7a7a; }
+  }
+  main { max-width: 680px; margin: 0 auto; padding: 48px 24px; }
+  h1 { font-size: 14px; font-weight: 600; margin: 0 0 4px; letter-spacing: 0; }
+  .muted { color: #888; }
+  .prompt { color: #6e6e6e; user-select: none; }
+  a { color: #7dd3fc; text-decoration: none; border-bottom: 1px dotted currentColor; }
+  a:hover { opacity: 0.8; }
+  pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+  section { margin: 24px 0; }
+  hr { border: 0; border-top: 1px dashed #2a2a2a; margin: 24px 0; }
+  @media (prefers-color-scheme: light) { hr { border-top-color: #ddd; } }
+  .badge { display: inline-block; padding: 1px 6px; border: 1px solid currentColor; border-radius: 3px; font-size: 11px; opacity: 0.7; }
+</style>
+</head>
+<body>
+<main>
+<pre>
+<span class="prompt">$</span> cat about.txt
+
+cairo <span class="muted">v${pkg.version}</span>  <span class="badge">headless</span> <span class="badge">mcp-first</span>
+
+open-source, headless, MCP-first customer data platform.
+agents are the primary user. no UI.
+
+<span class="prompt">$</span> ls endpoints/
+
+<a href="/mcp">/mcp</a>                  <span class="muted"># MCP server (POST for JSON-RPC, GET for discovery)</span>
+<a href="/llms.txt">/llms.txt</a>             <span class="muted"># agent-readable docs</span>
+<a href="/.well-known/mcp.json">/.well-known/mcp.json</a> <span class="muted"># automated MCP discovery</span>
+<a href="/health">/health</a>               <span class="muted"># service + db health</span>
+<a href="/health/simple">/health/simple</a>        <span class="muted"># fast health check (no db)</span>
+
+<span class="prompt">$</span> curl -X POST / -H "X-Write-Key: …"
+
+  curl -X POST $HOST/mcp \\
+    -H "Content-Type: application/json" \\
+    -H "X-Write-Key: your-write-key" \\
+    -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+
+<span class="prompt">$</span> <a href="https://github.com/outcome-driven-studio/cairo">github.com/outcome-driven-studio/cairo</a> <span class="muted">— MIT</span>
+</pre>
+</main>
+</body>
+</html>`);
+});
+
 // Serve llms.txt for agent discovery
 app.get("/llms.txt", (req, res) => {
   const fs = require("fs");
@@ -764,6 +832,7 @@ app.use((req, res, next) => {
     path: req.path,
     message: 'Cairo is a headless MCP-first CDP. Use POST /mcp for MCP protocol or /api/* for REST.',
     docs: {
+      landing: 'GET /',
       mcp_discovery: 'GET /mcp',
       health: 'GET /health',
       llms_txt: 'GET /llms.txt',
