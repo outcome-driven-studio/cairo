@@ -1,7 +1,5 @@
 FROM node:18-alpine
 
-RUN apk add --no-cache wget
-
 WORKDIR /app
 
 # Copy package files for layer caching
@@ -29,7 +27,7 @@ USER nodeuser
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/health/simple || exit 1
+# No HEALTHCHECK: Cloud Run uses its own TCP startup probe (240s timeout),
+# which gives us time to run migrations before binding port 8080.
 
 CMD ["./start.sh"]
