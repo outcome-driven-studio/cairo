@@ -2,6 +2,8 @@
 
 Cairo is an open-source, headless MCP-first customer data platform (CDP). Agents are the primary user. All interaction happens through the MCP protocol or REST API. There is no UI.
 
+Full HTML documentation with every tool's arguments and example calls: GET /docs
+
 ## MCP Protocol (Primary Interface)
 
 Cairo exposes an MCP server at `POST /mcp`. Authenticate with `X-Write-Key` header.
