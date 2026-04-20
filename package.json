@@ -9,7 +9,6 @@
     "bin/",
     "src/",
     "server.js",
-    "start-safe.js",
     "start.sh",
     "llms.txt",
     "package.json"
