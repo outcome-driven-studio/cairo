@@ -369,7 +369,8 @@ agents are the primary user. no UI.
 <span class="prompt">$</span> ls endpoints/
 
 <a href="/mcp">/mcp</a>                  <span class="muted"># MCP server (POST for JSON-RPC, GET for discovery)</span>
-<a href="/llms.txt">/llms.txt</a>             <span class="muted"># agent-readable docs</span>
+<a href="/docs">/docs</a>                 <span class="muted"># full documentation (plain HTML)</span>
+<a href="/llms.txt">/llms.txt</a>             <span class="muted"># agent-readable summary</span>
 <a href="/.well-known/mcp.json">/.well-known/mcp.json</a> <span class="muted"># automated MCP discovery</span>
 <a href="/health">/health</a>               <span class="muted"># service + db health</span>
 <a href="/health/simple">/health/simple</a>        <span class="muted"># fast health check (no db)</span>
@@ -399,6 +400,10 @@ app.get("/llms.txt", (req, res) => {
   }
 });
 
+// Plain-HTML documentation, auto-generated from the MCP tool registry
+const DocsRoutes = require("./src/routes/docsRoutes");
+app.use("/docs", DocsRoutes.setup());
+
 // .well-known/mcp.json for automated MCP server discovery
 app.get("/.well-known/mcp.json", (req, res) => {
   const host = req.headers.host || `localhost:${process.env.PORT || 8080}`;
@@ -423,6 +428,7 @@ app.get("/.well-known/mcp.json", (req, res) => {
     discovery: {
       tools_list: `${baseUrl}/mcp (GET)`,
       llms_txt: `${baseUrl}/llms.txt`,
+      docs: `${baseUrl}/docs`,
       health: `${baseUrl}/health`,
     },
     capabilities: {
@@ -833,6 +839,7 @@ app.use((req, res, next) => {
     message: 'Cairo is a headless MCP-first CDP. Use POST /mcp for MCP protocol or /api/* for REST.',
     docs: {
       landing: 'GET /',
+      full_docs: 'GET /docs',
       mcp_discovery: 'GET /mcp',
       health: 'GET /health',
       llms_txt: 'GET /llms.txt',
