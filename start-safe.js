@@ -95,18 +95,21 @@ async function bootstrap() {
     console.log("--- [STEP 3/3] STARTING APPLICATION SERVER ---");
     startupState = "handoff";
 
-    server.close((closeError) => {
-      if (closeError) {
-        console.error("Failed to close bootstrap server:", closeError);
-        startupState = "failed";
-        startupError = closeError.message;
-        process.exit(1);
-        return;
-      }
+    // Force-close all active connections (Cloud Run's startup probe keeps one
+    // alive, which would otherwise block server.close from completing).
+    if (typeof server.closeAllConnections === "function") {
+      server.closeAllConnections();
+    }
 
-      startupState = "starting-app";
-      require("./server.js");
+    await new Promise((resolve, reject) => {
+      server.close((closeError) => {
+        if (closeError) return reject(closeError);
+        resolve();
+      });
     });
+
+    startupState = "starting-app";
+    require("./server.js");
   } catch (error) {
     startupState = "failed";
     startupError = error.message;
