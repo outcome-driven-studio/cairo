@@ -58,15 +58,15 @@ const envConfig = {
     },
     {
       key: "GEMINI_MODEL_PRO",
-      description: "Gemini Pro model name (default: gemini-1.5-pro)",
+      description: "Gemini Pro model name (default: gemini-2.5-pro)",
       category: "AI Enrichment",
-      default: "gemini-1.5-pro",
+      default: "gemini-2.5-pro",
     },
     {
       key: "GEMINI_MODEL_FLASH",
-      description: "Gemini Flash model name (default: gemini-1.5-flash)",
+      description: "Gemini Flash model name (default: gemini-2.5-flash)",
       category: "AI Enrichment",
-      default: "gemini-1.5-flash",
+      default: "gemini-2.5-flash",
     },
     {
       key: "ENABLE_AI_LEAD_SCORING",

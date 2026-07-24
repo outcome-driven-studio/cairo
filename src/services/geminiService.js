@@ -24,8 +24,8 @@ class GeminiService {
     this.genAI = new GoogleGenerativeAI(apiKey);
     
     // Model configuration
-    this.modelPro = process.env.GEMINI_MODEL_PRO || "gemini-1.5-pro";
-    this.modelFlash = process.env.GEMINI_MODEL_FLASH || "gemini-1.5-flash";
+    this.modelPro = process.env.GEMINI_MODEL_PRO || "gemini-2.5-pro";
+    this.modelFlash = process.env.GEMINI_MODEL_FLASH || "gemini-2.5-flash";
     
     // Cost tracking (approximate costs per 1000 operations in USD)
     // Gemini pricing: Pro ~$1.25/1M input tokens, $5/1M output tokens
