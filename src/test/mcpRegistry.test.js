@@ -24,6 +24,9 @@ describe('McpService registry', () => {
       'enqueue_notification',
       'register_agent_webhook',
       'set_user_channel',
+      'create_write_key',
+      'list_write_keys',
+      'revoke_write_key',
       'system_health',
     ]));
     // Direct gateway send must NOT exist

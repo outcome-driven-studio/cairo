@@ -58,6 +58,11 @@ JSON-RPC 2.0. Methods: initialize, tools/list, tools/call, ping.
 - gdpr_unsuppress_user { user_id, namespace? }
 - gdpr_check_suppression { user_id, namespace? }
 
+### Auth
+- create_write_key { name?, key? }
+- list_write_keys {}
+- revoke_write_key { id }
+
 ### Agents / System
 - query_agent_sessions { agent_id?, limit?, namespace? }
 - system_health {}
@@ -70,8 +75,13 @@ JSON-RPC 2.0. Methods: initialize, tools/list, tools/call, ping.
 - /v2/errors/* — error tracking
 - /v2/agent/* — agent sessions
 
+## Auth notes
+- Pass X-Write-Key or Authorization: Bearer on every /mcp and /v2 request
+- NODE_ENV=production or CAIRO_REQUIRE_WRITE_KEYS=true disables bootstrap
+- Create keys: CLI `cairo create-write-key --name prod` or MCP create_write_key
+
 ## Typical agent relay loop
 1. create_notification_rule targeting your agent_id
-2. Events arrive → Cairo enqueues pending notifications (and optional webhook push)
+2. Events arrive → Cairo enqueues pending notifications (webhook push retries on failure)
 3. get_pending_notifications → relay via your gateway using payload.channels
 4. ack_notification
