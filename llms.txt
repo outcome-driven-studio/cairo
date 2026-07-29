@@ -1,215 +1,77 @@
-# Cairo
+# Cairo — agent-first event tracking
 
-Cairo is an open-source, headless MCP-first customer data platform (CDP). Agents are the primary user. All interaction happens through the MCP protocol or REST API. There is no UI.
+Cairo ingests events from products and agents, then hands notifications to agents.
+Agents relay to end users via their own gateways (Telegram, Discord, Slack, WhatsApp…).
+Cairo does NOT talk to messaging gateways itself.
 
-Full HTML documentation with every tool's arguments and example calls: GET /docs
+Base URL: your Cairo host
+Auth: X-Write-Key header (or Authorization: Bearer <key>)
 
-## MCP Protocol (Primary Interface)
+## Discovery
+- GET /mcp — MCP tool discovery
+- GET /docs — HTML docs
+- GET /llms.txt — this file
+- GET /health — health check
+- GET /.well-known/mcp.json — MCP well-known
 
-Cairo exposes an MCP server at `POST /mcp`. Authenticate with `X-Write-Key` header.
+## MCP (POST /mcp)
 
-### Connect via MCP
-
-```json
-POST /mcp
-X-Write-Key: your-write-key
-Content-Type: application/json
-
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
-```
-
-### List Available Tools
-
-```json
-{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
-```
-
-### Call a Tool
-
-```json
-{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{
-  "name":"track_event",
-  "arguments":{"event":"signup","user_email":"jane@example.com","properties":{"plan":"free"}}
-}}
-```
-
-## Available MCP Tools
+JSON-RPC 2.0. Methods: initialize, tools/list, tools/call, ping.
 
 ### Events
-- `track_event` - Track any CDP event (page view, click, purchase, custom)
-- `batch_track` - Track multiple events in a single call
-- `query_events` - Query events with filters (type, user, time range)
+- track_event { event, user_id?, user_email?, anonymous_id?, properties?, namespace? }
+- batch_track { events: [...], namespace? }
+- query_events { user_id?, event?, since?, until?, limit? }
 
 ### Users
-- `identify_user` - Identify a user with traits
-- `lookup_user` - Look up user profile and recent activity
+- identify_user { user_id, traits?, anonymous_id?, namespace? }
+  traits may include telegram_chat_id / discord_user_id / whatsapp_number / slack_user_id
+  (stored in user_channels for agents to look up when relaying)
+- lookup_user { user_id? | email? } — returns user + channels
 
-### Identity Resolution
-- `resolve_identity` - Resolve identity graph across IDs and emails
-- `alias_identity` - Link two user identities together
+### Identity
+- resolve_identity { user_id?, anonymous_id?, email?, namespace? }
+- alias_identity { previous_id, user_id, namespace? }
 
-### Error Tracking (Sentry alternative)
-- `capture_error` - Capture an error with stack trace and context
-- `list_error_groups` - List error groups by status (open, resolved, ignored)
-- `get_error_group` - Get error group details with recent occurrences
-- `resolve_error` - Update error group status
-- `error_trends` - Get error count trends over time
+### Errors
+- capture_error { message, stack?, level?, user_id?, tags?, extra?, namespace? }
+- list_error_groups { status?, limit?, namespace? }
+- get_error_group { fingerprint }
+- resolve_error { fingerprint }
+- error_trends { timeRange?, namespace? }
 
-### Destinations
-- `list_destinations` - List configured destinations and their status
-- `list_destination_types` - List all available destination types
-- `create_destination` - Create a new destination configuration
-- `update_destination` - Update a destination configuration
-- `delete_destination` - Delete a destination configuration
+### Notifications (agent handoff)
+- set_user_channel { user_id, channel: telegram|discord|whatsapp|slack|other, address, namespace? }
+- create_notification_rule { name, event_name, agent_id, message_template, property_match?, namespace? }
+  template vars: {{event}}, {{userId}}, {{properties.x}}, {{channels.telegram}}
+- list_notification_rules { namespace? }
+- delete_notification_rule { id }
+- enqueue_notification { agent_id, text, user_id?, event_name?, properties?, namespace? }
+- get_pending_notifications { agent_id?, limit?, namespace? }
+  each row payload includes channels{} for gateway addresses
+- ack_notification { id, status?: sent|failed|acked }
+- register_agent_webhook { agent_id, url, namespace? }
 
-### Transformations
-- `list_transformations` - List event transformation rules
-- `create_transformation` - Create a transformation rule (JavaScript)
-- `update_transformation` - Update a transformation rule
-- `delete_transformation` - Delete a transformation rule
+### GDPR
+- gdpr_delete_user { user_id, namespace? }
+- gdpr_suppress_user { user_id, reason?, namespace? }
+- gdpr_unsuppress_user { user_id, namespace? }
+- gdpr_check_suppression { user_id, namespace? }
 
-### Tracking Plans
-- `list_tracking_plans` - List tracking plans (event schema validation)
-- `create_tracking_plan` - Create a tracking plan
-- `update_tracking_plan` - Update a tracking plan
-- `delete_tracking_plan` - Delete a tracking plan
+### Agents / System
+- query_agent_sessions { agent_id?, limit?, namespace? }
+- system_health {}
+- describe_tool { name }
 
-### GDPR Compliance
-- `gdpr_delete_user` - Delete a user and all their data (right to erasure)
-- `gdpr_suppress_user` - Suppress a user (stop storing events)
-- `gdpr_unsuppress_user` - Remove suppression
-- `gdpr_check_suppression` - Check if a user is suppressed
+## REST (also under /api/v2)
+- POST /v2/track | /v2/batch | /v2/identify | /v2/page | /v2/screen | /v2/group | /v2/alias
+- /v2/identities/* — identity
+- /v2/users/:id — GDPR
+- /v2/errors/* — error tracking
+- /v2/agent/* — agent sessions
 
-### Agent Observability
-- `query_agent_sessions` - Query AI agent tracking sessions
-
-### System
-- `system_health` - Get system health, uptime, and counts
-- `describe_tool` - Get detailed info about any tool
-
-## Stdio MCP Server (for Claude Code, Cursor, etc.)
-
-```json
-{
-  "mcpServers": {
-    "cairo": {
-      "command": "npx",
-      "args": ["-y", "@cairo/agent-mcp"],
-      "env": {
-        "CAIRO_HOST": "https://your-cairo-instance.com",
-        "CAIRO_WRITE_KEY": "your-write-key",
-        "CAIRO_AGENT_ID": "my-agent"
-      }
-    }
-  }
-}
-```
-
-## Error Tracking (Sentry Alternative)
-
-### Via MCP
-
-```json
-{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
-  "name":"capture_error",
-  "arguments":{
-    "message":"TypeError: Cannot read property 'name' of undefined",
-    "stack_trace":"TypeError: Cannot read property...\n    at UserProfile.render (/app/src/components/UserProfile.js:42:15)",
-    "level":"error",
-    "environment":"production",
-    "tags":{"component":"user-profile"}
-  }
-}}
-```
-
-### Via REST
-
-```
-POST /api/v2/errors/capture
-X-Write-Key: your-write-key
-
-{
-  "message": "TypeError: Cannot read property 'name' of undefined",
-  "stack_trace": "...",
-  "level": "error",
-  "environment": "production"
-}
-```
-
-### Via SDK
-
-```typescript
-import { CairoClient } from '@cairo/node-sdk';
-
-const cairo = new CairoClient({ writeKey: 'your-key', dataPlaneUrl: 'https://your-cairo.com' });
-cairo.captureException(new Error('Something broke'), { component: 'payments' });
-cairo.captureMessage('Disk usage above 90%', 'warning', { disk: '/dev/sda1' });
-```
-
-## REST API (Compatibility Layer)
-
-REST endpoints are available for backward compatibility. All functionality is also available via MCP tools.
-
-### Event Ingestion (Segment-compatible)
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/v2/track` | POST | Track a single event |
-| `/v2/batch` | POST | Track multiple events |
-| `/v2/identify` | POST | Identify a user |
-| `/v2/group` | POST | Associate user with a group |
-| `/v2/page` | POST | Track a page view |
-| `/v2/screen` | POST | Track a screen view |
-| `/v2/alias` | POST | Link two user identities |
-
-## AI Agent Tracking
-
-```typescript
-import { AgentTracker } from '@cairo/agent-tracker';
-
-const tracker = AgentTracker.init({
-  writeKey: 'your-write-key',
-  host: 'https://your-cairo-instance.com',
-  agentId: 'my-agent',
-});
-
-tracker.generation({ model: 'claude-sonnet-4-20250514', promptTokens: 500, completionTokens: 200, latencyMs: 1200 });
-tracker.toolCall({ tool: 'search', input: { q: 'hello' }, success: true, latencyMs: 300 });
-tracker.decision({ type: 'routing', options: ['a', 'b'], chosen: 'a', confidence: 0.9 });
-tracker.error({ type: 'timeout', message: 'API timed out', recoverable: true });
-
-await tracker.shutdown();
-```
-
-## Self-hosting
-
-```bash
-git clone https://github.com/outcome-driven-studio/cairo.git
-cd cairo
-npm install
-# Set POSTGRES_URL in .env
-npm start
-```
-
-## Config Options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| writeKey | (required) | Authentication key |
-| host | http://localhost:8080 | Cairo server URL |
-| flushAt | 20 | Events before auto-flush |
-| flushInterval | 5000 | Ms between flushes |
-| maxRetries | 3 | Retry attempts |
-| timeout | 10000 | Request timeout (ms) |
-
-## Key Features
-
-- MCP-first: agents connect via MCP protocol, no UI
-- Error tracking: capture, fingerprint, group, resolve (Sentry alternative)
-- Segment-compatible API (drop-in replacement)
-- Identity resolution (merge anonymous + known users)
-- AI agent observability (sessions, costs, tool usage)
-- Event transformations and tracking plans
-- 15+ destinations (Mixpanel, BigQuery, Slack, Discord, webhooks)
-- GDPR compliance (user deletion, suppression, audit log)
-- Event replay (backfill destinations with historical data)
+## Typical agent relay loop
+1. create_notification_rule targeting your agent_id
+2. Events arrive → Cairo enqueues pending notifications (and optional webhook push)
+3. get_pending_notifications → relay via your gateway using payload.channels
+4. ack_notification

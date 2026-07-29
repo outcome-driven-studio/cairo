@@ -1,36 +1,40 @@
-<div align="center">
-  <img src="./logo.svg" alt="Cairo" width="200" height="auto">
-  <br/><br/>
-  <img src="https://img.shields.io/badge/version-2.0.0-blue.svg" alt="Version">
-  <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-green.svg" alt="Node">
-  <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
-  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome">
-</div>
-
 # Cairo
 
-Open-source, headless, MCP-first customer data platform. Agents are the primary user. Track events, resolve identities, transform data, route to 15+ destinations. No UI required.
+Open-source, agent-first event tracking. Agents are the primary user. Track events from products and agents, then hand notifications to agents who relay to end users via their own gateways (Telegram, Discord, Slack, WhatsApp, etc.).
+
+Cairo does **not** connect to messaging gateways itself.
 
 ## Why Cairo
 
-- **MCP-first.** Agents connect via the Model Context Protocol. 30+ tools for events, errors, identity, destinations, GDPR, and more. No UI to navigate.
-- **Segment-compatible.** Drop-in replacement for Segment's tracking API. Existing client libraries work out of the box.
-- **Full CDP pipeline.** Identity resolution, event transformations, tracking plans, GDPR compliance, and event replay.
-- **AI agent support.** First-class tracking for LLM generations, tool calls, decisions, and errors with dedicated agent SDK and MCP server.
-- **Self-hosted.** Your data stays on your infrastructure. Node.js + PostgreSQL.
+- **MCP-first.** Agents connect via Model Context Protocol. Tools for events, identity, errors, notification handoff, and GDPR.
+- **Product events still work.** Frontend, backend, and mobile SDKs send to the same ingest API (`/v2/track`, `/v2/batch`).
+- **Agent handoff.** Rules enqueue notifications for agents (pull via MCP or push via webhook). Agents relay through whatever gateway they already use.
+- **Self-hosted.** Node.js + PostgreSQL. Your data stays on your infrastructure.
 
 ## Quick Start
 
 ### For Agents (MCP)
 
-Add Cairo to your agent's MCP config:
+HTTP MCP against a running Cairo instance:
+
+```bash
+curl -X POST https://your-cairo.com/mcp \
+  -H "Content-Type: application/json" \
+  -H "X-Write-Key: your-write-key" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
+    "name":"track_event",
+    "arguments":{"event":"signup","user_id":"user_123","properties":{"plan":"free"}}
+  }}'
+```
+
+Agent self-reporting via stdio MCP (local package until published):
 
 ```json
 {
   "mcpServers": {
-    "cairo": {
-      "command": "npx",
-      "args": ["-y", "@cairo/agent-mcp"],
+    "cairo-agent": {
+      "command": "node",
+      "args": ["./packages/agent-mcp/dist/index.js"],
       "env": {
         "CAIRO_HOST": "https://your-cairo-instance.com",
         "CAIRO_WRITE_KEY": "your-write-key",
@@ -41,22 +45,11 @@ Add Cairo to your agent's MCP config:
 }
 ```
 
-Or connect directly via HTTP:
-
-```bash
-curl -X POST https://your-cairo.com/mcp \
-  -H "Content-Type: application/json" \
-  -H "X-Write-Key: your-write-key" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
-    "name":"track_event",
-    "arguments":{"event":"signup","user_email":"jane@example.com"}
-  }}'
-```
-
 ### For Apps (SDK)
 
 ```bash
 npm install @cairo/tracker
+# or until published: file:packages/tracker
 ```
 
 ```typescript
@@ -75,15 +68,48 @@ cairo.track({
 
 cairo.identify({
   userId: 'user_123',
-  traits: { name: 'Ava', email: 'ava@school.edu' },
+  traits: {
+    email: 'ava@school.edu',
+    telegram_chat_id: '123456789', // stored for agents to look up when relaying
+  },
 });
 
 await cairo.shutdown();
 ```
 
-## MCP Tools
+## Notification handoff
 
-Cairo exposes 30+ tools via the MCP protocol. Use `GET /mcp` for discovery or `GET /llms.txt` for the full reference.
+```text
+product/agent  →  track event  →  Cairo stores event
+                                      ↓
+                              matching rule?
+                                      ↓
+                         enqueue for agent_id
+                                      ↓
+              agent pulls (MCP) or receives webhook push
+                                      ↓
+         agent relays via its Telegram/Discord/Slack gateway
+```
+
+Example rule (MCP `create_notification_rule`):
+
+```json
+{
+  "name": "signup-relay",
+  "event_name": "signup",
+  "agent_id": "notify-bot",
+  "message_template": "New signup: {{userId}} plan={{properties.plan}}"
+}
+```
+
+Agent loop:
+
+1. `get_pending_notifications` (or webhook push)
+2. Read `payload.channels` for gateway addresses
+3. Send via the agent's own Telegram/Discord/Slack connection
+4. `ack_notification`
+
+## MCP Tools
 
 | Category | Tools |
 |----------|-------|
@@ -91,168 +117,45 @@ Cairo exposes 30+ tools via the MCP protocol. Use `GET /mcp` for discovery or `G
 | **Users** | `identify_user`, `lookup_user` |
 | **Identity** | `resolve_identity`, `alias_identity` |
 | **Errors** | `capture_error`, `list_error_groups`, `get_error_group`, `resolve_error`, `error_trends` |
-| **Destinations** | `list_destinations`, `list_destination_types`, `create_destination`, `update_destination`, `delete_destination` |
-| **Transformations** | `list_transformations`, `create_transformation`, `update_transformation`, `delete_transformation` |
-| **Tracking Plans** | `list_tracking_plans`, `create_tracking_plan`, `update_tracking_plan`, `delete_tracking_plan` |
+| **Notifications** | `set_user_channel`, `create_notification_rule`, `list_notification_rules`, `delete_notification_rule`, `enqueue_notification`, `get_pending_notifications`, `ack_notification`, `register_agent_webhook` |
 | **GDPR** | `gdpr_delete_user`, `gdpr_suppress_user`, `gdpr_unsuppress_user`, `gdpr_check_suppression` |
 | **Agents** | `query_agent_sessions` |
 | **System** | `system_health`, `describe_tool` |
 
-## AI Agent Tracking
+Discovery: `GET /mcp` · Docs: `GET /docs` · Agent text: `GET /llms.txt`
+
+## REST (compatibility)
+
+All require `X-Write-Key` (or `Authorization: Bearer`).
+
+| Method | Path | Notes |
+|--------|------|-------|
+| POST | `/v2/track`, `/api/v2/track` | Track event |
+| POST | `/v2/batch`, `/api/v2/batch` | Batch ingest |
+| POST | `/v2/identify` | Identify user |
+| GET/POST | `/v2/identities/*` | Identity |
+| * | `/v2/users/:id/*` | GDPR |
+| * | `/v2/errors/*` | Error tracking |
+| * | `/v2/agent/*` | Agent sessions |
+
+## Setup
 
 ```bash
-npm install @cairo/agent-tracker
-```
-
-```typescript
-import { AgentTracker } from '@cairo/agent-tracker';
-
-const tracker = AgentTracker.init({
-  writeKey: 'your-write-key',
-  host: 'https://your-cairo-instance.com',
-  agentId: 'support-agent',
-});
-
-tracker.generation({
-  model: 'claude-sonnet-4-20250514',
-  promptTokens: 1200,
-  completionTokens: 350,
-  latencyMs: 2100,
-});
-
-tracker.toolCall({ tool: 'search_kb', input: { query: 'refund policy' }, success: true, latencyMs: 450 });
-tracker.error({ type: 'tool_timeout', message: 'KB search timed out', recoverable: true });
-
-await tracker.shutdown();
-```
-
-## Architecture
-
-```
-                      +-----------------------+
-                      |   Agents / Apps       |
-                      |                       |
-                      |  MCP protocol         |
-                      |  @cairo/tracker       |
-                      |  @cairo/agent-tracker |
-                      +-----------+-----------+
-                                  |
-                         +--------v---------+
-                         |  Cairo Server    |
-                         |  (headless)      |
-                         |                  |
-                         |  POST /mcp       |
-                         |  /api/v2/*       |
-                         +--------+---------+
-                                  |
-                 +----------------+----------------+
-                 |                |                 |
-          +------v------+  +-----v------+  +-------v-------+
-          | Warehouses  |  | Analytics  |  | Operational   |
-          | BigQuery    |  | Mixpanel   |  | Slack         |
-          | Snowflake   |  | Amplitude  |  | Discord       |
-          | S3          |  | PostHog    |  | Webhooks      |
-          | Elastic     |  | Langfuse   |  | Kafka         |
-          +-------------+  +------------+  +---------------+
-```
-
-## REST API (Compatibility)
-
-REST endpoints exist for backward compatibility. All functionality is also available via MCP.
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/v2/track` | POST | Track a single event |
-| `/v2/batch` | POST | Track multiple events |
-| `/v2/identify` | POST | Identify a user |
-| `/v2/group` | POST | Associate user with a group |
-| `/v2/page` | POST | Track a page view |
-| `/v2/screen` | POST | Track a screen view |
-| `/v2/alias` | POST | Link two user identities |
-
-## Destinations
-
-| Category | Destinations |
-|----------|-------------|
-| **Analytics** | Mixpanel, Amplitude, PostHog, GA4 |
-| **CRM & Sales** | HubSpot, Salesforce, Pipedrive, Attio |
-| **Data Warehouses** | BigQuery, Snowflake, S3, Elasticsearch, Kafka |
-| **Messaging & Ops** | Slack, Discord, Braze, CustomerIO, Intercom, SendGrid, Resend, Webhook |
-
-## SDKs
-
-| Package | Description |
-|---------|-------------|
-| [`@cairo/tracker`](./packages/tracker) | Universal event tracking SDK |
-| [`@cairo/agent-tracker`](./packages/agent-tracker) | Agent behavior tracking with session management |
-| [`@cairo/agent-mcp`](./packages/agent-mcp) | MCP server for agent self-reporting |
-| [`@cairo/node-sdk`](./packages/node-sdk) | Node.js server-side SDK |
-
-## Server Setup
-
-### Prerequisites
-
-- Node.js >= 18
-- PostgreSQL >= 14
-
-### Install and Run
-
-```bash
-git clone https://github.com/outcome-driven-studio/cairo.git
-cd cairo
+cp .env.example .env.local
+# set POSTGRES_URL
 npm install
-cp .env.example .env
-# Edit .env with your POSTGRES_URL
+npm run migrate
 npm start
 ```
 
-Server runs on port 8080. Verify with `curl http://localhost:8080/health`.
+Insert a write key once the DB is up:
 
-### Docker
-
-```bash
-docker build -t cairo .
-docker run -p 8080:8080 --env-file .env cairo
+```sql
+INSERT INTO write_keys (key, name) VALUES ('dev-key', 'local');
 ```
 
-### Discovery Endpoints
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /mcp` | MCP server info and tool list |
-| `GET /llms.txt` | Agent-readable documentation |
-| `GET /.well-known/mcp.json` | Automated MCP server discovery |
-| `GET /health` | Health check with database status |
-
-## Project Structure
-
-| Directory | Purpose |
-|-----------|---------|
-| `server.js` | Express application entry point |
-| `src/routes/` | API route handlers |
-| `src/services/` | Business logic and pipeline services |
-| `src/destinations/` | Destination connector plugins |
-| `src/migrations/` | Database migration scripts |
-| `packages/tracker/` | Universal event tracking SDK |
-| `packages/agent-tracker/` | Agent tracking SDK |
-| `packages/agent-mcp/` | MCP server package |
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Make your changes and add tests
-4. Run `npm test`
-5. Open a pull request
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+Until at least one write key exists, any non-empty key is accepted (bootstrap mode).
 
 ## License
 
-MIT. See [LICENSE](LICENSE) for details.
-
----
-
-<div align="center">
-  <a href="https://github.com/outcome-driven-studio/cairo">github.com/outcome-driven-studio/cairo</a>
-</div>
+MIT

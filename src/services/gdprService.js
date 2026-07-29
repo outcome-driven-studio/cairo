@@ -7,32 +7,29 @@ class GDPRService {
     const tablesAffected = [];
     let totalRows = 0;
 
-    try {
-      const r = await query('DELETE FROM event_source WHERE user_id = $1', [userId]);
-      if (r.rowCount > 0) { tablesAffected.push('event_source'); totalRows += r.rowCount; }
-    } catch (e) { logger.error('GDPR delete event_source error:', e.message); }
+    const deletions = [
+      ['event_source', 'DELETE FROM event_source WHERE user_id = $1', [userId]],
+      ['playmaker_user_source', 'DELETE FROM playmaker_user_source WHERE email = $1 OR original_user_id = $1', [userId]],
+      ['identity_graph', 'DELETE FROM identity_graph WHERE identity_value = $1 AND namespace = $2', [userId, namespace]],
+      ['raw_events', `DELETE FROM raw_events WHERE namespace = $1 AND (payload->>'userId' = $2 OR payload->>'anonymousId' = $2)`, [namespace, userId]],
+      ['user_suppressions', 'DELETE FROM user_suppressions WHERE user_id = $1 AND namespace = $2', [userId, namespace]],
+      ['user_channels', 'DELETE FROM user_channels WHERE user_id = $1 AND namespace = $2', [userId, namespace]],
+      ['notifications', 'DELETE FROM notifications WHERE user_id = $1 AND namespace = $2', [userId, namespace]],
+      ['error_events', 'DELETE FROM error_events WHERE user_id = $1 OR user_email = $1', [userId]],
+      ['agent_sessions', 'DELETE FROM agent_sessions WHERE agent_id = $1 AND namespace = $2', [userId, namespace]],
+    ];
 
-    try {
-      const r = await query('DELETE FROM playmaker_user_source WHERE email = $1 OR original_user_id = $1', [userId]);
-      if (r.rowCount > 0) { tablesAffected.push('playmaker_user_source'); totalRows += r.rowCount; }
-    } catch (e) { logger.error('GDPR delete playmaker_user_source error:', e.message); }
-
-    try {
-      const r = await query('DELETE FROM identity_graph WHERE identity_value = $1 AND namespace = $2', [userId, namespace]);
-      if (r.rowCount > 0) { tablesAffected.push('identity_graph'); totalRows += r.rowCount; }
-    } catch (e) { /* table may not exist yet */ }
-
-    try {
-      const r = await query(
-        `DELETE FROM raw_events WHERE namespace = $1 AND (payload->>'userId' = $2 OR payload->>'anonymousId' = $2)`,
-        [namespace, userId]
-      );
-      if (r.rowCount > 0) { tablesAffected.push('raw_events'); totalRows += r.rowCount; }
-    } catch (e) { /* table may not exist yet */ }
-
-    try {
-      await query('DELETE FROM user_suppressions WHERE user_id = $1 AND namespace = $2', [userId, namespace]);
-    } catch (e) { /* table may not exist */ }
+    for (const [table, sql, params] of deletions) {
+      try {
+        const r = await query(sql, params);
+        if (r.rowCount > 0) {
+          tablesAffected.push(table);
+          totalRows += r.rowCount;
+        }
+      } catch (e) {
+        logger.warn(`GDPR delete ${table}: ${e.message}`);
+      }
+    }
 
     await this._audit(userId, namespace, 'delete', tablesAffected, totalRows, performedBy);
     logger.info(`GDPR delete complete for ${userId}: ${totalRows} rows from ${tablesAffected.length} tables`);
@@ -57,27 +54,39 @@ class GDPRService {
   }
 
   async isSuppressed(userId, namespace = 'default') {
-    const result = await query('SELECT id FROM user_suppressions WHERE user_id = $1 AND namespace = $2', [userId, namespace]);
+    const result = await query(
+      'SELECT id FROM user_suppressions WHERE user_id = $1 AND namespace = $2',
+      [userId, namespace]
+    );
     return result.rows.length > 0;
   }
 
   async getAuditLog(userId) {
-    const result = await query('SELECT * FROM deletion_audit_log WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+    const result = await query(
+      'SELECT * FROM deletion_audit_log WHERE user_id = $1 ORDER BY created_at DESC',
+      [userId]
+    );
     return result.rows;
   }
 
   async getSuppressions(namespace = 'default', limit = 100) {
-    const result = await query('SELECT * FROM user_suppressions WHERE namespace = $1 ORDER BY suppressed_at DESC LIMIT $2', [namespace, limit]);
+    const result = await query(
+      'SELECT * FROM user_suppressions WHERE namespace = $1 ORDER BY suppressed_at DESC LIMIT $2',
+      [namespace, limit]
+    );
     return result.rows;
   }
 
   async _audit(userId, namespace, action, tablesAffected, rowsDeleted, performedBy) {
     try {
       await query(
-        `INSERT INTO deletion_audit_log (user_id, namespace, action, tables_affected, rows_deleted, performed_by) VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO deletion_audit_log (user_id, namespace, action, tables_affected, rows_deleted, performed_by)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
         [userId, namespace, action, tablesAffected, rowsDeleted, performedBy]
       );
-    } catch (e) { logger.error('Failed to write audit log:', e.message); }
+    } catch (e) {
+      logger.error('Failed to write audit log:', e.message);
+    }
   }
 }
 

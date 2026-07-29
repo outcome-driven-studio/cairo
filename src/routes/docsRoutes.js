@@ -15,9 +15,9 @@ function renderDocs(baseUrl) {
   const categorize = (name) => {
     if (name.startsWith("gdpr_")) return "GDPR";
     if (name === "capture_error" || name.includes("error")) return "Error tracking";
-    if (name.includes("destination")) return "Destinations";
-    if (name.includes("transformation")) return "Transformations";
-    if (name.includes("tracking_plan")) return "Tracking plans";
+    if (name.includes("notification") || name === "set_user_channel" || name === "enqueue_notification" || name === "ack_notification" || name === "register_agent_webhook" || name === "get_pending_notifications") {
+      return "Notifications";
+    }
     if (name.includes("agent")) return "Agent observability";
     if (name.includes("identity") || name === "alias_identity") return "Identity";
     if (["track_event", "batch_track", "query_events"].includes(name)) return "Events";
@@ -31,8 +31,8 @@ function renderDocs(baseUrl) {
     (groups[cat] = groups[cat] || []).push(t);
   }
   const order = [
-    "Events", "Users", "Identity", "Error tracking", "Destinations",
-    "Transformations", "Tracking plans", "GDPR", "Agent observability", "System",
+    "Events", "Users", "Identity", "Error tracking", "Notifications",
+    "GDPR", "Agent observability", "System",
   ];
 
   const esc = (s) => String(s)
@@ -157,14 +157,14 @@ ${groups[cat].map(renderTool).join("\n")}`)
 <hr>
 
 <h2 id="overview">Overview</h2>
-<p>Cairo exposes its capabilities as an <strong>MCP (Model Context Protocol)</strong> server over HTTP. Agents send JSON-RPC requests to <code>POST /mcp</code> and receive structured JSON responses. The same capabilities are also exposed as REST endpoints for backward compatibility with existing tools (Segment-compatible event ingestion, REST CRUD for destinations, etc.).</p>
+<p>Cairo exposes its capabilities as an <strong>MCP (Model Context Protocol)</strong> server over HTTP. Agents send JSON-RPC requests to <code>POST /mcp</code> and receive structured JSON responses. Product SDKs use Segment-compatible REST ingest. Notifications are handed off to agents — Cairo does not connect to messaging gateways itself.</p>
 <p>There is no UI. Everything is done through MCP or REST.</p>
 
 <h2 id="auth">Authentication</h2>
-<p>All requests to <code>/mcp</code> require a write key. Pass it as one of:</p>
+<p>All requests to <code>/mcp</code> and <code>/v2/*</code> require a write key. Pass it as one of:</p>
 <pre>X-Write-Key: your-key</pre>
 <pre>Authorization: Bearer your-key</pre>
-<p>Any non-empty key is currently accepted. Fine-grained key validation (per-namespace scopes, rate limits) is on the roadmap.</p>
+<p>Keys are validated against the <code>write_keys</code> table. Until at least one key exists, any non-empty key is accepted (bootstrap mode).</p>
 
 <h2 id="protocol">MCP protocol</h2>
 <p>Cairo implements MCP protocol version <code>2024-11-05</code> over the Streamable HTTP transport. All requests are JSON-RPC 2.0.</p>
@@ -181,7 +181,7 @@ ${groups[cat].map(renderTool).join("\n")}`)
   "id": 1,
   "result": {
     "protocolVersion": "2024-11-05",
-    "serverInfo": { "name": "cairo-cdp", "version": "2.0.0" },
+    "serverInfo": { "name": "cairo", "version": "3.0.0" },
     "capabilities": { "tools": {} }
   }
 }</pre>
@@ -237,23 +237,21 @@ ${groups[cat].map(renderTool).join("\n")}`)
 ${toolSections}
 
 <h2 id="rest">REST compatibility</h2>
-<p>Cairo exposes Segment-compatible REST endpoints for existing client libraries. All also accept the <code>X-Write-Key</code> header.</p>
+<p>Segment-compatible REST endpoints. Also available under <code>/v2/*</code> (without the <code>/api</code> prefix). All require <code>X-Write-Key</code>.</p>
 <table>
   <thead><tr><th>Endpoint</th><th>Method</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>/api/v2/track</code></td><td>POST</td><td>Track a single event</td></tr>
-    <tr><td><code>/api/v2/batch</code></td><td>POST</td><td>Track many events</td></tr>
-    <tr><td><code>/api/v2/identify</code></td><td>POST</td><td>Identify a user</td></tr>
-    <tr><td><code>/api/v2/page</code></td><td>POST</td><td>Page view</td></tr>
-    <tr><td><code>/api/v2/screen</code></td><td>POST</td><td>Screen view (mobile)</td></tr>
-    <tr><td><code>/api/v2/group</code></td><td>POST</td><td>Associate user with group</td></tr>
-    <tr><td><code>/api/v2/alias</code></td><td>POST</td><td>Link two identities</td></tr>
-    <tr><td><code>/api/v2/errors/capture</code></td><td>POST</td><td>Capture an error</td></tr>
-    <tr><td><code>/api/v2/identities/resolve</code></td><td>GET</td><td>Resolve identity graph</td></tr>
-    <tr><td><code>/api/v2/destinations</code></td><td>GET/POST</td><td>Destination CRUD</td></tr>
-    <tr><td><code>/api/v2/transformations</code></td><td>GET/POST</td><td>Transformation CRUD</td></tr>
-    <tr><td><code>/api/v2/tracking-plans</code></td><td>GET/POST</td><td>Tracking plan CRUD</td></tr>
-    <tr><td><code>/api/v2/users/:userId</code></td><td>DELETE</td><td>GDPR delete</td></tr>
+    <tr><td><code>/v2/track</code></td><td>POST</td><td>Track a single event</td></tr>
+    <tr><td><code>/v2/batch</code></td><td>POST</td><td>Track many events</td></tr>
+    <tr><td><code>/v2/identify</code></td><td>POST</td><td>Identify a user (optional channel traits)</td></tr>
+    <tr><td><code>/v2/page</code></td><td>POST</td><td>Page view</td></tr>
+    <tr><td><code>/v2/screen</code></td><td>POST</td><td>Screen view (mobile)</td></tr>
+    <tr><td><code>/v2/group</code></td><td>POST</td><td>Associate user with group</td></tr>
+    <tr><td><code>/v2/alias</code></td><td>POST</td><td>Link two identities</td></tr>
+    <tr><td><code>/v2/errors/capture</code></td><td>POST</td><td>Capture an error</td></tr>
+    <tr><td><code>/v2/identities/resolve</code></td><td>GET</td><td>Resolve identity graph</td></tr>
+    <tr><td><code>/v2/users/:userId</code></td><td>DELETE</td><td>GDPR delete</td></tr>
+    <tr><td><code>/v2/agent/*</code></td><td>*</td><td>Agent sessions / metrics</td></tr>
   </tbody>
 </table>
 
@@ -263,8 +261,7 @@ ${toolSections}
   <tbody>
     <tr><td><code>@cairo/tracker</code></td><td>Universal event tracking from apps</td></tr>
     <tr><td><code>@cairo/agent-tracker</code></td><td>AI agent session tracking (generations, tool calls, costs)</td></tr>
-    <tr><td><code>@cairo/agent-mcp</code></td><td>stdio MCP server for Claude Code, Cursor, and other agents</td></tr>
-    <tr><td><code>@cairo/node-sdk</code></td><td>Node.js server-side SDK</td></tr>
+    <tr><td><code>@cairo/agent-mcp</code></td><td>stdio MCP server for agent self-reporting (not the full HTTP /mcp surface)</td></tr>
   </tbody>
 </table>
 

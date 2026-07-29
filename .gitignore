@@ -33,123 +33,61 @@ Thumbs.db
 *.swo
 *~
 
-# IDE files
+# IDE / agent tooling
 .vscode/
 .idea/
+.claude/
+.claude-flow/
+.swarm/
+.firecrawl/
+.mcp.json
 *.sublime-project
 *.sublime-workspace
-.project
-.classpath
-.c9/
-*.launch
-.settings/
 *.iml
 .vs/
+.cursorignore
 
 # Testing
 coverage/
 .nyc_output/
 *.lcov
-.coverage
-*.cover
-.hypothesis/
-.pytest_cache/
-cover/
+test-output/
+test-results/
 
-# Build and dist
+# Build
 dist/
 dist-ssr/
 build/
 out/
 *.local
 
-# Package files
-# package-lock.json  # Needed for Railway deployment
+# Package lock alternatives
 yarn.lock
 pnpm-lock.yaml
 
-# Temporary files
+# Temporary
 tmp/
 temp/
 .tmp/
 .temp/
 *.tmp
 *.temp
-
-# Data files and exports
 *.csv
 *.xlsx
-*.xls
-linkedin-interactions-*.csv
-sample-*.csv
-!sample-linkedin-mappings.csv  # Keep sample file for reference
-
-# Database dumps and backups
 *.dump
 *.sqlite
 *.sqlite3
-*.db.backup
-
-# Temporary SQL files (but keep migrations and setup scripts)
-*-temp.sql
-*-backup.sql
-007_*.sql
-008_*.sql
-!src/migrations/*.sql
-
-# Monitoring and tracking logs
-combined.log
-error.log
-.cursorignore
-
-# Project specific test files
-test-dashboard.html
-display-lemlist-table.html
-lemlist-activity-types-report.json
-Untitled-*
-
-# Generated reports and test outputs
-test-output/
-test-results/
-*.test-report.json
-projectplan.md
-MIXPANEL_INTEGRATION_PLAN.md
-FULL_SYNC_SYSTEM_SUMMARY.md
-DOCUMENTATION_DEPLOYMENT_SUMMARY.md
-TESTING_AND_VALIDATION_SUMMARY.md
-
-# Internal documentation and troubleshooting (not for public repo)
-CONSISTENCY_AUDIT_SUMMARY.md
-FIXES_APPLIED.md
-QUICK_FIX_SUMMARY.md
-ENV_SETUP_TROUBLESHOOTING.md
-PERIODIC_SYNC_SETUP.md
-GITIGNORE_UPDATE_SUMMARY.md
-src/app.js.README.md
-src/app.js.deprecated
-
-# Keep important files
-!README.md
-!railway.json
-!Procfile
-!Dockerfile
-!nixpacks.toml
-!.dockerignore
-!package.json
-
-# Backup files
 *.backup
 *.bak
 *.old
 
-# Session data
+# Session
 session/
 sessions/
 
-# Mac specific
+# Mac
 .AppleDouble
 .LSOverride
-Icon
 .DocumentRevisions-V100
 .fseventsd
 .TemporaryItems
@@ -157,7 +95,17 @@ Icon
 .com.apple.timemachine.donotpresent
 .AppleDB
 .AppleDesktop
-Network Trash Folder
-Temporary Items
 .apdisk
 /public
+
+# Secrets
+*.pem
+credentials.json
+service-account*.json
+
+# Keep
+!README.md
+!Dockerfile
+!.dockerignore
+!package.json
+!src/migrations/*.sql

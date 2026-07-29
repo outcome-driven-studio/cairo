@@ -1,9 +1,10 @@
 {
-  "name": "cairo-cdp",
-  "version": "2.0.0",
-  "description": "Headless MCP-first customer data platform with error tracking, identity resolution, and AI agent observability",
+  "name": "cairo",
+  "version": "3.0.0",
+  "description": "Agent-first event tracking — ingest events, hand notifications to agents who relay via their own gateways",
+  "private": false,
   "bin": {
-    "cairo-cdp": "./bin/cairo.js"
+    "cairo": "./bin/cairo.js"
   },
   "files": [
     "bin/",
@@ -14,59 +15,55 @@
     "package.json"
   ],
   "keywords": [
-    "cdp",
-    "customer-data-platform",
     "mcp",
     "model-context-protocol",
-    "error-tracking",
-    "sentry-alternative",
-    "agent-observability",
-    "headless",
-    "analytics",
     "event-tracking",
+    "agent-observability",
+    "notifications",
+    "headless",
     "ai-agent"
   ],
   "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/outcome-driven-studio/cairo.git"
   },
+  "workspaces": [
+    "packages/tracker",
+    "packages/agent-mcp",
+    "packages/agent-tracker"
+  ],
   "dependencies": {
     "@google-cloud/secret-manager": "^5.0.0",
     "@google-cloud/tasks": "^4.0.0",
-    "@google/generative-ai": "^0.21.0",
     "@sentry/node": "^7.120.4",
     "@sentry/profiling-node": "^7.120.3",
     "axios": "^1.9.0",
-    "axios-rate-limit": "^1.4.0",
-    "csv-parse": "^5.6.0",
-    "csv-parser": "^3.2.0",
     "dotenv": "^16.5.0",
     "express": "^4.18.2",
     "express-validator": "^7.3.2",
-    "node-cron": "^3.0.3",
     "pg": "^8.16.0",
     "uuid": "^9.0.1",
-    "winston": "^3.17.0",
-    "ws": "^8.18.0"
+    "winston": "^3.17.0"
   },
   "scripts": {
     "start": "node server.js",
     "start:dev": "nodemon server.js",
     "dev": "LOG_LEVEL=debug nodemon server.js",
-    "test": "echo \"No tests specified\" && exit 0",
+    "test": "jest --testPathPattern=src/test --forceExit",
     "setup": "node src/migrations/run_migrations.js",
     "setup-env": "node setup-env.js",
-    "build": "npm run build:sdks",
-    "build:sdks": "npm run build:sdk:node && npm run build:sdk:agent-tracker && npm run build:sdk:agent-mcp && npm run build:sdk:tracker",
-    "build:sdk:node": "cd packages/node-sdk && npm install && npm run build",
-    "build:sdk:agent-tracker": "cd packages/agent-tracker && npm install && npm run build",
-    "build:sdk:agent-mcp": "cd packages/agent-mcp && npm install && npm run build",
-    "build:sdk:tracker": "cd packages/tracker && npm install && npm run build",
+    "build": "npm run build --workspaces --if-present",
     "migrate": "node src/migrations/run_migrations.js"
   },
   "devDependencies": {
-    "@railway/cli": "^4.6.1",
+    "jest": "^29.7.0",
     "nodemon": "^3.1.10"
   }
 }

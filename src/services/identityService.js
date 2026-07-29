@@ -79,7 +79,10 @@ class IdentityService {
       throw new Error('Both previousId and userId are required');
     }
 
-    const prevResult = await this.lookup('userId', previousId, namespace);
+    // Look up previousId as userId OR anonymousId
+    let prevResult = await this.lookup('userId', previousId, namespace);
+    if (!prevResult) prevResult = await this.lookup('anonymousId', previousId, namespace);
+
     const userResult = await this.lookup('userId', userId, namespace);
 
     if (prevResult && userResult) {
@@ -91,12 +94,12 @@ class IdentityService {
       await this._linkIdentity(prevResult.canonical_id, 'userId', userId, namespace);
       return { canonicalId: prevResult.canonical_id, merged: false };
     } else if (!prevResult && userResult) {
-      await this._linkIdentity(userResult.canonical_id, 'userId', previousId, namespace);
+      await this._linkIdentity(userResult.canonical_id, 'anonymousId', previousId, namespace);
       return { canonicalId: userResult.canonical_id, merged: false };
     } else {
       const canonicalId = uuidv4();
       await this._linkIdentity(canonicalId, 'userId', userId, namespace);
-      await this._linkIdentity(canonicalId, 'userId', previousId, namespace);
+      await this._linkIdentity(canonicalId, 'anonymousId', previousId, namespace);
       return { canonicalId, merged: false };
     }
   }

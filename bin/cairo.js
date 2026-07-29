@@ -24,11 +24,11 @@ if (flags.version) {
 
 if (flags.help) {
   console.log(`
-cairo-cdp - Headless MCP-first customer data platform
+cairo - Agent-first event tracking
 
 Usage:
-  cairo-cdp [options]
-  cairo-cdp migrate
+  cairo [options]
+  cairo migrate
 
 Options:
   --port, -p <port>   Port to listen on (default: 8080, or PORT env var)
@@ -41,9 +41,8 @@ Commands:
 Environment variables:
   PORT                Server port (default: 8080)
   POSTGRES_URL        PostgreSQL connection string (required)
-  SENTRY_DSN          Sentry DSN for error monitoring
-  DISCORD_WEBHOOK_URL Discord webhook for notifications
-  SLACK_WEBHOOK_URL   Slack webhook for notifications
+  SENTRY_DSN          Optional Sentry DSN
+  CAIRO_ERROR_AGENT_ID  Optional agent id to receive error handoffs
 
 MCP protocol:
   POST /mcp           JSON-RPC endpoint for agents
@@ -51,9 +50,9 @@ MCP protocol:
   GET  /llms.txt      Agent-readable documentation
 
 Examples:
-  npx cairo-cdp --port 3000
-  npx cairo-cdp migrate
-  POSTGRES_URL=postgres://... npx cairo-cdp
+  npx cairo --port 3000
+  npx cairo migrate
+  POSTGRES_URL=postgres://... npx cairo
 `);
   process.exit(0);
 }
