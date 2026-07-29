@@ -1,31 +1,34 @@
-# Publishing @cairo packages (when ready)
+# Publishing @cairo packages
 
-Packages live under `packages/` and are **not published to npm yet**.
+## One-time setup (you)
 
-## Prerequisites
+1. Create an npm org named **`cairo`**: https://www.npmjs.com/org/create  
+   (Scoped packages `@cairo/*` require this org, or a user named `cairo`.)
+2. Create an **Automation** access token: https://www.npmjs.com/settings/~/tokens  
+   - Type: Automation  
+   - Grant publish access to the `cairo` org
+3. Add the token as a GitHub Actions secret named **`NPM_TOKEN`** on `outcome-driven-studio/cairo`  
+   Or export it locally: `export NPM_TOKEN=npm_...`
 
-1. Create an npm organization named `cairo` (or change package names).
-2. `npm login` with an account that can publish public scoped packages.
-3. Each package already has `"publishConfig": { "access": "public" }`.
+Root package is **not** published as `cairo` (that name is taken on npm by an unrelated package). Server distribution = git + Docker.
 
-## Build & publish
+## Publish (local)
 
 ```bash
-# from repo root
-npm install
-npm run build
+export NPM_TOKEN=npm_...   # or: npm login
+chmod +x scripts/publish-packages.sh
+./scripts/publish-packages.sh
 
-# publish each package (version bump first)
-cd packages/tracker && npm version patch && npm publish --access public
-cd ../agent-tracker && npm version patch && npm publish --access public
-cd ../agent-mcp && npm version patch && npm publish --access public
+# dry run:
+DRY_RUN=true ./scripts/publish-packages.sh
 ```
 
-Until then, consumers should install from git/path as documented in the root README.
+## Publish (GitHub Actions)
 
-## Root server package
+Actions → **Publish npm packages** → Run workflow.
 
-Root `package.json` is named `cairo` (v3). Publishing it would conflict with the unrelated existing `cairo` package on npm (`0.1.0-alpha.3`). Prefer:
+Or create a GitHub Release; the workflow also runs on `release: published`.
 
-- Distribute the server via git + Docker, or
-- Publish as `@cairo/server` / `cairo-cdp` after renaming
+## After publish
+
+`npm install @cairo/tracker` and `npx -y @cairo/agent-mcp` should work. Update the root README if needed (remove “not published yet” notes).

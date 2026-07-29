@@ -7,7 +7,14 @@
   "bin": {
     "cairo-agent-mcp": "./dist/index.js"
   },
-  "files": ["dist"],
+  "files": ["dist", "README.md"],
+  "homepage": "https://github.com/outcome-driven-studio/cairo/tree/main/packages/agent-mcp",
+  "bugs": {
+    "url": "https://github.com/outcome-driven-studio/cairo/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "publishConfig": {
     "access": "public"
   },

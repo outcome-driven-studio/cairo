@@ -1,8 +1,8 @@
 {
   "name": "cairo",
   "version": "3.0.0",
+  "private": true,
   "description": "Agent-first event tracking — ingest events, hand notifications to agents who relay via their own gateways",
-  "private": false,
   "bin": {
     "cairo": "./bin/cairo.js"
   },
@@ -60,7 +60,9 @@
     "setup": "node src/migrations/run_migrations.js",
     "setup-env": "node setup-env.js",
     "build": "npm run build --workspaces --if-present",
-    "migrate": "node src/migrations/run_migrations.js"
+    "migrate": "node src/migrations/run_migrations.js",
+    "publish:packages": "bash scripts/publish-packages.sh",
+    "publish:packages:dry": "DRY_RUN=true bash scripts/publish-packages.sh"
   },
   "devDependencies": {
     "jest": "^29.7.0",
