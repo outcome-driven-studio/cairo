@@ -1,13 +1,23 @@
 {
-  "name": "@cairo/agent-mcp",
-  "version": "1.0.0",
+  "name": "@ani-hq/agent-mcp",
+  "version": "1.0.1",
   "description": "stdio MCP server for AI agent self-reporting into Cairo",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "cairo-agent-mcp": "./dist/index.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "homepage": "https://github.com/outcome-driven-studio/cairo/tree/main/packages/agent-mcp",
+  "bugs": {
+    "url": "https://github.com/outcome-driven-studio/cairo/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -18,7 +28,11 @@
     "prepublishOnly": "npm run build"
   },
   "keywords": [
-    "cairo", "mcp", "agent", "tracking", "model-context-protocol"
+    "cairo",
+    "mcp",
+    "agent",
+    "tracking",
+    "model-context-protocol"
   ],
   "author": "Cairo Team",
   "license": "MIT",

@@ -1,10 +1,20 @@
 {
-  "name": "@cairo/tracker",
-  "version": "1.0.0",
+  "name": "@ani-hq/tracker",
+  "version": "1.0.1",
   "description": "Universal event tracking SDK for Cairo",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "homepage": "https://github.com/outcome-driven-studio/cairo/tree/main/packages/tracker",
+  "bugs": {
+    "url": "https://github.com/outcome-driven-studio/cairo/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -14,7 +24,12 @@
     "prepublishOnly": "npm run build"
   },
   "keywords": [
-    "cairo", "analytics", "tracking", "events", "ai-agent", "telemetry"
+    "cairo",
+    "analytics",
+    "tracking",
+    "events",
+    "ai-agent",
+    "telemetry"
   ],
   "author": "Cairo Team",
   "license": "MIT",

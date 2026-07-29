@@ -1,31 +1,29 @@
-# Publishing @cairo packages (when ready)
+# Publishing @ani-hq packages
 
-Packages live under `packages/` and are **not published to npm yet**.
+Packages publish under the existing **`ani-hq`** npm org.
 
-## Prerequisites
+## One-time setup
 
-1. Create an npm organization named `cairo` (or change package names).
-2. `npm login` with an account that can publish public scoped packages.
-3. Each package already has `"publishConfig": { "access": "public" }`.
+1. Automation token with publish access to `ani-hq`: https://www.npmjs.com/settings/~/tokens
+2. Add as GitHub secret **`NPM_TOKEN`**, or `export NPM_TOKEN=npm_...`
 
-## Build & publish
+Root package is **private** (server ships via git + Docker).
+
+## Publish
 
 ```bash
-# from repo root
-npm install
-npm run build
+export NPM_TOKEN=npm_...
+chmod +x scripts/publish-packages.sh
+./scripts/publish-packages.sh
 
-# publish each package (version bump first)
-cd packages/tracker && npm version patch && npm publish --access public
-cd ../agent-tracker && npm version patch && npm publish --access public
-cd ../agent-mcp && npm version patch && npm publish --access public
+# dry run:
+DRY_RUN=true ./scripts/publish-packages.sh
 ```
 
-Until then, consumers should install from git/path as documented in the root README.
+Or Actions → **Publish npm packages** → Run workflow.
 
-## Root server package
+## Packages
 
-Root `package.json` is named `cairo` (v3). Publishing it would conflict with the unrelated existing `cairo` package on npm (`0.1.0-alpha.3`). Prefer:
-
-- Distribute the server via git + Docker, or
-- Publish as `@cairo/server` / `cairo-cdp` after renaming
+- `@ani-hq/tracker`
+- `@ani-hq/agent-tracker`
+- `@ani-hq/agent-mcp`

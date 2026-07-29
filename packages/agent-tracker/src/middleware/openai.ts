@@ -4,7 +4,7 @@ import { AgentTracker } from '../index';
  * OpenAI client wrapper that automatically tracks generations.
  *
  * Usage:
- *   import { wrapOpenAI } from '@cairo/agent-tracker/middleware/openai';
+ *   import { wrapOpenAI } from '@ani-hq/agent-tracker/middleware/openai';
  *   const openai = wrapOpenAI(new OpenAI(), tracker);
  *   // All chat.completions.create calls are now tracked
  */

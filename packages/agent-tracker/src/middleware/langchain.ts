@@ -5,7 +5,7 @@ import { AgentTracker } from '../index';
  * Automatically tracks LLM generations, tool calls, and errors from LangChain chains/agents.
  *
  * Usage:
- *   import { CairoCallbackHandler } from '@cairo/agent-tracker/middleware/langchain';
+ *   import { CairoCallbackHandler } from '@ani-hq/agent-tracker/middleware/langchain';
  *   const handler = new CairoCallbackHandler(tracker);
  *   const chain = new LLMChain({ llm, prompt, callbacks: [handler] });
  */

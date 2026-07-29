@@ -5,13 +5,13 @@ Track AI agent behavior in 5 minutes. Events flow through Cairo's pipeline and g
 ## Install
 
 ```bash
-npm install @cairo/agent-tracker
+npm install @ani-hq/agent-tracker
 ```
 
 ## Initialize
 
 ```typescript
-import { AgentTracker } from '@cairo/agent-tracker';
+import { AgentTracker } from '@ani-hq/agent-tracker';
 
 const tracker = AgentTracker.init({
   writeKey: 'your-write-key',
@@ -86,7 +86,7 @@ Add the Cairo MCP server so agents can self-report events over stdio.
   "mcpServers": {
     "cairo": {
       "command": "npx",
-      "args": ["-y", "@cairo/agent-mcp"],
+      "args": ["-y", "@ani-hq/agent-mcp"],
       "env": {
         "CAIRO_WRITE_KEY": "your-write-key",
         "CAIRO_HOST": "https://your-cairo-instance.com",
@@ -104,7 +104,7 @@ The MCP server exposes tools: `track_generation`, `track_tool_call`, `track_deci
 ### LangChain
 
 ```typescript
-import { CairoCallbackHandler } from '@cairo/agent-tracker/middleware/langchain';
+import { CairoCallbackHandler } from '@ani-hq/agent-tracker/middleware/langchain';
 
 const handler = new CairoCallbackHandler(tracker);
 const chain = new LLMChain({ llm, prompt, callbacks: [handler] });
@@ -113,7 +113,7 @@ const chain = new LLMChain({ llm, prompt, callbacks: [handler] });
 ### OpenAI
 
 ```typescript
-import { wrapOpenAI } from '@cairo/agent-tracker/middleware/openai';
+import { wrapOpenAI } from '@ani-hq/agent-tracker/middleware/openai';
 import OpenAI from 'openai';
 
 const openai = wrapOpenAI(new OpenAI(), tracker);
@@ -123,7 +123,7 @@ const openai = wrapOpenAI(new OpenAI(), tracker);
 ### Vercel AI SDK
 
 ```typescript
-import { createTrackedGenerateText } from '@cairo/agent-tracker/middleware/vercel-ai';
+import { createTrackedGenerateText } from '@ani-hq/agent-tracker/middleware/vercel-ai';
 import { generateText } from 'ai';
 
 const trackedGenerate = createTrackedGenerateText(tracker, generateText);

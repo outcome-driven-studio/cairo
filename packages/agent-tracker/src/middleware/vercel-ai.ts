@@ -5,7 +5,7 @@ import { AgentTracker } from '../index';
  * Wraps the `generateText` / `streamText` result to track generations.
  *
  * Usage:
- *   import { trackVercelAI } from '@cairo/agent-tracker/middleware/vercel-ai';
+ *   import { trackVercelAI } from '@ani-hq/agent-tracker/middleware/vercel-ai';
  *   const result = await generateText({ model, prompt });
  *   trackVercelAI(tracker, result);
  */

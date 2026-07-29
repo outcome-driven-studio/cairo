@@ -40,7 +40,7 @@ Primary ingestion endpoint. The SDK uses this for all event delivery.
         "agent_id": "my-agent",
         "instance_id": "uuid",
         "session_id": "uuid",
-        "library": { "name": "@cairo/agent-tracker", "version": "1.0.0" }
+        "library": { "name": "@ani-hq/agent-tracker", "version": "1.0.0" }
       }
     }
   ],

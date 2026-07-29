@@ -10,8 +10,8 @@ Cairo is a server-side event pipeline that ingests, processes, and routes events
 Sources                      Cairo Server                              Destinations
 --------------------------   ----------------------------------------  ---------------------------
                              +--------------------------------------+
-  @cairo/agent-tracker --->  |                                      |  --> Slack
-  @cairo/agent-mcp    --->  |  Ingestion     Processing    Routing |  --> Mixpanel
+  @ani-hq/agent-tracker --->  |                                      |  --> Slack
+  @ani-hq/agent-mcp    --->  |  Ingestion     Processing    Routing |  --> Mixpanel
   HTTP (curl, any SDK) --->  |  (auth,        (suppress,   (fan-out|  --> BigQuery
                              |   validate)     identity,    per     |  --> Snowflake
                              |                 transform,   dest)   |  --> Kafka
@@ -128,7 +128,7 @@ Key database tables:
 
 ## SDKs
 
-### @cairo/agent-tracker
+### @ani-hq/agent-tracker
 
 TypeScript SDK. Uses native `fetch` (no HTTP library dependency). Queue-based batching with configurable `flushAt` and `flushInterval`. Session objects auto-accumulate token counts, costs, tool calls, and errors. Sampling, input redaction, and property truncation are built in.
 
@@ -137,9 +137,9 @@ Framework middleware:
 - **OpenAI**: `wrapOpenAI` patches `chat.completions.create`
 - **Vercel AI SDK**: `trackVercelAI` and `createTrackedGenerateText`
 
-### @cairo/agent-mcp
+### @ani-hq/agent-mcp
 
-MCP server for Claude, GPT, and other MCP-capable agents. Runs over stdio transport. Contains a self-contained event poster (does not depend on `@cairo/agent-tracker`). Exposes 6 MCP tools: `track_generation`, `track_tool_call`, `track_decision`, `track_error`, `start_session`, `end_session`.
+MCP server for Claude, GPT, and other MCP-capable agents. Runs over stdio transport. Contains a self-contained event poster (does not depend on `@ani-hq/agent-tracker`). Exposes 6 MCP tools: `track_generation`, `track_tool_call`, `track_decision`, `track_error`, `start_session`, `end_session`.
 
 Configuration via environment variables: `CAIRO_WRITE_KEY`, `CAIRO_HOST`, `CAIRO_AGENT_ID`, `CAIRO_DEBUG`.
 
