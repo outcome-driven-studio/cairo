@@ -2,20 +2,20 @@
 
 ## Overview
 
-`@cairo/agent-tracker` is a TypeScript SDK for tracking AI agent behavior. It collects structured events (LLM generations, tool calls, decisions, errors, handoffs) and sends them to a Cairo server, which processes them through an event pipeline and routes them to configured destinations.
+`@ani-hq/agent-tracker` is a TypeScript SDK for tracking AI agent behavior. It collects structured events (LLM generations, tool calls, decisions, errors, handoffs) and sends them to a Cairo server, which processes them through an event pipeline and routes them to configured destinations.
 
 The SDK uses native `fetch`, queue-based batching, and automatic session accumulation. It has zero runtime dependencies beyond `uuid`.
 
 ## Installation
 
 ```bash
-npm install @cairo/agent-tracker
+npm install @ani-hq/agent-tracker
 ```
 
 ## Configuration
 
 ```typescript
-import { AgentTracker } from '@cairo/agent-tracker';
+import { AgentTracker } from '@ani-hq/agent-tracker';
 
 const tracker = AgentTracker.init({
   writeKey: 'your-write-key',
@@ -250,7 +250,7 @@ The `session.end()` call emits an `agent.session.end` event with:
 `CairoCallbackHandler` implements the LangChain callback interface. It automatically tracks generations, tool calls, and errors from any chain or agent.
 
 ```typescript
-import { CairoCallbackHandler } from '@cairo/agent-tracker/middleware/langchain';
+import { CairoCallbackHandler } from '@ani-hq/agent-tracker/middleware/langchain';
 
 const handler = new CairoCallbackHandler(tracker);
 
@@ -272,7 +272,7 @@ Tracked automatically: `handleLLMStart/End` (generations with token counts and l
 
 ```typescript
 import OpenAI from 'openai';
-import { wrapOpenAI } from '@cairo/agent-tracker/middleware/openai';
+import { wrapOpenAI } from '@ani-hq/agent-tracker/middleware/openai';
 
 const openai = wrapOpenAI(new OpenAI(), tracker);
 
@@ -291,7 +291,7 @@ Two options: manual tracking with `trackVercelAI`, or auto-tracking with `create
 
 ```typescript
 import { generateText } from 'ai';
-import { trackVercelAI, createTrackedGenerateText } from '@cairo/agent-tracker/middleware/vercel-ai';
+import { trackVercelAI, createTrackedGenerateText } from '@ani-hq/agent-tracker/middleware/vercel-ai';
 
 // Option 1: Manual
 const result = await generateText({ model, prompt });

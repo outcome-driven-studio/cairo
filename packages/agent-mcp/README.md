@@ -1,9 +1,9 @@
-# @cairo/agent-mcp
+# @ani-hq/agent-mcp
 
 stdio [MCP](https://modelcontextprotocol.io) server for agent self-reporting into [Cairo](https://github.com/outcome-driven-studio/cairo).
 
 ```bash
-npx -y @cairo/agent-mcp
+npx -y @ani-hq/agent-mcp
 ```
 
 Cursor / Claude Code config:
@@ -13,7 +13,7 @@ Cursor / Claude Code config:
   "mcpServers": {
     "cairo-agent": {
       "command": "npx",
-      "args": ["-y", "@cairo/agent-mcp"],
+      "args": ["-y", "@ani-hq/agent-mcp"],
       "env": {
         "CAIRO_HOST": "https://your-cairo-instance.com",
         "CAIRO_WRITE_KEY": "your-write-key",

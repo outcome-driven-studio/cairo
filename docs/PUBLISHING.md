@@ -1,21 +1,18 @@
-# Publishing @cairo packages
+# Publishing @ani-hq packages
 
-## One-time setup (you)
+Packages publish under the existing **`ani-hq`** npm org.
 
-1. Create an npm org named **`cairo`**: https://www.npmjs.com/org/create  
-   (Scoped packages `@cairo/*` require this org, or a user named `cairo`.)
-2. Create an **Automation** access token: https://www.npmjs.com/settings/~/tokens  
-   - Type: Automation  
-   - Grant publish access to the `cairo` org
-3. Add the token as a GitHub Actions secret named **`NPM_TOKEN`** on `outcome-driven-studio/cairo`  
-   Or export it locally: `export NPM_TOKEN=npm_...`
+## One-time setup
 
-Root package is **not** published as `cairo` (that name is taken on npm by an unrelated package). Server distribution = git + Docker.
+1. Automation token with publish access to `ani-hq`: https://www.npmjs.com/settings/~/tokens
+2. Add as GitHub secret **`NPM_TOKEN`**, or `export NPM_TOKEN=npm_...`
 
-## Publish (local)
+Root package is **private** (server ships via git + Docker).
+
+## Publish
 
 ```bash
-export NPM_TOKEN=npm_...   # or: npm login
+export NPM_TOKEN=npm_...
 chmod +x scripts/publish-packages.sh
 ./scripts/publish-packages.sh
 
@@ -23,12 +20,10 @@ chmod +x scripts/publish-packages.sh
 DRY_RUN=true ./scripts/publish-packages.sh
 ```
 
-## Publish (GitHub Actions)
+Or Actions → **Publish npm packages** → Run workflow.
 
-Actions → **Publish npm packages** → Run workflow.
+## Packages
 
-Or create a GitHub Release; the workflow also runs on `release: published`.
-
-## After publish
-
-`npm install @cairo/tracker` and `npx -y @cairo/agent-mcp` should work. Update the root README if needed (remove “not published yet” notes).
+- `@ani-hq/tracker`
+- `@ani-hq/agent-tracker`
+- `@ani-hq/agent-mcp`

@@ -1,13 +1,13 @@
-# @cairo/tracker
+# @ani-hq/tracker
 
 Universal Segment-style event tracking SDK for [Cairo](https://github.com/outcome-driven-studio/cairo).
 
 ```bash
-npm install @cairo/tracker
+npm install @ani-hq/tracker
 ```
 
 ```ts
-import { Cairo } from '@cairo/tracker';
+import { Cairo } from '@ani-hq/tracker';
 
 const cairo = Cairo.init({
   writeKey: process.env.CAIRO_WRITE_KEY!,

@@ -11,7 +11,7 @@ import {
   Message,
 } from './types';
 
-const LIBRARY_NAME = '@cairo/tracker';
+const LIBRARY_NAME = '@ani-hq/tracker';
 const LIBRARY_VERSION = '1.0.0';
 
 const DEFAULTS: Required<Omit<TrackerConfig, 'writeKey'>> = {

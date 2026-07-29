@@ -60,7 +60,7 @@ class EventPoster {
         agent_id: this.agentId,
         instance_id: this.instanceId,
         session_id: this.sessionId,
-        library: { name: '@cairo/agent-mcp', version: '1.0.0' },
+        library: { name: '@ani-hq/agent-mcp', version: '1.0.0' },
       },
     });
 

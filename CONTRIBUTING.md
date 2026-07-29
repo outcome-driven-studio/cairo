@@ -42,7 +42,7 @@ INSERT INTO write_keys (key, name) VALUES ('dev-key', 'local');
 - Primary interface: `POST /mcp`
 - Product ingest: `POST /v2/track` / `POST /v2/batch` (also under `/api/v2`)
 - Notifications hand off to agents; agents relay via their own gateways
-- Packages live under `packages/` (workspaces): `@cairo/tracker`, `@cairo/agent-tracker`, `@cairo/agent-mcp`
+- Packages live under `packages/` (workspaces): `@ani-hq/tracker`, `@ani-hq/agent-tracker`, `@ani-hq/agent-mcp`
 
 ## License
 

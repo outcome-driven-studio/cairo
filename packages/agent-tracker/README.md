@@ -1,13 +1,13 @@
-# @cairo/agent-tracker
+# @ani-hq/agent-tracker
 
 Track AI agent sessions, LLM generations, tool calls, decisions, and errors into [Cairo](https://github.com/outcome-driven-studio/cairo).
 
 ```bash
-npm install @cairo/agent-tracker
+npm install @ani-hq/agent-tracker
 ```
 
 ```ts
-import { AgentTracker } from '@cairo/agent-tracker';
+import { AgentTracker } from '@ani-hq/agent-tracker';
 
 const tracker = AgentTracker.init({
   writeKey: process.env.CAIRO_WRITE_KEY!,

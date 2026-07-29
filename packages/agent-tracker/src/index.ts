@@ -17,7 +17,7 @@ import {
   TrackMessage,
 } from './types';
 
-const LIBRARY_NAME = '@cairo/agent-tracker';
+const LIBRARY_NAME = '@ani-hq/agent-tracker';
 const LIBRARY_VERSION = '1.0.0';
 
 const DEFAULT_CONFIG: Partial<AgentTrackerConfig> = {

@@ -1,10 +1,13 @@
 {
-  "name": "@cairo/agent-tracker",
-  "version": "1.0.0",
+  "name": "@ani-hq/agent-tracker",
+  "version": "1.0.1",
   "description": "Agent behavior tracking SDK for Cairo — generations, tool calls, decisions, errors",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "homepage": "https://github.com/outcome-driven-studio/cairo/tree/main/packages/agent-tracker",
   "bugs": {
     "url": "https://github.com/outcome-driven-studio/cairo/issues"
@@ -21,7 +24,12 @@
     "prepublishOnly": "npm run build"
   },
   "keywords": [
-    "cairo", "agent", "tracking", "llm", "observability", "mcp"
+    "cairo",
+    "agent",
+    "tracking",
+    "llm",
+    "observability",
+    "mcp"
   ],
   "author": "Cairo Team",
   "license": "MIT",

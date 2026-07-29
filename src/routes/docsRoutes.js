@@ -259,9 +259,9 @@ ${toolSections}
 <table>
   <thead><tr><th>Package</th><th>Use for</th></tr></thead>
   <tbody>
-    <tr><td><code>@cairo/tracker</code></td><td>Universal event tracking from apps</td></tr>
-    <tr><td><code>@cairo/agent-tracker</code></td><td>AI agent session tracking (generations, tool calls, costs)</td></tr>
-    <tr><td><code>@cairo/agent-mcp</code></td><td>stdio MCP server for agent self-reporting (not the full HTTP /mcp surface)</td></tr>
+    <tr><td><code>@ani-hq/tracker</code></td><td>Universal event tracking from apps</td></tr>
+    <tr><td><code>@ani-hq/agent-tracker</code></td><td>AI agent session tracking (generations, tool calls, costs)</td></tr>
+    <tr><td><code>@ani-hq/agent-mcp</code></td><td>stdio MCP server for agent self-reporting (not the full HTTP /mcp surface)</td></tr>
   </tbody>
 </table>
 
@@ -270,7 +270,7 @@ ${toolSections}
   "mcpServers": {
     "cairo": {
       "command": "npx",
-      "args": ["-y", "@cairo/agent-mcp"],
+      "args": ["-y", "@ani-hq/agent-mcp"],
       "env": {
         "CAIRO_HOST": "${baseUrl}",
         "CAIRO_WRITE_KEY": "your-write-key",

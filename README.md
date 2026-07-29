@@ -4,7 +4,7 @@ Open-source, agent-first event tracking. Agents are the primary user. Track even
 
 Cairo does **not** connect to messaging gateways itself.
 
-> **Status:** dogfood / early production. Self-host from git. npm packages (`@cairo/*`) are not published yet.
+> **Status:** dogfood / early production. Self-host from git. Client packages publish on npm as `@ani-hq/*`.
 
 ## Why Cairo
 
@@ -43,18 +43,14 @@ curl -X POST https://your-cairo.com/mcp \
   }}'
 ```
 
-Agent self-reporting via stdio MCP (from this repo until packages are published):
-
-```bash
-cd packages/agent-mcp && npm install && npm run build
-```
+Agent self-reporting via stdio MCP:
 
 ```json
 {
   "mcpServers": {
     "cairo-agent": {
-      "command": "node",
-      "args": ["/absolute/path/to/cairo/packages/agent-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@ani-hq/agent-mcp"],
       "env": {
         "CAIRO_HOST": "https://your-cairo-instance.com",
         "CAIRO_WRITE_KEY": "YOUR_KEY",
@@ -67,16 +63,13 @@ cd packages/agent-mcp && npm install && npm run build
 
 ### For Apps (SDK)
 
-Packages are not on npm yet. Install from git/workspace:
-
 ```bash
-# from this monorepo
-cd packages/tracker && npm install && npm run build
-npm install /absolute/path/to/cairo/packages/tracker
+npm install @ani-hq/tracker
+# or: npm install @ani-hq/agent-tracker
 ```
 
 ```typescript
-import { Cairo } from '@cairo/tracker';
+import { Cairo } from '@ani-hq/tracker';
 
 const cairo = Cairo.init({
   writeKey: 'YOUR_KEY',

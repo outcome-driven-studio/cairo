@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Publish @cairo/* packages to npm.
-# Requires: valid npm auth (npm login or NPM_TOKEN), and ownership of the @cairo scope.
+# Publish @ani-hq/* packages to npm.
+# Requires: valid npm auth (npm login or NPM_TOKEN), and ownership of the @ani-hq scope.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -16,7 +16,7 @@ echo "==> Checking npm auth"
 if ! npm whoami >/dev/null 2>&1; then
   echo "ERROR: not logged in to npm."
   echo "  Run: npm login"
-  echo "  Or set NPM_TOKEN to an automation token with publish rights on @cairo"
+  echo "  Or set NPM_TOKEN to an automation token with publish rights on @ani-hq"
   exit 1
 fi
 echo "Logged in as: $(npm whoami)"
@@ -44,6 +44,6 @@ for pkg in "${PACKAGES[@]}"; do
 done
 
 echo "==> Done"
-npm view @cairo/tracker version || true
-npm view @cairo/agent-tracker version || true
-npm view @cairo/agent-mcp version || true
+npm view @ani-hq/tracker version || true
+npm view @ani-hq/agent-tracker version || true
+npm view @ani-hq/agent-mcp version || true
