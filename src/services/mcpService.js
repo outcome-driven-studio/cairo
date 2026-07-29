@@ -384,8 +384,38 @@ class McpService {
       },
     }, this._toolQueryAgentSessions);
 
-    // ── System ─────────────────────────────────────────────────────────
-    register('system_health', 'Check Cairo health and configured notification channels.', {
+    // ── System / auth ────────────────────────────────────────────────────
+    register('create_write_key', 'Create a new write key. Returns the full key once — store it securely.', {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        key: { type: 'string', description: 'Optional custom key value; auto-generated if omitted' },
+      },
+    }, async (args) => {
+      const { createWriteKey } = require('../middleware/auth');
+      return createWriteKey({ name: args.name || 'default', key: args.key });
+    });
+
+    register('list_write_keys', 'List write keys (prefixes only; full secrets are not returned).', {
+      type: 'object',
+      properties: {},
+    }, async () => {
+      const { listWriteKeys } = require('../middleware/auth');
+      return listWriteKeys();
+    });
+
+    register('revoke_write_key', 'Revoke a write key by id or full key value.', {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'Write key id or full key' } },
+      required: ['id'],
+    }, async (args) => {
+      const { revokeWriteKey } = require('../middleware/auth');
+      const row = await revokeWriteKey(args.id);
+      if (!row) throw new Error('Key not found or already revoked');
+      return row;
+    });
+
+    register('system_health', 'Check Cairo health and delivery mode.', {
       type: 'object',
       properties: {},
     }, this._toolSystemHealth);
@@ -606,10 +636,20 @@ class McpService {
       dbOk = true;
     } catch (_) { /* */ }
 
+    const { requireKeysEnforced, loadWriteKeys } = require('../middleware/auth');
+    let keyCount = 0;
+    try {
+      const cache = await loadWriteKeys();
+      keyCount = cache.keys.size;
+    } catch (_) { /* */ }
+
     return {
       status: dbOk ? 'healthy' : 'degraded',
       version: this.serverInfo.version,
       delivery: 'agent-handoff',
+      write_keys_enforced: requireKeysEnforced(),
+      write_keys_active: keyCount,
+      rate_limit: parseInt(process.env.CAIRO_RATE_LIMIT || '120', 10),
       tool_count: Object.keys(this.tools).length,
       timestamp: new Date().toISOString(),
     };

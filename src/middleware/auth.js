@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { query } = require('../utils/db');
 const logger = require('../utils/logger');
 
@@ -5,16 +6,22 @@ const logger = require('../utils/logger');
  * Validate write key against the write_keys table.
  * Accepts X-Write-Key header or Authorization: Bearer <key>.
  *
- * Bootstrap: if write_keys table is empty (or missing), any non-empty key
- * is accepted so first-run setup is not locked out. Once at least one key
- * exists, validation is enforced.
+ * Bootstrap (dev only): if write_keys is empty, any non-empty key is accepted
+ * unless NODE_ENV=production or CAIRO_REQUIRE_WRITE_KEYS=true.
  */
-let _cache = { keys: new Set(), loadedAt: 0 };
-const CACHE_TTL_MS = 60_000;
+let _cache = { keys: new Set(), loadedAt: 0, empty: true };
+const CACHE_TTL_MS = 30_000;
+
+function requireKeysEnforced() {
+  return (
+    process.env.CAIRO_REQUIRE_WRITE_KEYS === 'true' ||
+    process.env.NODE_ENV === 'production'
+  );
+}
 
 async function loadWriteKeys() {
   const now = Date.now();
-  if (now - _cache.loadedAt < CACHE_TTL_MS && _cache.keys.size >= 0) {
+  if (now - _cache.loadedAt < CACHE_TTL_MS) {
     return _cache;
   }
   try {
@@ -27,7 +34,6 @@ async function loadWriteKeys() {
       empty: result.rows.length === 0,
     };
   } catch (err) {
-    // Table may not exist yet during first boot
     logger.warn('[auth] write_keys lookup failed:', err.message);
     _cache = { keys: new Set(), loadedAt: now, empty: true, error: true };
   }
@@ -42,6 +48,41 @@ function extractWriteKey(req) {
   );
 }
 
+function generateWriteKey() {
+  return `ck_${crypto.randomBytes(24).toString('hex')}`;
+}
+
+async function createWriteKey({ name = 'default', key } = {}) {
+  const value = key || generateWriteKey();
+  const result = await query(
+    `INSERT INTO write_keys (key, name) VALUES ($1, $2) RETURNING id, key, name, created_at`,
+    [value, name]
+  );
+  invalidateWriteKeyCache();
+  return result.rows[0];
+}
+
+async function listWriteKeys() {
+  const result = await query(
+    `SELECT id, name, created_at, revoked_at,
+            LEFT(key, 8) || '…' AS key_prefix
+     FROM write_keys
+     ORDER BY created_at DESC`
+  );
+  return result.rows;
+}
+
+async function revokeWriteKey(idOrKey) {
+  const result = await query(
+    `UPDATE write_keys SET revoked_at = NOW()
+     WHERE (id::text = $1 OR key = $1) AND revoked_at IS NULL
+     RETURNING id, name, revoked_at`,
+    [idOrKey]
+  );
+  invalidateWriteKeyCache();
+  return result.rows[0] || null;
+}
+
 async function requireWriteKey(req, res, next) {
   const writeKey = extractWriteKey(req);
 
@@ -53,9 +94,16 @@ async function requireWriteKey(req, res, next) {
   }
 
   const cache = await loadWriteKeys();
+  const enforced = requireKeysEnforced();
 
-  // Bootstrap / fail-open when no keys configured yet
   if (cache.empty) {
+    if (enforced) {
+      return res.status(401).json({
+        success: false,
+        error:
+          'No write keys configured. Run: npx cairo create-write-key --name production',
+      });
+    }
     req.writeKey = writeKey;
     return next();
   }
@@ -71,7 +119,6 @@ async function requireWriteKey(req, res, next) {
   next();
 }
 
-/** MCP variant — JSON-RPC error shape */
 async function requireWriteKeyMcp(req, res, next) {
   const writeKey = extractWriteKey(req);
 
@@ -87,7 +134,24 @@ async function requireWriteKeyMcp(req, res, next) {
   }
 
   const cache = await loadWriteKeys();
-  if (!cache.empty && !cache.keys.has(writeKey)) {
+  const enforced = requireKeysEnforced();
+
+  if (cache.empty) {
+    if (enforced) {
+      return res.status(401).json({
+        jsonrpc: '2.0',
+        id: null,
+        error: {
+          code: -32000,
+          message: 'No write keys configured. Run: npx cairo create-write-key',
+        },
+      });
+    }
+    req.writeKey = writeKey;
+    return next();
+  }
+
+  if (!cache.keys.has(writeKey)) {
     return res.status(401).json({
       jsonrpc: '2.0',
       id: null,
@@ -100,7 +164,7 @@ async function requireWriteKeyMcp(req, res, next) {
 }
 
 function invalidateWriteKeyCache() {
-  _cache = { keys: new Set(), loadedAt: 0 };
+  _cache = { keys: new Set(), loadedAt: 0, empty: true };
 }
 
 module.exports = {
@@ -109,4 +173,9 @@ module.exports = {
   extractWriteKey,
   invalidateWriteKeyCache,
   loadWriteKeys,
+  createWriteKey,
+  listWriteKeys,
+  revokeWriteKey,
+  generateWriteKey,
+  requireKeysEnforced,
 };

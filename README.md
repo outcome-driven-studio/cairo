@@ -4,6 +4,8 @@ Open-source, agent-first event tracking. Agents are the primary user. Track even
 
 Cairo does **not** connect to messaging gateways itself.
 
+> **Status:** dogfood / early production. Self-host from git. npm packages (`@cairo/*`) are not published yet.
+
 ## Why Cairo
 
 - **MCP-first.** Agents connect via Model Context Protocol. Tools for events, identity, errors, notification handoff, and GDPR.
@@ -11,7 +13,21 @@ Cairo does **not** connect to messaging gateways itself.
 - **Agent handoff.** Rules enqueue notifications for agents (pull via MCP or push via webhook). Agents relay through whatever gateway they already use.
 - **Self-hosted.** Node.js + PostgreSQL. Your data stays on your infrastructure.
 
-## Quick Start
+## Quick Start (self-host)
+
+```bash
+git clone https://github.com/outcome-driven-studio/cairo.git
+cd cairo
+cp .env.example .env.local
+# set POSTGRES_URL in .env.local
+
+npm install
+npm run migrate
+node bin/cairo.js create-write-key --name local   # prints a key — save it
+npm start
+```
+
+Production tip: set `NODE_ENV=production` (or `CAIRO_REQUIRE_WRITE_KEYS=true`) so bootstrap mode is disabled and only real keys work.
 
 ### For Agents (MCP)
 
@@ -20,24 +36,28 @@ HTTP MCP against a running Cairo instance:
 ```bash
 curl -X POST https://your-cairo.com/mcp \
   -H "Content-Type: application/json" \
-  -H "X-Write-Key: your-write-key" \
+  -H "X-Write-Key: YOUR_KEY" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
     "name":"track_event",
     "arguments":{"event":"signup","user_id":"user_123","properties":{"plan":"free"}}
   }}'
 ```
 
-Agent self-reporting via stdio MCP (local package until published):
+Agent self-reporting via stdio MCP (from this repo until packages are published):
+
+```bash
+cd packages/agent-mcp && npm install && npm run build
+```
 
 ```json
 {
   "mcpServers": {
     "cairo-agent": {
       "command": "node",
-      "args": ["./packages/agent-mcp/dist/index.js"],
+      "args": ["/absolute/path/to/cairo/packages/agent-mcp/dist/index.js"],
       "env": {
         "CAIRO_HOST": "https://your-cairo-instance.com",
-        "CAIRO_WRITE_KEY": "your-write-key",
+        "CAIRO_WRITE_KEY": "YOUR_KEY",
         "CAIRO_AGENT_ID": "my-agent"
       }
     }
@@ -47,16 +67,19 @@ Agent self-reporting via stdio MCP (local package until published):
 
 ### For Apps (SDK)
 
+Packages are not on npm yet. Install from git/workspace:
+
 ```bash
-npm install @cairo/tracker
-# or until published: file:packages/tracker
+# from this monorepo
+cd packages/tracker && npm install && npm run build
+npm install /absolute/path/to/cairo/packages/tracker
 ```
 
 ```typescript
 import { Cairo } from '@cairo/tracker';
 
 const cairo = Cairo.init({
-  writeKey: 'your-write-key',
+  writeKey: 'YOUR_KEY',
   host: 'https://your-cairo-instance.com',
 });
 
@@ -70,7 +93,7 @@ cairo.identify({
   userId: 'user_123',
   traits: {
     email: 'ava@school.edu',
-    telegram_chat_id: '123456789', // stored for agents to look up when relaying
+    telegram_chat_id: '123456789', // for agents to look up when relaying
   },
 });
 
@@ -119,6 +142,7 @@ Agent loop:
 | **Errors** | `capture_error`, `list_error_groups`, `get_error_group`, `resolve_error`, `error_trends` |
 | **Notifications** | `set_user_channel`, `create_notification_rule`, `list_notification_rules`, `delete_notification_rule`, `enqueue_notification`, `get_pending_notifications`, `ack_notification`, `register_agent_webhook` |
 | **GDPR** | `gdpr_delete_user`, `gdpr_suppress_user`, `gdpr_unsuppress_user`, `gdpr_check_suppression` |
+| **Auth** | `create_write_key`, `list_write_keys`, `revoke_write_key` |
 | **Agents** | `query_agent_sessions` |
 | **System** | `system_health`, `describe_tool` |
 
@@ -138,23 +162,15 @@ All require `X-Write-Key` (or `Authorization: Bearer`).
 | * | `/v2/errors/*` | Error tracking |
 | * | `/v2/agent/*` | Agent sessions |
 
-## Setup
+## Ops
 
 ```bash
-cp .env.example .env.local
-# set POSTGRES_URL
-npm install
-npm run migrate
-npm start
+node bin/cairo.js create-write-key --name prod
+node bin/cairo.js list-write-keys
+node bin/cairo.js revoke-write-key --id <id>
 ```
 
-Insert a write key once the DB is up:
-
-```sql
-INSERT INTO write_keys (key, name) VALUES ('dev-key', 'local');
-```
-
-Until at least one write key exists, any non-empty key is accepted (bootstrap mode).
+Useful env vars: see [`.env.example`](./.env.example). Rate limit defaults to 120 req/min per write key. Agent webhook push retries 3 times with backoff (`CAIRO_WEBHOOK_RETRIES`).
 
 ## License
 

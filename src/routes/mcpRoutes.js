@@ -54,6 +54,7 @@ class McpRoutes {
       if (name.includes('identity') || name === 'alias_identity') return 'identity';
       if (['track_event', 'batch_track', 'query_events'].includes(name)) return 'events';
       if (['identify_user', 'lookup_user'].includes(name)) return 'users';
+      if (name.includes('write_key')) return 'auth';
       return 'system';
     };
 

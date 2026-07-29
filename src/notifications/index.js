@@ -236,33 +236,61 @@ class NotificationService {
   }
 
   async _pushToAgent(agentId, notification, namespace) {
+    const maxAttempts = Math.max(1, parseInt(process.env.CAIRO_WEBHOOK_RETRIES || '3', 10));
+    const baseDelayMs = Math.max(50, parseInt(process.env.CAIRO_WEBHOOK_RETRY_DELAY_MS || '250', 10));
+
+    let url;
     try {
       const result = await query(
         `SELECT webhook_url FROM agent_endpoints WHERE agent_id = $1 AND namespace = $2`,
         [agentId, namespace]
       );
-      const url = result.rows[0]?.webhook_url;
-      if (!url) return;
-
-      await axios.post(
-        url,
-        {
-          type: 'notification',
-          notification: {
-            id: notification.id,
-            event: notification.event_name,
-            userId: notification.user_id,
-            message: notification.message,
-            payload: notification.payload,
-            channels: notification.payload?.channels || {},
-            createdAt: notification.created_at,
-          },
-        },
-        { timeout: 8000 }
-      );
+      url = result.rows[0]?.webhook_url;
     } catch (err) {
-      logger.warn(`[notifications] agent webhook push failed for ${agentId}:`, err.message);
+      logger.warn(`[notifications] agent endpoint lookup failed:`, err.message);
+      return { pushed: false, reason: 'lookup_failed' };
     }
+
+    if (!url) return { pushed: false, reason: 'no_webhook' };
+
+    const body = {
+      type: 'notification',
+      notification: {
+        id: notification.id,
+        event: notification.event_name,
+        userId: notification.user_id,
+        message: notification.message,
+        payload: notification.payload,
+        channels: notification.payload?.channels || {},
+        createdAt: notification.created_at,
+      },
+    };
+
+    let lastError = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await axios.post(url, body, { timeout: 8000 });
+        return { pushed: true, attempts: attempt };
+      } catch (err) {
+        lastError = err.response?.data?.message || err.message;
+        logger.warn(
+          `[notifications] webhook push attempt ${attempt}/${maxAttempts} failed for ${agentId}: ${lastError}`
+        );
+        if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, baseDelayMs * 2 ** (attempt - 1)));
+        }
+      }
+    }
+
+    // Exhausted retries — leave pending for pull, but record error
+    try {
+      await query(
+        `UPDATE notifications SET error = $1, updated_at = NOW() WHERE id = $2`,
+        [`webhook_failed_after_${maxAttempts}: ${lastError}`, notification.id]
+      );
+    } catch (_) { /* */ }
+
+    return { pushed: false, reason: 'exhausted', error: lastError, attempts: maxAttempts };
   }
 
   /**
