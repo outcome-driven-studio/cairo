@@ -1,6 +1,7 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const IdentityService = require('../services/identityService');
+const { requireWriteKey } = require('../middleware/auth');
 
 class IdentityRoutes {
   constructor() {
@@ -9,7 +10,9 @@ class IdentityRoutes {
 
   setupRoutes() {
     const router = express.Router();
+    router.use(requireWriteKey);
 
+    // Static paths BEFORE parameterized :canonicalId
     router.get('/resolve', async (req, res) => {
       try {
         const { userId, anonymousId, email, namespace = 'default' } = req.query;
@@ -24,13 +27,16 @@ class IdentityRoutes {
       }
     });
 
-    router.get('/:canonicalId', async (req, res) => {
+    router.get('/lookup', async (req, res) => {
       try {
-        const { namespace = 'default' } = req.query;
-        const identities = await this.identityService.getIdentities(req.params.canonicalId, namespace);
-        res.json({ success: true, canonicalId: req.params.canonicalId, identities });
+        const { type, value, namespace = 'default' } = req.query;
+        if (!type || !value) {
+          return res.status(400).json({ success: false, error: 'type and value required' });
+        }
+        const result = await this.identityService.lookup(type, value, namespace);
+        res.json({ success: true, identity: result });
       } catch (error) {
-        logger.error('Identity get error:', error);
+        logger.error('Identity lookup error:', error);
         res.status(500).json({ success: false, error: error.message });
       }
     });
@@ -49,16 +55,13 @@ class IdentityRoutes {
       }
     });
 
-    router.get('/lookup', async (req, res) => {
+    router.get('/:canonicalId', async (req, res) => {
       try {
-        const { type, value, namespace = 'default' } = req.query;
-        if (!type || !value) {
-          return res.status(400).json({ success: false, error: 'type and value required' });
-        }
-        const result = await this.identityService.lookup(type, value, namespace);
-        res.json({ success: true, identity: result });
+        const { namespace = 'default' } = req.query;
+        const identities = await this.identityService.getIdentities(req.params.canonicalId, namespace);
+        res.json({ success: true, canonicalId: req.params.canonicalId, identities });
       } catch (error) {
-        logger.error('Identity lookup error:', error);
+        logger.error('Identity get error:', error);
         res.status(500).json({ success: false, error: error.message });
       }
     });

@@ -1,20 +1,12 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const AgentMetricsService = require('../services/agentMetricsService');
+const { requireWriteKey } = require('../middleware/auth');
 
 class AgentTrackingRoutes {
   constructor() {
     this.metricsService = new AgentMetricsService();
     logger.info('Agent Tracking Routes initialized');
-  }
-
-  authenticate(req, res, next) {
-    const writeKey = req.headers['x-write-key'] || req.headers.authorization?.replace('Bearer ', '');
-    if (!writeKey) {
-      return res.status(401).json({ success: false, error: 'Missing write key' });
-    }
-    req.writeKey = writeKey;
-    next();
   }
 
   /**
@@ -127,8 +119,7 @@ class AgentTrackingRoutes {
 
   setupRoutes() {
     const router = express.Router();
-
-    router.use(this.authenticate.bind(this));
+    router.use(requireWriteKey);
 
     router.post('/session/start', this.handleSessionStart.bind(this));
     router.post('/session/end', this.handleSessionEnd.bind(this));

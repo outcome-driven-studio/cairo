@@ -14,19 +14,15 @@ coverage
 .idea
 .claude
 .claude-flow
+.swarm
+.firecrawl
 .mcp.json
 CLAUDE.md
-
-# Documentation (llms.txt is included for agent discovery)
 docs/
 *.md
 !README.md
-
-# Deprecated packages (not needed at runtime)
-packages/browser-sdk
-packages/react-sdk
-
-# Tests
-tests/
+packages/
+examples/
+src/test/
 *.test.js
 *.spec.js

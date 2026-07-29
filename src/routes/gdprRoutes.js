@@ -1,6 +1,7 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const GDPRService = require('../services/gdprService');
+const { requireWriteKey } = require('../middleware/auth');
 
 class GDPRRoutes {
   constructor() {
@@ -9,6 +10,7 @@ class GDPRRoutes {
 
   setupRoutes() {
     const router = express.Router();
+    router.use(requireWriteKey);
 
     router.delete('/users/:userId', async (req, res) => {
       try {
@@ -53,9 +55,9 @@ class GDPRRoutes {
 
     router.get('/audit-log', async (req, res) => {
       try {
-        const { userId, namespace = 'default' } = req.query;
+        const { userId } = req.query;
         if (!userId) return res.status(400).json({ success: false, error: 'userId required' });
-        const log = await this.gdprService.getAuditLog(userId, namespace);
+        const log = await this.gdprService.getAuditLog(userId);
         res.json({ success: true, auditLog: log });
       } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -65,7 +67,7 @@ class GDPRRoutes {
     router.get('/suppressions', async (req, res) => {
       try {
         const { namespace = 'default', limit = 100 } = req.query;
-        const suppressions = await this.gdprService.getSuppressions(namespace, parseInt(limit));
+        const suppressions = await this.gdprService.getSuppressions(namespace, parseInt(limit, 10));
         res.json({ success: true, suppressions });
       } catch (error) {
         res.status(500).json({ success: false, error: error.message });
