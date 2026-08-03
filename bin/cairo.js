@@ -14,6 +14,8 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i] === '--name' || args[i] === '-n') flags.name = args[++i];
   else if (args[i] === '--key') flags.key = args[++i];
   else if (args[i] === '--id') flags.id = args[++i];
+  else if (args[i] === '--host') flags.host = args[++i];
+  else if (args[i] === '--agent-id') flags.agentId = args[++i];
 }
 
 if (flags.version) {
@@ -31,6 +33,7 @@ Usage:
   cairo create-write-key [--name <name>] [--key <value>]
   cairo list-write-keys
   cairo revoke-write-key --id <id-or-key>
+  cairo agent-config [--host <url>] [--agent-id <id>] [--name <key-name>] [--key <value>]
 
 Options:
   --port, -p <port>   Port to listen on (default: 8080)
@@ -44,10 +47,12 @@ Environment:
   CAIRO_RATE_LIMIT          Requests per window (default 120)
   CAIRO_RATE_WINDOW_MS      Window size ms (default 60000)
   CAIRO_WEBHOOK_RETRIES     Agent webhook push retries (default 3)
+  BASE_URL / CAIRO_PUBLIC_URL  Public host used in agent-config output
 
 Examples:
   POSTGRES_URL=postgres://... npx cairo migrate
   POSTGRES_URL=postgres://... npx cairo create-write-key --name prod
+  POSTGRES_URL=postgres://... npx cairo agent-config --host https://cairo.example --agent-id my-agent
   POSTGRES_URL=postgres://... npx cairo --port 8080
 `);
   process.exit(0);
@@ -105,6 +110,42 @@ if (command === 'migrate') {
       process.exit(1);
     }
     console.log(`Revoked: ${row.id} (${row.name || 'unnamed'})`);
+  }).then(() => process.exit(0)).catch((e) => { console.error(e.message); process.exit(1); });
+} else if (command === 'agent-config') {
+  withDb(async () => {
+    const { createWriteKey } = require('../src/middleware/auth');
+    const host = (flags.host || process.env.BASE_URL || process.env.CAIRO_PUBLIC_URL || 'https://your-cairo-instance.com')
+      .replace(/\/$/, '');
+    const agentId = flags.agentId || 'my-agent';
+    const keyName = flags.name || `agent-${agentId}`;
+    const row = await createWriteKey({ name: keyName, key: flags.key });
+
+    const config = {
+      mcpServers: {
+        cairo: {
+          command: 'npx',
+          args: ['-y', '@ani-hq/cairo-mcp'],
+          env: {
+            CAIRO_HOST: host,
+            CAIRO_WRITE_KEY: row.key,
+            CAIRO_AGENT_ID: agentId,
+          },
+        },
+      },
+    };
+
+    console.log('Agent write key created (store securely — shown once):');
+    console.log(`  id:   ${row.id}`);
+    console.log(`  name: ${row.name}`);
+    console.log(`  key:  ${row.key}`);
+    console.log('');
+    console.log('Paste this into Cursor / Claude Code / OpenClaw MCP settings:');
+    console.log('');
+    console.log(JSON.stringify(config, null, 2));
+    console.log('');
+    console.log('Then tell your agent:');
+    console.log('  "Set up tracking for <product>; notify me on signup, checkout, and errors."');
+    console.log('It will call setup_product, then drain_notifications to relay via its gateway.');
   }).then(() => process.exit(0)).catch((e) => { console.error(e.message); process.exit(1); });
 } else if (command) {
   console.error(`Unknown command: ${command}. Try --help`);

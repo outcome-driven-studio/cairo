@@ -333,6 +333,34 @@ class McpService {
       namespace: args.namespace || 'default',
     }));
 
+    register('setup_product', 'One-shot product onboarding: create a write key and notification rules for an agent. Returns the write key (once) plus install snippets for the product and MCP.', {
+      type: 'object',
+      properties: {
+        product_name: { type: 'string', description: 'Product / app name (used for key name and namespace default)' },
+        agent_id: { type: 'string', description: 'Agent that will relay notifications via its own gateway' },
+        events: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Event names to notify on (e.g. signup, checkout_completed)',
+        },
+        namespace: { type: 'string', description: 'Defaults to a slug of product_name' },
+        message_template: {
+          type: 'string',
+          description: 'Optional template for all rules. Supports {{event}}, {{userId}}, {{properties.x}}',
+        },
+      },
+      required: ['product_name', 'agent_id', 'events'],
+    }, this._toolSetupProduct);
+
+    register('drain_notifications', 'Pull pending notifications in a stable relay-ready shape (id, message, event, user, properties). Relay via your gateway, then ack_notification each id.', {
+      type: 'object',
+      properties: {
+        agent_id: { type: 'string' },
+        namespace: { type: 'string' },
+        limit: { type: 'number' },
+      },
+    }, this._toolDrainNotifications);
+
     // ── GDPR ───────────────────────────────────────────────────────────
     register('gdpr_delete_user', 'Delete all data for a user (GDPR).', {
       type: 'object',
@@ -652,6 +680,124 @@ class McpService {
       rate_limit: parseInt(process.env.CAIRO_RATE_LIMIT || '120', 10),
       tool_count: Object.keys(this.tools).length,
       timestamp: new Date().toISOString(),
+    };
+  }
+
+  _slugifyProduct(name) {
+    return String(name || 'product')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 48) || 'product';
+  }
+
+  async _toolSetupProduct(args) {
+    const productName = String(args.product_name || '').trim();
+    const agentId = String(args.agent_id || '').trim();
+    const events = Array.isArray(args.events) ? args.events.map((e) => String(e).trim()).filter(Boolean) : [];
+
+    if (!productName) throw new Error('product_name is required');
+    if (!agentId) throw new Error('agent_id is required');
+    if (!events.length) throw new Error('events must be a non-empty array of event names');
+
+    const namespace = (args.namespace && String(args.namespace).trim()) || this._slugifyProduct(productName);
+    const template =
+      args.message_template ||
+      `${productName}: {{event}} user={{userId}} {{properties}}`;
+
+    const { createWriteKey } = require('../middleware/auth');
+    const keyRow = await createWriteKey({ name: productName });
+
+    const rules = [];
+    for (const eventName of events) {
+      const rule = await this.notifications.createRule({
+        name: `${namespace}-${eventName}`,
+        event_name: eventName,
+        agent_id: agentId,
+        message_template: template,
+        namespace,
+      });
+      rules.push(rule);
+    }
+
+    const hostHint = process.env.BASE_URL || process.env.CAIRO_PUBLIC_URL || null;
+
+    return {
+      product_name: productName,
+      namespace,
+      agent_id: agentId,
+      write_key: keyRow.key,
+      write_key_id: keyRow.id,
+      host_hint: hostHint,
+      rules: rules.map((r) => ({
+        id: r.id,
+        name: r.name,
+        event_name: r.event_name,
+        agent_id: r.agent_id,
+        namespace: r.namespace,
+      })),
+      install: {
+        env: {
+          CAIRO_HOST: hostHint || 'https://your-cairo-instance.com',
+          CAIRO_WRITE_KEY: keyRow.key,
+          CAIRO_NAMESPACE: namespace,
+        },
+        tracker_snippet: [
+          "import { Cairo } from '@ani-hq/tracker';",
+          '',
+          'const cairo = Cairo.init({',
+          `  writeKey: '${keyRow.key}',`,
+          `  host: '${hostHint || 'https://your-cairo-instance.com'}',`,
+          '});',
+          '',
+          `cairo.track({ event: '${events[0]}', userId: 'user_123', properties: {} });`,
+        ].join('\n'),
+        mcp_snippet: {
+          mcpServers: {
+            cairo: {
+              command: 'npx',
+              args: ['-y', '@ani-hq/cairo-mcp'],
+              env: {
+                CAIRO_HOST: hostHint || 'https://your-cairo-instance.com',
+                CAIRO_WRITE_KEY: '<agent-ops-write-key>',
+                CAIRO_AGENT_ID: agentId,
+              },
+            },
+          },
+        },
+        note: 'Store write_key securely — it is returned only once. Product uses the product write key; the agent MCP uses an ops/agent write key from `cairo agent-config`.',
+      },
+    };
+  }
+
+  async _toolDrainNotifications(args) {
+    const agentId = args.agent_id || null;
+    const namespace = args.namespace || 'default';
+    const limit = Math.min(args.limit || 50, 200);
+    const rows = await this.notifications.getPendingNotifications({
+      agentId,
+      limit,
+      namespace,
+    });
+
+    return {
+      count: rows.length,
+      agent_id: agentId,
+      namespace,
+      notifications: rows.map((row) => {
+        const payload = row.payload || {};
+        return {
+          id: row.id,
+          message: row.message,
+          event: row.event_name || payload.event || null,
+          user: row.user_id || payload.userId || null,
+          properties: payload.properties || {},
+          channels: payload.channels || {},
+          created_at: row.created_at,
+          status: row.status,
+        };
+      }),
+      next_step: 'Relay each notification via your gateway, then call ack_notification with the id.',
     };
   }
 }

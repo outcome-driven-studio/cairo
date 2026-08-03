@@ -7,6 +7,16 @@ Cairo does NOT talk to messaging gateways itself.
 Base URL: your Cairo host
 Auth: X-Write-Key header (or Authorization: Bearer <key>)
 
+## Turnkey agent path
+1. Human runs: `cairo agent-config --host <url> --agent-id <id>` → paste MCP JSON into the agent
+2. Agent MCP package: `npx -y @ani-hq/cairo-mcp` (full surface). Not `@ani-hq/agent-mcp` (telemetry only).
+3. User says: set up Product X; notify on signup / checkout / errors
+4. Agent calls `setup_product` → returns product write_key + install snippets
+5. Product posts to `/v2/track` with that key
+6. Agent calls `drain_notifications` → relays via its gateway → `ack_notification`
+
+Docs: GET /docs · GET /llms.txt · docs/AGENT_ONBOARDING.md
+
 ## Discovery
 - GET /mcp — MCP tool discovery
 - GET /docs — HTML docs
@@ -17,6 +27,12 @@ Auth: X-Write-Key header (or Authorization: Bearer <key>)
 ## MCP (POST /mcp)
 
 JSON-RPC 2.0. Methods: initialize, tools/list, tools/call, ping.
+
+### Onboarding
+- setup_product { product_name, agent_id, events[], namespace?, message_template? }
+  Creates a product write key + one rule per event. Returns write_key (once) and install snippets.
+- drain_notifications { agent_id?, namespace?, limit? }
+  Pending notifications in relay-ready shape: id, message, event, user, properties, channels.
 
 ### Events
 - track_event { event, user_id?, user_email?, anonymous_id?, properties?, namespace? }
@@ -79,9 +95,10 @@ JSON-RPC 2.0. Methods: initialize, tools/list, tools/call, ping.
 - Pass X-Write-Key or Authorization: Bearer on every /mcp and /v2 request
 - NODE_ENV=production or CAIRO_REQUIRE_WRITE_KEYS=true disables bootstrap
 - Create keys: CLI `cairo create-write-key --name prod` or MCP create_write_key
+- Agent install: `cairo agent-config --host <url> --agent-id <id>`
 
 ## Typical agent relay loop
-1. create_notification_rule targeting your agent_id
-2. Events arrive → Cairo enqueues pending notifications (webhook push retries on failure)
-3. get_pending_notifications → relay via your gateway using payload.channels
+1. setup_product (or create_notification_rule) targeting your agent_id
+2. Events arrive → Cairo enqueues pending notifications
+3. drain_notifications → relay via your gateway using channels{}
 4. ack_notification

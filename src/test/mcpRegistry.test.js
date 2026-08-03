@@ -20,6 +20,8 @@ describe('McpService registry', () => {
       'identify_user',
       'create_notification_rule',
       'get_pending_notifications',
+      'drain_notifications',
+      'setup_product',
       'ack_notification',
       'enqueue_notification',
       'register_agent_webhook',

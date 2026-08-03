@@ -1,0 +1,43 @@
+{
+  "name": "@ani-hq/cairo-mcp",
+  "version": "1.0.0",
+  "description": "stdio MCP server that proxies the full Cairo HTTP /mcp surface for agents",
+  "main": "index.js",
+  "bin": {
+    "cairo-mcp": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "README.md"
+  ],
+  "homepage": "https://github.com/outcome-driven-studio/cairo/tree/main/packages/cairo-mcp",
+  "bugs": {
+    "url": "https://github.com/outcome-driven-studio/cairo/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "cairo",
+    "mcp",
+    "agent",
+    "notifications",
+    "model-context-protocol"
+  ],
+  "author": "Cairo Team",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/outcome-driven-studio/cairo.git",
+    "directory": "packages/cairo-mcp"
+  }
+}
