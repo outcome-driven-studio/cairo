@@ -241,11 +241,7 @@ class NotificationService {
 
     let url;
     try {
-      const result = await query(
-        `SELECT webhook_url FROM agent_endpoints WHERE agent_id = $1 AND namespace = $2`,
-        [agentId, namespace]
-      );
-      url = result.rows[0]?.webhook_url;
+      url = await this._resolveAgentWebhook(agentId, namespace || 'default');
     } catch (err) {
       logger.warn(`[notifications] agent endpoint lookup failed:`, err.message);
       return { pushed: false, reason: 'lookup_failed' };
@@ -255,6 +251,8 @@ class NotificationService {
 
     const body = {
       type: 'notification',
+      agent_id: agentId,
+      namespace: namespace || 'default',
       notification: {
         id: notification.id,
         event: notification.event_name,
@@ -266,10 +264,14 @@ class NotificationService {
       },
     };
 
+    const headers = { 'Content-Type': 'application/json' };
+    const hookSecret = process.env.CAIRO_WEBHOOK_SECRET;
+    if (hookSecret) headers['X-Hook-Secret'] = hookSecret;
+
     let lastError = null;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        await axios.post(url, body, { timeout: 8000 });
+        await axios.post(url, body, { timeout: 8000, headers });
         return { pushed: true, attempts: attempt };
       } catch (err) {
         lastError = err.response?.data?.message || err.message;
@@ -291,6 +293,25 @@ class NotificationService {
     } catch (_) { /* */ }
 
     return { pushed: false, reason: 'exhausted', error: lastError, attempts: maxAttempts };
+  }
+
+  /**
+   * Resolve webhook URL for an agent: exact namespace first, then default.
+   * One registered default webhook can cover all product namespaces.
+   */
+  async _resolveAgentWebhook(agentId, namespace) {
+    const ns = namespace || 'default';
+    const primary = await query(
+      `SELECT webhook_url FROM agent_endpoints WHERE agent_id = $1 AND namespace = $2`,
+      [agentId, ns]
+    );
+    if (primary.rows[0]?.webhook_url) return primary.rows[0].webhook_url;
+    if (ns === 'default') return null;
+    const fallback = await query(
+      `SELECT webhook_url FROM agent_endpoints WHERE agent_id = $1 AND namespace = 'default'`,
+      [agentId]
+    );
+    return fallback.rows[0]?.webhook_url || null;
   }
 
   /**

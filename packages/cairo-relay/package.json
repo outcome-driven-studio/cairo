@@ -1,0 +1,41 @@
+{
+  "name": "@ani-hq/cairo-relay",
+  "version": "1.0.0",
+  "description": "Thin webhook relay: Cairo notification push → batched Discord → ack",
+  "main": "src/index.js",
+  "bin": {
+    "cairo-relay": "./src/index.js"
+  },
+  "files": [
+    "src/",
+    "README.md"
+  ],
+  "homepage": "https://github.com/outcome-driven-studio/cairo/tree/main/packages/cairo-relay",
+  "bugs": {
+    "url": "https://github.com/outcome-driven-studio/cairo/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "cairo",
+    "webhook",
+    "discord",
+    "notifications",
+    "relay"
+  ],
+  "author": "Cairo Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/outcome-driven-studio/cairo.git",
+    "directory": "packages/cairo-relay"
+  }
+}

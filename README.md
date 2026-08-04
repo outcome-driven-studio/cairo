@@ -10,7 +10,7 @@ Cairo does **not** connect to messaging gateways itself.
 
 - **MCP-first.** Point any agent at Cairo; say “set this up for my product and ping me on signup.”
 - **Product events still work.** Frontend, backend, and mobile SDKs send to `/v2/track`.
-- **Agent handoff.** Rules enqueue for your `agent_id`. You pull (`drain_notifications`) or get a webhook, then relay on your gateway.
+- **Agent handoff.** Rules enqueue for your `agent_id`. Prefer webhook push to a thin relay (e.g. `@ani-hq/cairo-relay` → Discord); pull (`drain_notifications`) is the backup.
 - **Self-hosted.** Node.js + PostgreSQL.
 
 ## Turnkey (agent path)
@@ -31,7 +31,7 @@ Then tell your agent:
 
 > Set up tracking for Product X. Notify me on signup, checkout_completed, and errors.
 
-The agent calls **`setup_product`**, returns a product write key + install snippets. Later it **`drain_notifications`** and relays in Discord/Slack/etc.
+The agent calls **`setup_product`**, registers **`register_agent_webhook`** once at a thin relay, and returns a product write key + install snippets. Alerts arrive in Discord via the relay without asking the agent each time. **`drain_notifications`** remains for digests / backup.
 
 Full ritual: [docs/AGENT_ONBOARDING.md](./docs/AGENT_ONBOARDING.md) · skill: [skills/cairo-onboarding/SKILL.md](./skills/cairo-onboarding/SKILL.md)
 
@@ -97,13 +97,13 @@ product/agent  →  track event  →  Cairo stores event
          agent relays via its Telegram/Discord/Slack gateway
 ```
 
-Prefer **`setup_product`** for onboarding and **`drain_notifications`** for the relay loop. Lower-level tools: `create_notification_rule`, `get_pending_notifications`, `ack_notification`.
+Prefer **`setup_product`** + **`register_agent_webhook`** (→ cairo-relay) for proactive alerts. Use **`drain_notifications`** for digests or when the webhook is down. Lower-level tools: `create_notification_rule`, `get_pending_notifications`, `ack_notification`.
 
 ## MCP Tools
 
 | Category | Tools |
 |----------|-------|
-| **Onboarding** | `setup_product`, `drain_notifications` |
+| **Onboarding** | `setup_product`, `register_agent_webhook`, `drain_notifications` |
 | **Events** | `track_event`, `batch_track`, `query_events` |
 | **Users** | `identify_user`, `lookup_user` |
 | **Identity** | `resolve_identity`, `alias_identity` |
