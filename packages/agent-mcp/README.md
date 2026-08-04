@@ -1,6 +1,6 @@
 # @ani-hq/agent-mcp
 
-stdio [MCP](https://modelcontextprotocol.io) server for agent self-reporting into [Cairo](https://github.com/outcome-driven-studio/cairo).
+stdio [MCP](https://modelcontextprotocol.io) server for agent self-reporting into [Cairo](https://github.com/Ani-HQ/cairo).
 
 ```bash
 npx -y @ani-hq/agent-mcp

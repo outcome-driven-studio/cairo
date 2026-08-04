@@ -133,7 +133,7 @@ const result = await trackedGenerate({ model, prompt });
 ## Server Setup (self-hosting)
 
 ```bash
-git clone https://github.com/outcome-driven-studio/cairo.git
+git clone https://github.com/Ani-HQ/cairo.git
 cd cairo
 npm install
 npm run setup    # creates database tables

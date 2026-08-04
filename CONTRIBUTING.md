@@ -22,7 +22,7 @@ Be respectful, constructive, and collaborative.
 ## Development Setup
 
 ```bash
-git clone git@github.com:outcome-driven-studio/cairo.git
+git clone git@github.com:Ani-HQ/cairo.git
 cd cairo
 cp .env.example .env.local
 # set POSTGRES_URL

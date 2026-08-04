@@ -1,6 +1,6 @@
 # @ani-hq/tracker
 
-Universal Segment-style event tracking SDK for [Cairo](https://github.com/outcome-driven-studio/cairo).
+Universal Segment-style event tracking SDK for [Cairo](https://github.com/Ani-HQ/cairo).
 
 ```bash
 npm install @ani-hq/tracker

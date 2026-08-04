@@ -8,9 +8,9 @@
     "dist",
     "README.md"
   ],
-  "homepage": "https://github.com/outcome-driven-studio/cairo/tree/main/packages/agent-tracker",
+  "homepage": "https://github.com/Ani-HQ/cairo/tree/main/packages/agent-tracker",
   "bugs": {
-    "url": "https://github.com/outcome-driven-studio/cairo/issues"
+    "url": "https://github.com/Ani-HQ/cairo/issues"
   },
   "engines": {
     "node": ">=18"
@@ -43,7 +43,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/outcome-driven-studio/cairo.git",
+    "url": "git+https://github.com/Ani-HQ/cairo.git",
     "directory": "packages/agent-tracker"
   }
 }
