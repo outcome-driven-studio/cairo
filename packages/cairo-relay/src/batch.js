@@ -17,8 +17,8 @@ class BatchBuffer {
     this.buckets = new Map();
   }
 
-  static key(agentId, event, channel = 'discord') {
-    return `${agentId || '_'}|${event || '_'}|${channel || 'discord'}`;
+  static key(agentId, event, channel = 'default') {
+    return `${agentId || '_'}|${event || '_'}|${channel || 'default'}`;
   }
 
   push(key, item) {

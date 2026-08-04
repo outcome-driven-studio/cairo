@@ -1,19 +1,31 @@
 # Cairo
 
-Open-source, agent-first event tracking. Agents are the primary user. Track events from products and agents, then hand notifications to agents who relay to end users via their own gateways (Telegram, Discord, Slack, WhatsApp, etc.).
+**Agent-first event tracking.** Products and agents emit events; Cairo stores them and hands matching notifications to your agents. Agents relay through **their own** gateways (Slack, Discord, Telegram, WhatsApp, email, …).
 
-Cairo does **not** connect to messaging gateways itself.
+Cairo does **not** connect to messaging platforms.
 
-> **Status:** dogfood / early production. Self-host from git. Client packages: `@ani-hq/tracker`, `@ani-hq/agent-tracker`, `@ani-hq/agent-mcp`, `@ani-hq/cairo-mcp`.
+```text
+your product ──track──▶ Cairo ──rule match──▶ pending queue
+                                              │
+                         webhook push ────────┤
+                                              ▼
+                                    thin relay (optional)
+                                              │
+                                              ▼
+                                 your Slack / Discord / …
+```
+
+> Self-host from git. npm clients: `@ani-hq/tracker`, `@ani-hq/agent-tracker`, `@ani-hq/cairo-mcp`, `@ani-hq/agent-mcp`, `@ani-hq/cairo-relay`.
 
 ## Why Cairo
 
 - **MCP-first.** Point any agent at Cairo; say “set this up for my product and ping me on signup.”
-- **Product events still work.** Frontend, backend, and mobile SDKs send to `/v2/track`.
-- **Agent handoff.** Rules enqueue for your `agent_id`. Prefer webhook push to a thin relay (e.g. `@ani-hq/cairo-relay` → Discord); pull (`drain_notifications`) is the backup.
-- **Self-hosted.** Node.js + PostgreSQL.
+- **Product events still work.** SDKs and `POST /v2/track` for apps.
+- **Agent handoff, not CDP fan-out.** Rules target an `agent_id`. Prefer webhook push to a thin relay; pull (`drain_notifications`) is the backup.
+- **Gateway-agnostic.** Cairo POSTs JSON to *your* URL. Use `@ani-hq/cairo-relay`, or any worker you already run.
+- **Self-hosted.** Node.js + PostgreSQL. MIT licensed.
 
-## Turnkey (agent path)
+## Quick start
 
 ```bash
 git clone https://github.com/outcome-driven-studio/cairo.git
@@ -25,24 +37,27 @@ npm install && npm run migrate && npm start
 node bin/cairo.js agent-config --host https://your-cairo-instance.com --agent-id my-agent
 ```
 
-Paste the JSON into Cursor / Claude Code / OpenClaw / Hermes (`@ani-hq/cairo-mcp`).
+Paste the JSON into Cursor, Claude Code, OpenClaw, Hermes, or any MCP client (`@ani-hq/cairo-mcp`).
 
 Then tell your agent:
 
 > Set up tracking for Product X. Notify me on signup, checkout_completed, and errors.
 
-The agent calls **`setup_product`**, registers **`register_agent_webhook`** once at a thin relay, and returns a product write key + install snippets. Alerts arrive in Discord via the relay without asking the agent each time. **`drain_notifications`** remains for digests / backup.
+The agent calls **`setup_product`**, registers **`register_agent_webhook`** once at your relay, and returns a product write key + install snippets. Alerts reach your channel via the relay **without** asking the agent each time. Use **`drain_notifications`** for digests or when the webhook is down.
 
 Full ritual: [docs/AGENT_ONBOARDING.md](./docs/AGENT_ONBOARDING.md) · skill: [skills/cairo-onboarding/SKILL.md](./skills/cairo-onboarding/SKILL.md)
 
 Production tip: set `NODE_ENV=production` (or `CAIRO_REQUIRE_WRITE_KEYS=true`) so bootstrap mode is disabled.
 
-### Agent MCP packages
+### Packages
 
 | Package | Use |
 |---------|-----|
-| `@ani-hq/cairo-mcp` | **Full surface** — setup, rules, drain, GDPR, events |
+| `@ani-hq/cairo-mcp` | **Full MCP surface** — setup, rules, drain, GDPR, events |
 | `@ani-hq/agent-mcp` | Agent self-telemetry only (generations, tool calls) |
+| `@ani-hq/tracker` | App / product event SDK |
+| `@ani-hq/agent-tracker` | Agent session / generation SDK |
+| `@ani-hq/cairo-relay` | Optional thin relay: push → batch → your webhook/Slack/Discord → ack |
 
 ```json
 {
@@ -60,7 +75,7 @@ Production tip: set `NODE_ENV=production` (or `CAIRO_REQUIRE_WRITE_KEYS=true`) s
 }
 ```
 
-### For Apps (SDK)
+### Product SDK
 
 ```bash
 npm install @ani-hq/tracker
@@ -92,14 +107,14 @@ product/agent  →  track event  →  Cairo stores event
                                       ↓
                          enqueue for agent_id
                                       ↓
-              agent drains (MCP) or receives webhook push
+              webhook push (preferred)  or  agent drain (backup)
                                       ↓
-         agent relays via its Telegram/Discord/Slack gateway
+              your relay / agent  →  Slack, Discord, Telegram, …
 ```
 
-Prefer **`setup_product`** + **`register_agent_webhook`** (→ cairo-relay) for proactive alerts. Use **`drain_notifications`** for digests or when the webhook is down. Lower-level tools: `create_notification_rule`, `get_pending_notifications`, `ack_notification`.
+Prefer **`setup_product`** + **`register_agent_webhook`**. Lower-level tools: `create_notification_rule`, `get_pending_notifications`, `ack_notification`.
 
-## MCP Tools
+## MCP tools
 
 | Category | Tools |
 |----------|-------|
@@ -139,8 +154,12 @@ node bin/cairo.js list-write-keys
 node bin/cairo.js revoke-write-key --id <id>
 ```
 
-Useful env vars: see [`.env.example`](./.env.example). Rate limit defaults to 120 req/min per write key. Agent webhook push retries 3 times with backoff (`CAIRO_WEBHOOK_RETRIES`).
+Env: [`.env.example`](./.env.example). Rate limit defaults to 120 req/min per write key. Webhook push retries with backoff (`CAIRO_WEBHOOK_RETRIES`). Optional shared secret: `CAIRO_WEBHOOK_SECRET` → `X-Hook-Secret`.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md). Security: [SECURITY.md](./SECURITY.md).
 
 ## License
 
-MIT
+[MIT](./LICENSE)

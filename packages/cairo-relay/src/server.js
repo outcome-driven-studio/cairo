@@ -3,7 +3,8 @@
 const http = require('http');
 const { URL } = require('url');
 const { BatchBuffer } = require('./batch');
-const { formatDiscordContent, postDiscord } = require('./discord');
+const { formatMessage } = require('./format');
+const { deliver, resolveDestination } = require('./destinations');
 const { ackNotification } = require('./cairo');
 
 function readJson(req) {
@@ -36,19 +37,20 @@ function sendJson(res, status, body) {
  * @param {object} env
  */
 function createApp(env = process.env) {
-  const PORT = parseInt(env.PORT || '8787', 10);
+  const PORT = parseInt(env.PORT || '8790', 10);
   const CAIRO_HOST = env.CAIRO_HOST || '';
   const CAIRO_WRITE_KEY = env.CAIRO_WRITE_KEY || '';
   const HOOK_SECRET = env.HOOK_SECRET || '';
   const BATCH_MAX = parseInt(env.BATCH_MAX || '10', 10);
   const BATCH_MS = parseInt(env.BATCH_MS || '30000', 10);
+  const destination = resolveDestination(env) || 'unset';
 
   const buffer = new BatchBuffer({
     max: BATCH_MAX,
     ms: BATCH_MS,
     onFlush: async (_key, items) => {
-      const content = formatDiscordContent(items);
-      await postDiscord(env, content);
+      const content = formatMessage(items);
+      await deliver(env, content, items);
       for (const item of items) {
         const id = item.notification?.id || item.id;
         if (!id) continue;
@@ -66,7 +68,11 @@ function createApp(env = process.env) {
       const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
 
       if (req.method === 'GET' && url.pathname === '/health') {
-        return sendJson(res, 200, { ok: true, service: 'cairo-relay' });
+        return sendJson(res, 200, {
+          ok: true,
+          service: 'cairo-relay',
+          destination,
+        });
       }
 
       const hookMatch = url.pathname.match(/^\/hooks\/([^/]+)$/);
@@ -86,7 +92,7 @@ function createApp(env = process.env) {
         }
 
         const event = notification.event || body.event || '_';
-        const key = BatchBuffer.key(agentId, event, 'discord');
+        const key = BatchBuffer.key(agentId, event, destination);
         const item = {
           agent_id: body.agent_id || agentId,
           namespace: body.namespace || 'default',
@@ -94,7 +100,6 @@ function createApp(env = process.env) {
           receivedAt: new Date().toISOString(),
         };
 
-        // Respond immediately; flush is async (batch or timer)
         sendJson(res, 202, { accepted: true, agent_id: agentId, id: notification.id });
         buffer.push(key, item).catch((err) => {
           console.error('[cairo-relay] flush error:', err.message);
@@ -113,10 +118,11 @@ function createApp(env = process.env) {
     server,
     buffer,
     PORT,
+    destination,
     start() {
       return new Promise((resolve) => {
         server.listen(PORT, () => {
-          console.log(`[cairo-relay] listening on :${PORT}`);
+          console.log(`[cairo-relay] listening on :${PORT} (destination=${destination})`);
           resolve(server);
         });
       });

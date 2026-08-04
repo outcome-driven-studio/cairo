@@ -40,4 +40,4 @@ Then tell your agent:
 
 > Set up tracking for Product X. Notify me on signup, checkout, and errors.
 
-It should call `setup_product`, then later `drain_notifications` and relay via its own gateway.
+It should call `setup_product`, register a webhook (`register_agent_webhook`) for proactive delivery, and use `drain_notifications` for digests or backup. Relays go through the agent’s own gateway — Cairo never talks to Slack/Discord/etc.

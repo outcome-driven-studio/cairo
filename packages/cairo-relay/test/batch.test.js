@@ -15,9 +15,9 @@ describe('BatchBuffer', () => {
       },
     });
 
-    await buf.push('a|signup|discord', { id: 1 });
+    await buf.push('a|signup|default', { id: 1 });
     assert.equal(flushed.length, 0);
-    await buf.push('a|signup|discord', { id: 2 });
+    await buf.push('a|signup|default', { id: 2 });
     assert.equal(flushed.length, 1);
     assert.equal(flushed[0].items.length, 2);
   });
@@ -32,7 +32,7 @@ describe('BatchBuffer', () => {
       },
     });
 
-    await buf.push('a|signup|discord', { id: 1 });
+    await buf.push('a|signup|default', { id: 1 });
     await new Promise((r) => setTimeout(r, 80));
     assert.equal(flushed.length, 1);
     assert.equal(flushed[0][0].id, 1);

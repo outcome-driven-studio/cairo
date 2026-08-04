@@ -41,28 +41,28 @@ describe('_resolveAgentWebhook namespace fallback', () => {
   });
 
   it('returns exact namespace webhook when present', async () => {
-    query.mockResolvedValueOnce({ rows: [{ webhook_url: 'https://relay/hooks/dash' }] });
-    await expect(svc._resolveAgentWebhook('dash', 'adventures-of')).resolves.toBe(
-      'https://relay/hooks/dash'
+    query.mockResolvedValueOnce({ rows: [{ webhook_url: 'https://relay.example/hooks/my-agent' }] });
+    await expect(svc._resolveAgentWebhook('my-agent', 'product-a')).resolves.toBe(
+      'https://relay.example/hooks/my-agent'
     );
     expect(query).toHaveBeenCalledTimes(1);
-    expect(query.mock.calls[0][1]).toEqual(['dash', 'adventures-of']);
+    expect(query.mock.calls[0][1]).toEqual(['my-agent', 'product-a']);
   });
 
   it('falls back to default namespace when exact miss', async () => {
     query
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ webhook_url: 'https://relay/hooks/dash' }] });
-    await expect(svc._resolveAgentWebhook('dash', 'adventures-of')).resolves.toBe(
-      'https://relay/hooks/dash'
+      .mockResolvedValueOnce({ rows: [{ webhook_url: 'https://relay.example/hooks/my-agent' }] });
+    await expect(svc._resolveAgentWebhook('my-agent', 'product-a')).resolves.toBe(
+      'https://relay.example/hooks/my-agent'
     );
     expect(query).toHaveBeenCalledTimes(2);
-    expect(query.mock.calls[1][1]).toEqual(['dash']);
+    expect(query.mock.calls[1][1]).toEqual(['my-agent']);
   });
 
   it('does not double-query when namespace is already default', async () => {
     query.mockResolvedValueOnce({ rows: [] });
-    await expect(svc._resolveAgentWebhook('dash', 'default')).resolves.toBeNull();
+    await expect(svc._resolveAgentWebhook('my-agent', 'default')).resolves.toBeNull();
     expect(query).toHaveBeenCalledTimes(1);
   });
 });

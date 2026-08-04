@@ -28,3 +28,4 @@ Or Actions → **Publish npm packages** → Run workflow.
 - `@ani-hq/agent-tracker`
 - `@ani-hq/agent-mcp`
 - `@ani-hq/cairo-mcp`
+- `@ani-hq/cairo-relay`

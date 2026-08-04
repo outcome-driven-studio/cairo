@@ -1,43 +1,38 @@
-# cairo-relay — systemd (holdco)
+# cairo-relay — sample systemd unit
+#
+# 1. Copy the package to e.g. /opt/cairo-relay
+# 2. Create /opt/cairo-relay/.env (see below)
+# 3. Install this unit and start the service
+# 4. Put HTTPS in front (Caddy, nginx, Cloudflare Tunnel, …)
+# 5. register_agent_webhook → https://relay.example.com/hooks/<agent_id>
 
-```ini
 [Unit]
-Description=Cairo thin Discord notification relay
+Description=Cairo notification relay (batch → your gateway → ack)
 After=network.target
 
 [Service]
 Type=simple
-User=ubuntu
-WorkingDirectory=/home/ubuntu/cairo-relay
-EnvironmentFile=/home/ubuntu/cairo-relay/.env
-ExecStart=/usr/bin/node /home/ubuntu/cairo-relay/src/index.js
+User=cairo
+WorkingDirectory=/opt/cairo-relay
+EnvironmentFile=/opt/cairo-relay/.env
+ExecStart=/usr/bin/node /opt/cairo-relay/src/index.js
 Restart=always
 RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
-```
 
-Copy to `/etc/systemd/system/cairo-relay.service`, then:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now cairo-relay
-sudo systemctl status cairo-relay
-```
-
-`.env` example:
-
-```bash
-PORT=8790
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
-# or DISCORD_BOT_TOKEN + DISCORD_CHANNEL_ID
-CAIRO_HOST=https://cairo-cdp-6xknfazxaq-uc.a.run.app
-CAIRO_WRITE_KEY=ck_...
-HOOK_SECRET=
-BATCH_MAX=10
-BATCH_MS=30000
-```
-
-Expose via nginx/Caddy or Cloudflare tunnel so Cairo Cloud Run can reach `https://…/hooks/dash`.
-Example path on fleet: `https://fleet.ani.computer/cairo-hooks/dash` → `http://127.0.0.1:8790/hooks/dash`.
+# --- /opt/cairo-relay/.env example ---
+#
+# PORT=8790
+# CAIRO_HOST=https://your-cairo-instance.com
+# CAIRO_WRITE_KEY=ck_...
+# HOOK_SECRET=
+# BATCH_MAX=10
+# BATCH_MS=30000
+#
+# Pick one destination:
+#   FORWARD_URL=https://hooks.example.com/incoming
+#   WEBHOOK_STYLE=slack          # optional; Slack-compatible { text }
+#   DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+#   DESTINATION=stdout           # debug
