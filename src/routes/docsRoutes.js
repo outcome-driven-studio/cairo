@@ -13,6 +13,7 @@ function renderDocs(baseUrl) {
   const tools = Object.values(mcp.tools);
 
   const categorize = (name) => {
+    if (name === "setup_product" || name === "drain_notifications") return "Onboarding";
     if (name.startsWith("gdpr_")) return "GDPR";
     if (name === "capture_error" || name.includes("error")) return "Error tracking";
     if (name.includes("notification") || name === "set_user_channel" || name === "enqueue_notification" || name === "ack_notification" || name === "register_agent_webhook" || name === "get_pending_notifications") {
@@ -31,7 +32,7 @@ function renderDocs(baseUrl) {
     (groups[cat] = groups[cat] || []).push(t);
   }
   const order = [
-    "Events", "Users", "Identity", "Error tracking", "Notifications",
+    "Onboarding", "Events", "Users", "Identity", "Error tracking", "Notifications",
     "GDPR", "Agent observability", "System",
   ];
 
@@ -261,16 +262,17 @@ ${toolSections}
   <tbody>
     <tr><td><code>@ani-hq/tracker</code></td><td>Universal event tracking from apps</td></tr>
     <tr><td><code>@ani-hq/agent-tracker</code></td><td>AI agent session tracking (generations, tool calls, costs)</td></tr>
-    <tr><td><code>@ani-hq/agent-mcp</code></td><td>stdio MCP server for agent self-reporting (not the full HTTP /mcp surface)</td></tr>
+    <tr><td><code>@ani-hq/cairo-mcp</code></td><td>stdio MCP proxy to the full HTTP /mcp surface (setup_product, drain, rules)</td></tr>
+    <tr><td><code>@ani-hq/agent-mcp</code></td><td>stdio MCP for agent self-reporting only</td></tr>
   </tbody>
 </table>
 
-<h3>stdio MCP for Claude Code / Cursor</h3>
+<h3>stdio MCP for Claude Code / Cursor / OpenClaw</h3>
 <pre>{
   "mcpServers": {
     "cairo": {
       "command": "npx",
-      "args": ["-y", "@ani-hq/agent-mcp"],
+      "args": ["-y", "@ani-hq/cairo-mcp"],
       "env": {
         "CAIRO_HOST": "${baseUrl}",
         "CAIRO_WRITE_KEY": "your-write-key",
@@ -279,6 +281,7 @@ ${toolSections}
     }
   }
 }</pre>
+<p>Then ask the agent to call <code>setup_product</code> and later <code>drain_notifications</code>.</p>
 
 <h2 id="selfhost">Self-hosting</h2>
 <p>Cairo is Node.js + PostgreSQL. MIT licensed.</p>
