@@ -1,6 +1,6 @@
 # @ani-hq/agent-tracker
 
-Track AI agent sessions, LLM generations, tool calls, decisions, and errors into [Cairo](https://github.com/outcome-driven-studio/cairo).
+Track AI agent sessions, LLM generations, tool calls, decisions, and errors into [Cairo](https://github.com/Ani-HQ/cairo).
 
 ```bash
 npm install @ani-hq/agent-tracker

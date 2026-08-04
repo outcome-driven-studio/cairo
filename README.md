@@ -28,7 +28,7 @@ your product ──track──▶ Cairo ──rule match──▶ pending queue
 ## Quick start
 
 ```bash
-git clone https://github.com/outcome-driven-studio/cairo.git
+git clone https://github.com/Ani-HQ/cairo.git
 cd cairo
 cp .env.example .env.local   # set POSTGRES_URL
 npm install && npm run migrate && npm start

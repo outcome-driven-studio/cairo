@@ -286,7 +286,7 @@ ${toolSections}
 
 <h2 id="selfhost">Self-hosting</h2>
 <p>Cairo is Node.js + PostgreSQL. MIT licensed.</p>
-<pre>git clone https://github.com/outcome-driven-studio/cairo.git
+<pre>git clone https://github.com/Ani-HQ/cairo.git
 cd cairo
 npm install
 cp .env.example .env
@@ -295,7 +295,7 @@ npm run migrate
 npm start</pre>
 
 <hr>
-<p class="muted">Source: <a href="https://github.com/outcome-driven-studio/cairo">github.com/outcome-driven-studio/cairo</a></p>
+<p class="muted">Source: <a href="https://github.com/Ani-HQ/cairo">github.com/Ani-HQ/cairo</a></p>
 
 </body>
 </html>`;

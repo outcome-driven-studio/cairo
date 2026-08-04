@@ -11,9 +11,9 @@
     "README.md",
     "deploy/"
   ],
-  "homepage": "https://github.com/outcome-driven-studio/cairo/tree/main/packages/cairo-relay",
+  "homepage": "https://github.com/Ani-HQ/cairo/tree/main/packages/cairo-relay",
   "bugs": {
-    "url": "https://github.com/outcome-driven-studio/cairo/issues"
+    "url": "https://github.com/Ani-HQ/cairo/issues"
   },
   "engines": {
     "node": ">=18"
@@ -38,7 +38,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/outcome-driven-studio/cairo.git",
+    "url": "git+https://github.com/Ani-HQ/cairo.git",
     "directory": "packages/cairo-relay"
   }
 }

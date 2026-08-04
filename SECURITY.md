@@ -8,7 +8,7 @@ Security fixes are applied on the latest `main` branch. Self-hosters should stay
 
 Please **do not** open a public GitHub issue for security problems.
 
-Email the maintainers via the contact listed on the [GitHub organization](https://github.com/outcome-driven-studio) or open a **private** security advisory on the repository if available.
+Email the maintainers via the contact listed on the [GitHub organization](https://github.com/Ani-HQ) or open a **private** security advisory on the repository if available.
 
 Include:
 
