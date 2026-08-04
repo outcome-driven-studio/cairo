@@ -2,6 +2,7 @@
 'use strict';
 
 const { createApp } = require('./server');
+const { assertDestinationConfigured } = require('./destinations');
 
 async function main() {
   const required = ['CAIRO_HOST', 'CAIRO_WRITE_KEY'];
@@ -11,13 +12,11 @@ async function main() {
       process.exit(1);
     }
   }
-  const hasDiscord =
-    process.env.DISCORD_WEBHOOK_URL ||
-    (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_CHANNEL_ID);
-  if (!hasDiscord) {
-    console.error(
-      'cairo-relay requires DISCORD_WEBHOOK_URL or DISCORD_BOT_TOKEN+DISCORD_CHANNEL_ID'
-    );
+
+  try {
+    assertDestinationConfigured(process.env);
+  } catch (err) {
+    console.error(err.message);
     process.exit(1);
   }
 

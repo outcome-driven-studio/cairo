@@ -5,7 +5,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DRY_RUN="${DRY_RUN:-false}"
-PACKAGES=(tracker agent-tracker agent-mcp cairo-mcp)
+PACKAGES=(tracker agent-tracker agent-mcp cairo-mcp cairo-relay)
 
 if [[ -n "${NPM_TOKEN:-}" ]]; then
   echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "${HOME}/.npmrc-cairo-publish"
@@ -48,3 +48,4 @@ npm view @ani-hq/tracker version || true
 npm view @ani-hq/agent-tracker version || true
 npm view @ani-hq/agent-mcp version || true
 npm view @ani-hq/cairo-mcp version || true
+npm view @ani-hq/cairo-relay version || true

@@ -264,6 +264,7 @@ ${toolSections}
     <tr><td><code>@ani-hq/agent-tracker</code></td><td>AI agent session tracking (generations, tool calls, costs)</td></tr>
     <tr><td><code>@ani-hq/cairo-mcp</code></td><td>stdio MCP proxy to the full HTTP /mcp surface (setup_product, drain, rules)</td></tr>
     <tr><td><code>@ani-hq/agent-mcp</code></td><td>stdio MCP for agent self-reporting only</td></tr>
+    <tr><td><code>@ani-hq/cairo-relay</code></td><td>Optional thin relay: webhook push → batch → your gateway → ack</td></tr>
   </tbody>
 </table>
 
@@ -281,7 +282,7 @@ ${toolSections}
     }
   }
 }</pre>
-<p>Then ask the agent to call <code>setup_product</code> and later <code>drain_notifications</code>.</p>
+<p>Ask the agent to call <code>setup_product</code> and <code>register_agent_webhook</code> for proactive delivery. Use <code>drain_notifications</code> for digests or backup.</p>
 
 <h2 id="selfhost">Self-hosting</h2>
 <p>Cairo is Node.js + PostgreSQL. MIT licensed.</p>
