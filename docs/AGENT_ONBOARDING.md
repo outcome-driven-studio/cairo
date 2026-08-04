@@ -1,6 +1,18 @@
 # Agent onboarding (turnkey)
 
-Cairo is agent-first: **you talk to your agent**, the agent talks to Cairo, and the agent relays alerts through its own gateway (Discord, Slack, Telegram, etc.). Cairo never opens those gateways.
+Cairo is agent-first: **you talk to your agent**, the agent talks to Cairo, and alerts reach you through your gateway (Discord, Slack, Telegram, etc.). Cairo never opens those gateways itself.
+
+## Proactive path (recommended)
+
+When you say “let me know when someone signs up”:
+
+1. Agent calls **`setup_product`** (write key + notification rules).
+2. Agent ensures a **thin relay** webhook is registered once via **`register_agent_webhook`** (usually `namespace: "default"` so one URL covers all products).
+3. Product emits events → Cairo enqueues + **HTTP pushes** to the relay → relay batches → Discord → **`ack_notification`**.
+
+After setup, alerts arrive **without** you asking the agent. The agent is for setup and digests (“how many today?”), not the hot path. Do **not** use heartbeat/polling for every signup.
+
+See [`packages/cairo-relay`](../packages/cairo-relay/README.md).
 
 ## 1. Connect your agent (once)
 
@@ -49,6 +61,18 @@ The agent should call **`setup_product`** once with:
 
 It gets back a **product write key** (shown once) plus install snippets. Give the product that key and host.
 
+Then register the relay (once per agent):
+
+```text
+register_agent_webhook {
+  agent_id: "my-agent",
+  url: "https://your-relay-host/hooks/my-agent",
+  namespace: "default"
+}
+```
+
+Tell the user: you’ll ping their Discord channel when those events fire (via the relay).
+
 ## 3. Product emits events
 
 ```bash
@@ -63,22 +87,23 @@ cairo.track({ event: 'signup', userId: 'u1', properties: { plan: 'free' } });
 
 Or HTTP: `POST /v2/track` with `X-Write-Key`.
 
-## 4. Agent relays notifications
+## 4. Backup: pull / “any alerts?”
 
-On a schedule or when asked:
+If the webhook is down, or the user asks “any alerts?”, the agent can still:
 
 1. **`drain_notifications`** `{ agent_id }` (optional `namespace`)
 2. Post each `message` via the agent’s gateway
 3. **`ack_notification`** `{ id }` for each delivered row
 
-Optional: **`register_agent_webhook`** for push instead of pull.
+Pull is the backup path; webhook + relay is the proactive default.
 
 ## Ritual cheat sheet
 
-| Step | Tool |
+| Step | Tool / service |
 |---|---|
 | Onboard product | `setup_product` |
-| Pull alerts | `drain_notifications` |
-| Confirm delivery | `ack_notification` |
+| Proactive delivery | `register_agent_webhook` → **cairo-relay** → Discord |
+| Pull / digests | `drain_notifications` |
+| Confirm delivery | `ack_notification` (relay or agent) |
 | Add more rules later | `create_notification_rule` |
 | New ops key | `create_write_key` or `cairo agent-config` |
