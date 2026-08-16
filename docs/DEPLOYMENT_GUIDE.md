@@ -42,10 +42,7 @@ Step-by-step instructions for deploying Cairo to production environments, includ
 ### Required Accounts & Services
 
 - **Database**: Any PostgreSQL 14+ instance (Cloud SQL, RDS, self-hosted, etc.)
-- **APIs**: Smartlead and Lemlist API keys
-- **Analytics**: Mixpanel project token (optional)
-- **CRM**: Attio API key (optional)
-- **Deployment**: Railway/AWS/Docker hosting
+- **Deployment**: Cloud Run, Docker, or any Node host
 
 ---
 
@@ -75,88 +72,29 @@ DB_POOL_IDLE_TIMEOUT=10000
 DB_POOL_CONNECTION_TIMEOUT=5000
 ```
 
-**API Keys:**
-
-```bash
-# Smartlead API
-SMARTLEAD_API_KEY="your_smartlead_api_key"
-SMARTLEAD_BASE_URL="https://server.smartlead.ai"
-
-# Lemlist API
-LEMLIST_API_KEY="your_lemlist_api_key"
-LEMLIST_BASE_URL="https://api.lemlist.com"
-
-# Attio CRM (optional)
-ATTIO_API_KEY="your_attio_api_key"
-ATTIO_BASE_URL="https://api.attio.com"
-
-# Mixpanel Analytics (optional)
-MIXPANEL_PROJECT_TOKEN="your_mixpanel_token"
-```
-
 **Application Configuration:**
 
 ```bash
-# Server settings
-PORT=3000
+PORT=8080
 NODE_ENV=production
-
-# Full Sync System
-PERIODIC_SYNC_ENABLED=true
-PERIODIC_SYNC_INTERVAL_MINUTES=60
-PERIODIC_SYNC_LEMLIST_ENABLED=true
-PERIODIC_SYNC_SMARTLEAD_ENABLED=true
-PERIODIC_SYNC_MIXPANEL_ENABLED=true
-
-# Rate Limiting
-RATE_LIMIT_ENABLED=true
-RATE_LIMIT_REQUESTS_PER_MINUTE=100
-RATE_LIMIT_BURST_SIZE=20
-```
-
-**Background Jobs:**
-
-```bash
-# Job queue configuration
-JOB_QUEUE_REDIS_URL="redis://localhost:6379"
-JOB_QUEUE_CONCURRENCY=5
-JOB_QUEUE_MAX_ATTEMPTS=3
-JOB_QUEUE_DELAY_MS=1000
-
-# Cron jobs
-CRON_SYNC_ENABLED=true
-CRON_SYNC_SCHEDULE="0 */6 * * *"
-CRON_CLEANUP_ENABLED=true
-CRON_CLEANUP_SCHEDULE="0 2 * * *"
+# Optional
+# SENTRY_DSN=
 ```
 
 ### Environment-Specific Configurations
 
-**Development (.env.development):**
+**Development:**
 
 ```bash
 NODE_ENV=development
 LOG_LEVEL=debug
-DB_POOL_MAX=10
-PERIODIC_SYNC_INTERVAL_MINUTES=30
 ```
 
-**Staging (.env.staging):**
-
-```bash
-NODE_ENV=staging
-LOG_LEVEL=info
-DB_POOL_MAX=15
-PERIODIC_SYNC_INTERVAL_MINUTES=15
-```
-
-**Production (.env.production):**
+**Production:**
 
 ```bash
 NODE_ENV=production
 LOG_LEVEL=warn
-DB_POOL_MAX=20
-PERIODIC_SYNC_INTERVAL_MINUTES=60
 ```
 
 ---
@@ -291,18 +229,7 @@ railway variables set POSTGRES_URL="postgresql://user:pass@host:5432/db"
 railway variables set NODE_ENV=production
 railway variables set PORT=3000
 
-# API keys
-railway variables set SMARTLEAD_API_KEY="your_key"
-railway variables set LEMLIST_API_KEY="your_key"
-railway variables set MIXPANEL_PROJECT_TOKEN="your_token"
-
-# Sync configuration
-railway variables set PERIODIC_SYNC_ENABLED=true
-railway variables set PERIODIC_SYNC_INTERVAL_MINUTES=60
-
-# Background jobs
-railway variables set CRON_SYNC_ENABLED=true
-railway variables set CRON_SYNC_SCHEDULE="0 */6 * * *"
+railway variables set POSTGRES_URL="postgresql://user:pass@host:5432/cairo"
 ```
 
 ### Deployment Configuration
@@ -417,9 +344,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-      - SMARTLEAD_API_KEY=${SMARTLEAD_API_KEY}
-      - LEMLIST_API_KEY=${LEMLIST_API_KEY}
+      - POSTGRES_URL=${POSTGRES_URL}
     depends_on:
       - postgres
       - redis
@@ -507,8 +432,8 @@ docker-compose up -d
           "valueFrom": "arn:aws:ssm:region:account:parameter/cairo/database-url"
         },
         {
-          "name": "SMARTLEAD_API_KEY",
-          "valueFrom": "arn:aws:ssm:region:account:parameter/cairo/smartlead-key"
+          "name": "POSTGRES_URL",
+          "valueFrom": "arn:aws:ssm:region:account:parameter/cairo/postgres-url"
         }
       ],
       "healthCheck": {
@@ -552,40 +477,6 @@ aws ecs create-service \
   --network-configuration "awsvpcConfiguration={subnets=[subnet-xxx,subnet-yyy],securityGroups=[sg-xxx],assignPublicIp=ENABLED}"
 ```
 
-### Lambda Deployment (for background jobs)
-
-**serverless.yml:**
-
-```yaml
-service: cairo-sync-jobs
-
-provider:
-  name: aws
-  runtime: nodejs18.x
-  region: us-east-1
-  environment:
-    DATABASE_URL: ${ssm:/cairo/database-url}
-    SMARTLEAD_API_KEY: ${ssm:/cairo/smartlead-key}
-    LEMLIST_API_KEY: ${ssm:/cairo/lemlist-key}
-
-functions:
-  periodicSync:
-    handler: src/lambda/periodicSync.handler
-    timeout: 900
-    memorySize: 1024
-    events:
-      - schedule: rate(60 minutes)
-
-  cleanupJob:
-    handler: src/lambda/cleanup.handler
-    timeout: 300
-    events:
-      - schedule: cron(0 2 * * ? *)
-
-plugins:
-  - serverless-offline
-```
-
 ---
 
 ## Production Checklist
@@ -605,7 +496,7 @@ plugins:
 - [ ] **Health Checks**: Application health endpoint responding
 - [ ] **Database Migrations**: All migrations applied successfully
 - [ ] **Database Optimizations**: Performance optimizations applied
-- [ ] **Background Jobs**: Cron jobs and periodic sync running
+- [ ] **Write keys**: At least one key in `write_keys`
 - [ ] **API Endpoints**: All endpoints accessible and functional
 - [ ] **Rate Limiting**: Rate limits configured and working
 - [ ] **Error Handling**: Error monitoring and alerting active
@@ -640,11 +531,8 @@ app.get("/health", async (req, res) => {
     // Check database connection
     await query("SELECT 1");
 
-    // Check external APIs
     const checks = await Promise.allSettled([
-      checkSmartleadAPI(),
-      checkLemlistAPI(),
-      checkDatabasePerformance(),
+      query("SELECT 1"),
     ]);
 
     const healthy = checks.every((check) => check.status === "fulfilled");
@@ -756,12 +644,11 @@ psql $DATABASE_URL -c "SELECT version();"
 curl https://your-app.com/api/database/performance
 ```
 
-**2. API Key Issues**
+**2. Auth Issues**
 
 ```bash
-# Test API connectivity
-curl -H "Authorization: Bearer $SMARTLEAD_API_KEY" \
-  https://server.smartlead.ai/api/v1/campaigns
+# Confirm a write key exists, then call health
+curl https://your-app.com/health
 ```
 
 **3. Memory Issues**

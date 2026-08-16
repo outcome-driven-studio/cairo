@@ -6,7 +6,7 @@ Use the **Notion-specific** event bridge endpoint when you trigger from Notionâ€
 
 - **URL:** `POST /api/bridge/notion`
 - **Auth:** none
-- **Behavior:** Accepts whatever Notion sends, normalizes it, and posts one message to Discord. No database or Mixpanel.
+- **Behavior:** Accepts whatever Notion sends, normalizes it, and posts one message to Discord. No database.
 
 ## Setup in Notion
 

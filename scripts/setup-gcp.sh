@@ -139,93 +139,13 @@ create_secret() {
 create_secret "db-password" "$APP_PASSWORD"
 echo -e "${GREEN}✓ Created db-password secret${NC}"
 
-# Prompt for other secrets
 echo ""
-echo -e "${YELLOW}Enter your API keys (press Enter to skip):${NC}"
+echo -e "${YELLOW}Optional secrets (press Enter to skip):${NC}"
 echo ""
-
-# AI Enrichment (Required for AI features)
-echo -e "${BLUE}AI Enrichment:${NC}"
-read -p "Gemini API Key (required for AI features): " GEMINI_KEY
-if [ -n "$GEMINI_KEY" ]; then
-    create_secret "gemini-api-key" "$GEMINI_KEY"
-    echo -e "${GREEN}✓ Created gemini-api-key secret${NC}"
-fi
-
-# Lead Enrichment APIs
-echo ""
-echo -e "${BLUE}Lead Enrichment APIs:${NC}"
-read -p "Apollo API Key (optional, for lead enrichment): " APOLLO_KEY
-if [ -n "$APOLLO_KEY" ]; then
-    create_secret "apollo-api-key" "$APOLLO_KEY"
-    echo -e "${GREEN}✓ Created apollo-api-key secret${NC}"
-fi
-
-read -p "Hunter API Key (optional, fallback enrichment): " HUNTER_KEY
-if [ -n "$HUNTER_KEY" ]; then
-    create_secret "hunter-api-key" "$HUNTER_KEY"
-    echo -e "${GREEN}✓ Created hunter-api-key secret${NC}"
-fi
-
-# CRM Integration
-echo ""
-echo -e "${BLUE}CRM Integration:${NC}"
-read -p "Attio API Key: " ATTIO_KEY
-if [ -n "$ATTIO_KEY" ]; then
-    create_secret "attio-api-key" "$ATTIO_KEY"
-    echo -e "${GREEN}✓ Created attio-api-key secret${NC}"
-fi
-
-# Email Marketing & Analytics
-echo ""
-echo -e "${BLUE}Email Marketing & Analytics:${NC}"
-read -p "Lemlist API Key: " LEMLIST_KEY
-if [ -n "$LEMLIST_KEY" ]; then
-    create_secret "lemlist-api-key" "$LEMLIST_KEY"
-    echo -e "${GREEN}✓ Created lemlist-api-key secret${NC}"
-fi
-
-read -p "Smartlead API Key: " SMARTLEAD_KEY
-if [ -n "$SMARTLEAD_KEY" ]; then
-    create_secret "smartlead-api-key" "$SMARTLEAD_KEY"
-    echo -e "${GREEN}✓ Created smartlead-api-key secret${NC}"
-fi
-
-read -p "Mixpanel Project Token: " MIXPANEL_TOKEN
-if [ -n "$MIXPANEL_TOKEN" ]; then
-    create_secret "mixpanel-token" "$MIXPANEL_TOKEN"
-    echo -e "${GREEN}✓ Created mixpanel-token secret${NC}"
-fi
-
-# Monitoring
-echo ""
-echo -e "${BLUE}Monitoring:${NC}"
 read -p "Sentry DSN: " SENTRY_DSN
 if [ -n "$SENTRY_DSN" ]; then
     create_secret "sentry-dsn" "$SENTRY_DSN"
     echo -e "${GREEN}✓ Created sentry-dsn secret${NC}"
-fi
-
-# Notifications
-echo ""
-echo -e "${BLUE}Notifications:${NC}"
-read -p "Slack Webhook URL (optional, for event alerts): " SLACK_WEBHOOK
-if [ -n "$SLACK_WEBHOOK" ]; then
-    create_secret "slack-webhook-url" "$SLACK_WEBHOOK"
-    echo -e "${GREEN}✓ Created slack-webhook-url secret${NC}"
-fi
-
-read -p "Discord Webhook URL (optional, for event alerts): " DISCORD_WEBHOOK
-if [ -n "$DISCORD_WEBHOOK" ]; then
-    create_secret "discord-webhook-url" "$DISCORD_WEBHOOK"
-    echo -e "${GREEN}✓ Created discord-webhook-url secret${NC}"
-fi
-
-# Mixpanel API Secret (optional, for advanced Mixpanel features)
-read -p "Mixpanel API Secret (optional, for advanced features): " MIXPANEL_SECRET
-if [ -n "$MIXPANEL_SECRET" ]; then
-    create_secret "mixpanel-api-secret" "$MIXPANEL_SECRET"
-    echo -e "${GREEN}✓ Created mixpanel-api-secret secret${NC}"
 fi
 
 echo ""
@@ -246,7 +166,7 @@ fi
 echo "Service account: $SERVICE_ACCOUNT"
 
 # Grant access to all secrets
-for secret in db-password gemini-api-key apollo-api-key hunter-api-key lemlist-api-key smartlead-api-key attio-api-key mixpanel-token mixpanel-api-secret sentry-dsn slack-webhook-url discord-webhook-url; do
+for secret in db-password sentry-dsn postgres-url; do
     if gcloud secrets describe $secret --project=$PROJECT_ID &>/dev/null; then
         gcloud secrets add-iam-policy-binding $secret \
           --member="serviceAccount:$SERVICE_ACCOUNT" \

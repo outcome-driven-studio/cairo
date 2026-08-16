@@ -45,25 +45,17 @@ assignees: ["anianroid"]
 - **Database:** [e.g., PostgreSQL 15, Cloud SQL]
 - **OS:** [e.g., Ubuntu 20.04, macOS 13.0, Windows 11]
 
-## 🔗 Related Integrations
+## 🔗 Surface
 
-<!-- Check all that apply -->
-
-- [ ] Lemlist
-- [ ] Smartlead
-- [ ] Attio CRM
-- [ ] Mixpanel
-- [ ] Apollo
-- [ ] Hunter
-- [ ] AI Enrichment (OpenAI/Anthropic/Perplexity)
+- [ ] MCP / agents
+- [ ] `/v2` ingest
+- [ ] Notifications / relay
+- [ ] Database / migrations
 
 ## 📊 Data Context
 
-<!-- If relevant to the bug -->
-
 - **Number of users affected:** [e.g., ~100 users]
 - **Data volume:** [e.g., 10K events/day]
-- **Campaign types:** [e.g., Email, LinkedIn]
 
 ## 🔍 Additional Context
 

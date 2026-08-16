@@ -38,7 +38,7 @@
 - [ ] I have tested this change locally
 - [ ] I have added/updated relevant tests
 - [ ] All existing tests pass
-- [ ] I have tested with different data sources (Lemlist/Smartlead)
+- [ ] I have tested ingest and/or MCP paths that this change touches
 - [ ] I have verified database migrations work correctly
 
 ## 📋 Checklist
