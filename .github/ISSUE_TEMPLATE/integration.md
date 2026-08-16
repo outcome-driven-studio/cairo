@@ -61,11 +61,9 @@ assignees: ["anianroid"]
 
 <!-- Are there similar services Cairo already integrates with? -->
 
-- [ ] Similar to Lemlist (email campaigns)
-- [ ] Similar to Smartlead (outbound sequences)
-- [ ] Similar to Attio (CRM)
-- [ ] Similar to Mixpanel (analytics)
-- [ ] Similar to Apollo (enrichment)
+- [ ] Agent webhook / relay
+- [ ] MCP client
+- [ ] Product SDK
 - [ ] Completely new type of integration
 
 ## 💼 Business Impact

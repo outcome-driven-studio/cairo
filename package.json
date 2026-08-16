@@ -60,7 +60,6 @@
     "dev": "LOG_LEVEL=debug nodemon server.js",
     "test": "jest --testPathPattern=src/test --forceExit",
     "setup": "node src/migrations/run_migrations.js",
-    "setup-env": "node setup-env.js",
     "build": "npm run build --workspaces --if-present",
     "migrate": "node src/migrations/run_migrations.js",
     "publish:packages": "bash scripts/publish-packages.sh",

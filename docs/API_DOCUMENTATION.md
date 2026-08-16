@@ -399,28 +399,13 @@ Replay raw events from storage.
 | POST | `/v2/replay` | Replay events for a time range and namespace |
 | GET | `/v2/replay/status/:jobId` | Check replay job status |
 
-### Destinations
-
-CRUD for destination configurations.
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/v2/destinations` | List configured destinations |
-| POST | `/v2/destinations` | Create a destination |
-| GET | `/v2/destinations/:id` | Get a destination |
-| PUT | `/v2/destinations/:id` | Update a destination |
-| DELETE | `/v2/destinations/:id` | Delete a destination |
-| POST | `/v2/destinations/:id/test` | Test destination connectivity |
-
-Available destination types: `slack`, `mixpanel`, `discord`, `resend`, `webhook`, `bigquery`, `hubspot`, `salesforce`, `ga4`, `amplitude`, `posthog`, `braze`, `customerio`, `sendgrid`, `kafka`, `elasticsearch`, `snowflake`, `s3`, `intercom`, `pipedrive`.
-
 ---
 
 ## Health
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /health` | Full health check (database, destinations) |
+| `GET /health` | Full health check (database) |
 | `GET /health/simple` | Returns `200 OK` if server is running |
 | `GET /health/detailed` | Detailed status of all subsystems |
 

@@ -2,22 +2,19 @@
 
 ## Overview
 
-Cairo is a server-side event pipeline that ingests, processes, and routes events. It is designed for tracking AI agent behavior but works for any Segment-compatible event type. Events flow from sources (SDKs, MCP, raw HTTP) through a processing pipeline (identity resolution, tracking plan validation, transformations, GDPR suppression) and fan out to destination connectors.
+Cairo is a server-side event pipeline that ingests product and agent events, stores them in PostgreSQL, and hands matching notifications to your agents. Agents relay through their own gateways. Cairo does not call third-party marketing, CRM, or analytics APIs.
 
 ## System Architecture
 
 ```
-Sources                      Cairo Server                              Destinations
---------------------------   ----------------------------------------  ---------------------------
-                             +--------------------------------------+
-  @ani-hq/agent-tracker --->  |                                      |  --> Slack
-  @ani-hq/agent-mcp    --->  |  Ingestion     Processing    Routing |  --> Mixpanel
-  HTTP (curl, any SDK) --->  |  (auth,        (suppress,   (fan-out|  --> BigQuery
-                             |   validate)     identity,    per     |  --> Snowflake
-                             |                 transform,   dest)   |  --> Kafka
-                             |                 track plan)          |  --> HubSpot
-                             |                                      |  --> S3 / GCS
-                             +-------------- PostgreSQL ------------+  --> 13 more...
+Sources                      Cairo Server                         Agents
+--------------------------   ----------------------------------  ---------------------------
+                             +--------------------------------+
+  @ani-hq/tracker      --->  |                                |  --> webhook push
+  @ani-hq/agent-tracker ---> |  Ingest   Store   Notify       |  --> MCP pull
+  @ani-hq/cairo-mcp    --->  |  /v2/*    Postgres  rules      |  --> your relay
+  HTTP (curl, any SDK) --->  |  /mcp                          |
+                             +--------------------------------+
 ```
 
 ## Event Pipeline
@@ -73,41 +70,9 @@ Every event entering Cairo passes through `processMessage()`. The steps, in orde
 | Session | `sessionId` | Per task | UUID generated on `tracker.session()` |
 | Team | `groupId` | Organization | Optional, via `group` calls |
 
-## Destination Architecture
+## Agent handoff
 
-Destinations follow a plugin pattern. Every destination extends a base interface:
-
-```javascript
-class BaseDestination {
-  constructor(config) { }
-  async initialize() { }
-  async test() { }                  // returns { success, message }
-  async validateConfig() { }
-  async track(event) { }
-  async identify(event) { }
-  async page(event) { }
-  async screen(event) { }
-  async group(event) { }
-  async alias(event) { }
-  async batch(events) { }          // optional batch support
-  get supportsBatch() { }
-  get batchSize() { }
-}
-```
-
-The destination registry maps type strings to destination classes:
-
-```javascript
-const registry = {
-  slack, mixpanel, discord, resend, webhook, bigquery, hubspot,
-  salesforce, ga4, amplitude, posthog, braze, customerio, sendgrid,
-  kafka, elasticsearch, snowflake, s3, intercom, pipedrive
-};
-```
-
-**Adding a new destination:** Create a module that extends the base interface, register it in `src/destinations/registry.js`. No changes to the pipeline are needed.
-
-**Warehouse destinations** (BigQuery, Snowflake, S3) differ from API destinations. They buffer events in memory, trigger on size or time thresholds, perform schema evolution (additive only), and write batches. Table naming follows `{namespace}_{event_type}`.
+Matching events enqueue a notification. Cairo either POSTs JSON to a registered agent webhook (`@ani-hq/cairo-relay` or any URL you run) or holds the row for MCP `drain_notifications`.
 
 ## Data Model
 

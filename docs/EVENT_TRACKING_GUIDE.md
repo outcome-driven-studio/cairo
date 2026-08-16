@@ -388,4 +388,4 @@ analytics.track({ userId: 'user_1', event: 'Order Completed', properties: { tota
 // Just change the write key and host. The API accepts the same request body.
 ```
 
-Cairo supports 20 destination connectors out of the box, so you can replace Segment's destination catalog with Cairo's for common targets like Mixpanel, BigQuery, Snowflake, Slack, HubSpot, and others.
+Cairo stores events and hands matching notifications to your agents. Agents relay through their own gateways.

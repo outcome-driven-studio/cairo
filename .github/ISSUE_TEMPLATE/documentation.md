@@ -56,8 +56,8 @@ assignees: ["anianroid"]
 - [ ] Database schema
 - [ ] Environment variables
 - [ ] Deployment options
-- [ ] Integration guides (Lemlist/Smartlead/Attio)
-- [ ] Lead scoring configuration
+- [ ] Agent / MCP onboarding
+- [ ] Relay / webhooks
 - [ ] Troubleshooting
 - [ ] Performance optimization
 - [ ] Security considerations

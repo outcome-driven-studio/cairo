@@ -40,16 +40,11 @@ assignees: ["anianroid"]
 
 <!-- Which parts of Cairo would this feature affect? -->
 
-- [ ] Lemlist integration
-- [ ] Smartlead integration
-- [ ] Attio CRM sync
-- [ ] Mixpanel events
-- [ ] Lead scoring system
-- [ ] AI enrichment
+- [ ] MCP / agents
+- [ ] Event ingest
+- [ ] Notifications / relay
 - [ ] Database schema
 - [ ] API endpoints
-- [ ] Dashboard
-- [ ] Background jobs
 
 ## 📊 Expected Benefits
 

@@ -48,7 +48,6 @@ if (process.env.NODE_ENV !== 'production') {
 // Create a wrapper that also sends errors and warnings to Sentry
 const originalError = logger.error.bind(logger);
 const originalWarn = logger.warn.bind(logger);
-const originalInfo = logger.info.bind(logger);
 
 logger.error = function(message, ...args) {
   originalError(message, ...args);
@@ -76,38 +75,6 @@ logger.warn = function(message, ...args) {
   // Send warnings to Sentry if initialized
   if (process.env.SENTRY_DSN && process.env.SENTRY_LOG_WARNINGS === 'true') {
     Sentry.captureMessage(message, 'warning');
-  }
-};
-
-// Track critical info messages to Sentry (for monitoring sync operations)
-logger.info = function(message, ...args) {
-  originalInfo(message, ...args);
-
-  // Send critical sync-related info to Sentry for monitoring
-  if (process.env.SENTRY_DSN && process.env.SENTRY_TRACK_SYNC === 'true') {
-    const criticalPatterns = [
-      /periodic sync/i,
-      /sync failed/i,
-      /mixpanel/i,
-      /error/i,
-      /failed/i,
-      /crash/i,
-      /unable to/i
-    ];
-
-    if (criticalPatterns.some(pattern => pattern.test(message))) {
-      Sentry.addBreadcrumb({
-        message: message,
-        level: 'info',
-        category: 'sync',
-        data: args[0] || {}
-      });
-
-      // If it's a sync completion or failure, send as message
-      if (/sync (completed|failed|started)/i.test(message)) {
-        Sentry.captureMessage(message, 'info');
-      }
-    }
   }
 };
 

@@ -1,24 +1,18 @@
 # Cairo Documentation
 
-Cairo is open-source infrastructure for tracking AI agent behavior. It collects events from your agents (LLM generations, tool calls, decisions, errors, handoffs) and routes them to any destination: warehouses, analytics tools, Slack, Kafka, and more.
+Cairo is open-source, agent-first event tracking. Products and agents emit events; Cairo stores them and hands matching notifications to your agents. Agents relay through their own gateways.
 
 ## Guides
 
-- [Quick Start](./EVENT_TRACKING_QUICK_REFERENCE.md) -- get tracking in 5 minutes
-- [SDK Integration Guide](./EVENT_TRACKING_GUIDE.md) -- full SDK reference and framework middleware
-- [API Reference](./API_DOCUMENTATION.md) -- all HTTP endpoints
+- [Quick Start](./EVENT_TRACKING_QUICK_REFERENCE.md)
+- [SDK Integration Guide](./EVENT_TRACKING_GUIDE.md)
+- [API Reference](./API_DOCUMENTATION.md)
+- [Agent onboarding](./AGENT_ONBOARDING.md)
 
 ## Operations
 
 - [Deployment Guide](./DEPLOYMENT_GUIDE.md)
-- [Production Readiness Checklist](./PRODUCTION_READINESS_CHECKLIST.md)
 
 ## Architecture
 
-- [Technical Architecture](./TECHNICAL_ARCHITECTURE.md) -- event pipeline, destination plugins, data model
-
-## Integrations
-
-- [Slack Alerts](./SLACK_ALERTS_EXAMPLES.md)
-- [Notion Bridge](./NOTION_BRIDGE.md)
-- [Usage Guide](./USAGE_GUIDE.md)
+- [Technical Architecture](./TECHNICAL_ARCHITECTURE.md)
