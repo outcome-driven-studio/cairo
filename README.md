@@ -23,7 +23,7 @@ your product ──track──▶ Cairo ──rule match──▶ pending queue
 - **Product events still work.** SDKs and `POST /v2/track` for apps.
 - **Agent handoff, not CDP fan-out.** Rules target an `agent_id`. Prefer webhook push to a thin relay; pull (`drain_notifications`) is the backup.
 - **Gateway-agnostic.** Cairo POSTs JSON to *your* URL. Use `@ani-hq/cairo-relay`, or any worker you already run.
-- **Self-hosted.** Node.js + PostgreSQL. MIT licensed.
+- **Self-hosted.** Node.js + any PostgreSQL 14+ (Cloud SQL, RDS, self-hosted). MIT licensed.
 
 ## Quick start
 

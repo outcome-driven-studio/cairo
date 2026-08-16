@@ -40,9 +40,9 @@ assignees: ["anianroid"]
 <!-- Please complete the following information -->
 
 - **Cairo Version:** [e.g., 1.0.0]
-- **Deployment:** [e.g., Railway, Docker, Local]
+- **Deployment:** [e.g., Cloud Run, Docker, Local]
 - **Node.js Version:** [e.g., 18.17.0]
-- **Database:** [e.g., PostgreSQL 14, NeonDB]
+- **Database:** [e.g., PostgreSQL 15, Cloud SQL]
 - **OS:** [e.g., Ubuntu 20.04, macOS 13.0, Windows 11]
 
 ## 🔗 Related Integrations

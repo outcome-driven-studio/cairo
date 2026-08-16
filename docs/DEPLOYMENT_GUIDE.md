@@ -41,7 +41,7 @@ Step-by-step instructions for deploying Cairo to production environments, includ
 
 ### Required Accounts & Services
 
-- **Database**: PostgreSQL instance (NeonDB, AWS RDS, etc.)
+- **Database**: Any PostgreSQL 14+ instance (Cloud SQL, RDS, self-hosted, etc.)
 - **APIs**: Smartlead and Lemlist API keys
 - **Analytics**: Mixpanel project token (optional)
 - **CRM**: Attio API key (optional)
@@ -165,7 +165,7 @@ PERIODIC_SYNC_INTERVAL_MINUTES=60
 
 ### Database Creation
 
-**NeonDB (Recommended):**
+**Any PostgreSQL (Cloud SQL, RDS, self-hosted):**
 
 ```sql
 -- Create database
@@ -175,6 +175,18 @@ CREATE DATABASE cairo_production;
 CREATE USER cairo_user WITH PASSWORD 'secure_password';
 GRANT ALL PRIVILEGES ON DATABASE cairo_production TO cairo_user;
 ```
+
+Point `POSTGRES_URL` (or `DATABASE_URL`) at that instance. Examples:
+
+```bash
+# TCP (private IP, Auth Proxy on localhost, or public host)
+POSTGRES_URL=postgresql://cairo_user:secure_password@10.0.0.8:5432/cairo_production
+
+# Cloud SQL Unix socket (Cloud Run)
+POSTGRES_URL=postgresql://cairo_user:secure_password@/cairo_production?host=/cloudsql/PROJECT:REGION:INSTANCE
+```
+
+SSL is inferred: sockets and localhost skip SSL; remote TCP uses SSL without requiring a vendor CA. Override with `PGSSLMODE=disable|no-verify|require`.
 
 **AWS RDS:**
 
@@ -198,7 +210,7 @@ aws rds create-db-instance \
 
 ```bash
 # Apply all database migrations
-npm run migrate:up
+npm run migrate
 
 # Or using the API
 curl -X POST https://your-app.com/api/migrations/run \
@@ -262,13 +274,12 @@ cd cairo-sync-system
 
 ### Database Configuration
 
-**Add NeonDB Database:**
+**Add PostgreSQL:**
 
 ```bash
-# Link NeonDB database
+# Link a Postgres plugin, or point at any external instance (Cloud SQL, RDS, …)
 railway add --database postgresql
-# Or use external NeonDB
-railway variables set DATABASE_URL="postgresql://user:pass@host:5432/db"
+railway variables set POSTGRES_URL="postgresql://user:pass@host:5432/db"
 ```
 
 ### Environment Variables
