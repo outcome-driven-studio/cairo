@@ -26,8 +26,8 @@ const envConfig = {
       category: "Database",
       examples: [
         "postgresql://user:password@localhost:5432/cairo",
-        "postgresql://user:password@host.neon.tech/cairo?sslmode=require",
-        "postgresql://user:password@db.railway.app:5432/railway",
+        "postgresql://user:password@10.0.0.8:5432/cairo",
+        "postgresql://user:password@/cairo?host=/cloudsql/PROJECT:REGION:INSTANCE",
       ],
     },
   ],
@@ -370,7 +370,8 @@ class EnvSetup {
     if (variable.key === "DATABASE_URL" && variable.examples) {
       this.log("\nDatabase URL examples:", "cyan");
       variable.examples.forEach((example, index) => {
-        const type = index === 0 ? "Local" : index === 1 ? "Neon" : "Railway";
+        const type =
+          index === 0 ? "Local" : index === 1 ? "Private IP" : "Cloud SQL socket";
         this.log(`  ${type}: ${example}`, "cyan");
       });
     }
@@ -460,7 +461,7 @@ class EnvSetup {
         this.log(
           "  • Docker: docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=password postgres"
         );
-        this.log("  • Or use a cloud database like Neon, Supabase, or Railway");
+        this.log("  • Or point POSTGRES_URL at any hosted Postgres (Cloud SQL, RDS, …)");
       }
 
       this.log("\n📝 Next steps:", "yellow");

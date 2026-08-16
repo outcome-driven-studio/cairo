@@ -9,11 +9,12 @@
  */
 
 const logger = require('../utils/logger');
+const { ensurePgcrypto } = require('./requiredTables');
 
 async function up(query) {
   logger.info('[037] Applying agent-first notification schema...');
 
-  await query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
+  await ensurePgcrypto(query);
 
   // Core event + user tables (lightweight)
   await query(`
